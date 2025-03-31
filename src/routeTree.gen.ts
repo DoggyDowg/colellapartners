@@ -13,14 +13,30 @@ import { createFileRoute } from '@tanstack/react-router'
 // Import Routes
 
 import { Route as rootRoute } from './routes/__root'
+import { Route as IndexImport } from './routes/_index'
+import { Route as DashboardImport } from './routes/dashboard'
+import { Route as AuthImport } from './routes/auth'
+import { Route as AdminImport } from './routes/admin'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
+import { Route as AdminIndexImport } from './routes/admin/_index'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
+import { Route as AuthLoginImport } from './routes/auth/login'
+import { Route as AuthCallbackImport } from './routes/auth/callback'
+import { Route as AdminUsersImport } from './routes/admin/users'
+import { Route as AdminRewardsImport } from './routes/admin/rewards'
+import { Route as AdminReferrersImport } from './routes/admin/referrers'
+import { Route as AdminReferralsImport } from './routes/admin/referrals'
+import { Route as AdminRafflesImport } from './routes/admin/raffles'
+import { Route as AdminEventsImport } from './routes/admin/events'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
 
 // Create Virtual Routes
 
+const RegisterLazyImport = createFileRoute('/register')()
+const LoginLazyImport = createFileRoute('/login')()
+const AuthRegisterLazyImport = createFileRoute('/auth/register')()
 const errors503LazyImport = createFileRoute('/(errors)/503')()
 const errors500LazyImport = createFileRoute('/(errors)/500')()
 const errors404LazyImport = createFileRoute('/(errors)/404')()
@@ -67,9 +83,49 @@ const AuthenticatedSettingsAccountLazyImport = createFileRoute(
 
 // Create/Update Routes
 
+const IndexRoute = IndexImport.update({
+  id: '/_index',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const RegisterLazyRoute = RegisterLazyImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/register.lazy').then((d) => d.Route))
+
+const LoginLazyRoute = LoginLazyImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/login.lazy').then((d) => d.Route))
+
+const DashboardRoute = DashboardImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/dashboard.lazy').then((d) => d.Route))
+
+const AuthRoute = AuthImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const AdminRoute = AdminImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRoute,
+} as any)
+
 const AuthenticatedRouteRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRoute,
+} as any)
+
+const AdminIndexRoute = AdminIndexImport.update({
+  id: '/_index',
+  getParentRoute: () => AdminRoute,
 } as any)
 
 const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
@@ -77,6 +133,12 @@ const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+
+const AuthRegisterLazyRoute = AuthRegisterLazyImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => AuthRoute,
+} as any).lazy(() => import('./routes/auth/register.lazy').then((d) => d.Route))
 
 const errors503LazyRoute = errors503LazyImport
   .update({
@@ -152,6 +214,54 @@ const AuthenticatedSettingsRouteLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/route.lazy').then((d) => d.Route),
   )
+
+const AuthLoginRoute = AuthLoginImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => AuthRoute,
+} as any).lazy(() => import('./routes/auth/login.lazy').then((d) => d.Route))
+
+const AuthCallbackRoute = AuthCallbackImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
+} as any)
+
+const AdminUsersRoute = AdminUsersImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminRewardsRoute = AdminRewardsImport.update({
+  id: '/rewards',
+  path: '/rewards',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminReferrersRoute = AdminReferrersImport.update({
+  id: '/referrers',
+  path: '/referrers',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminReferralsRoute = AdminReferralsImport.update({
+  id: '/referrals',
+  path: '/referrals',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminRafflesRoute = AdminRafflesImport.update({
+  id: '/raffles',
+  path: '/raffles',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminEventsRoute = AdminEventsImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AdminRoute,
+} as any)
 
 const authSignInRoute = authSignInImport.update({
   id: '/(auth)/sign-in',
@@ -283,6 +393,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRoute
     }
+    '/_index': {
+      id: '/_index'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof IndexImport
+      parentRoute: typeof rootRoute
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminImport
+      parentRoute: typeof rootRoute
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthImport
+      parentRoute: typeof rootRoute
+    }
+    '/dashboard': {
+      id: '/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof DashboardImport
+      parentRoute: typeof rootRoute
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginLazyImport
+      parentRoute: typeof rootRoute
+    }
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterLazyImport
+      parentRoute: typeof rootRoute
+    }
     '/(auth)/500': {
       id: '/(auth)/500'
       path: '/500'
@@ -303,6 +455,69 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in'
       preLoaderRoute: typeof authSignInImport
       parentRoute: typeof rootRoute
+    }
+    '/admin/_index': {
+      id: '/admin/_index'
+      path: ''
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminIndexImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/events': {
+      id: '/admin/events'
+      path: '/events'
+      fullPath: '/admin/events'
+      preLoaderRoute: typeof AdminEventsImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/raffles': {
+      id: '/admin/raffles'
+      path: '/raffles'
+      fullPath: '/admin/raffles'
+      preLoaderRoute: typeof AdminRafflesImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/referrals': {
+      id: '/admin/referrals'
+      path: '/referrals'
+      fullPath: '/admin/referrals'
+      preLoaderRoute: typeof AdminReferralsImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/referrers': {
+      id: '/admin/referrers'
+      path: '/referrers'
+      fullPath: '/admin/referrers'
+      preLoaderRoute: typeof AdminReferrersImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/rewards': {
+      id: '/admin/rewards'
+      path: '/rewards'
+      fullPath: '/admin/rewards'
+      preLoaderRoute: typeof AdminRewardsImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersImport
+      parentRoute: typeof AdminImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackImport
+      parentRoute: typeof AuthImport
+    }
+    '/auth/login': {
+      id: '/auth/login'
+      path: '/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof AuthLoginImport
+      parentRoute: typeof AuthImport
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
@@ -366,6 +581,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/503'
       preLoaderRoute: typeof errors503LazyImport
       parentRoute: typeof rootRoute
+    }
+    '/auth/register': {
+      id: '/auth/register'
+      path: '/register'
+      fullPath: '/auth/register'
+      preLoaderRoute: typeof AuthRegisterLazyImport
+      parentRoute: typeof AuthImport
     }
     '/_authenticated/': {
       id: '/_authenticated/'
@@ -499,11 +721,60 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AdminRouteChildren {
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminEventsRoute: typeof AdminEventsRoute
+  AdminRafflesRoute: typeof AdminRafflesRoute
+  AdminReferralsRoute: typeof AdminReferralsRoute
+  AdminReferrersRoute: typeof AdminReferrersRoute
+  AdminRewardsRoute: typeof AdminRewardsRoute
+  AdminUsersRoute: typeof AdminUsersRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminIndexRoute: AdminIndexRoute,
+  AdminEventsRoute: AdminEventsRoute,
+  AdminRafflesRoute: AdminRafflesRoute,
+  AdminReferralsRoute: AdminReferralsRoute,
+  AdminReferrersRoute: AdminReferrersRoute,
+  AdminRewardsRoute: AdminRewardsRoute,
+  AdminUsersRoute: AdminUsersRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthLoginRoute: typeof AuthLoginRoute
+  AuthRegisterLazyRoute: typeof AuthRegisterLazyRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+  AuthLoginRoute: AuthLoginRoute,
+  AuthRegisterLazyRoute: AuthRegisterLazyRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 export interface FileRoutesByFullPath {
-  '': typeof AuthenticatedRouteRouteWithChildren
+  '': typeof IndexRoute
+  '/admin': typeof AdminIndexRoute
+  '/auth': typeof AuthRouteWithChildren
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/raffles': typeof AdminRafflesRoute
+  '/admin/referrals': typeof AdminReferralsRoute
+  '/admin/referrers': typeof AdminReferrersRoute
+  '/admin/rewards': typeof AdminRewardsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/login': typeof AuthLoginRoute
   '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
@@ -512,6 +783,7 @@ export interface FileRoutesByFullPath {
   '/403': typeof errors403LazyRoute
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
+  '/auth/register': typeof AuthRegisterLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
@@ -526,9 +798,23 @@ export interface FileRoutesByFullPath {
 }
 
 export interface FileRoutesByTo {
+  '': typeof IndexRoute
+  '/admin': typeof AdminIndexRoute
+  '/auth': typeof AuthRouteWithChildren
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/raffles': typeof AdminRafflesRoute
+  '/admin/referrals': typeof AdminReferralsRoute
+  '/admin/referrers': typeof AdminReferrersRoute
+  '/admin/rewards': typeof AdminRewardsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/login': typeof AuthLoginRoute
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
   '/sign-up': typeof authSignUpLazyRoute
@@ -536,6 +822,7 @@ export interface FileRoutesByTo {
   '/403': typeof errors403LazyRoute
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
+  '/auth/register': typeof AuthRegisterLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
@@ -552,9 +839,24 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/_index': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
+  '/auth': typeof AuthRouteWithChildren
+  '/dashboard': typeof DashboardRoute
+  '/login': typeof LoginLazyRoute
+  '/register': typeof RegisterLazyRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
+  '/admin/_index': typeof AdminIndexRoute
+  '/admin/events': typeof AdminEventsRoute
+  '/admin/raffles': typeof AdminRafflesRoute
+  '/admin/referrals': typeof AdminReferralsRoute
+  '/admin/referrers': typeof AdminReferrersRoute
+  '/admin/rewards': typeof AdminRewardsRoute
+  '/admin/users': typeof AdminUsersRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/login': typeof AuthLoginRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
   '/(auth)/sign-in-2': typeof authSignIn2LazyRoute
@@ -564,6 +866,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404LazyRoute
   '/(errors)/500': typeof errors500LazyRoute
   '/(errors)/503': typeof errors503LazyRoute
+  '/auth/register': typeof AuthRegisterLazyRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/settings/account': typeof AuthenticatedSettingsAccountLazyRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
@@ -581,9 +884,22 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | ''
+    | '/admin'
+    | '/auth'
+    | '/dashboard'
+    | '/login'
+    | '/register'
     | '/500'
     | '/otp'
     | '/sign-in'
+    | '/admin/events'
+    | '/admin/raffles'
+    | '/admin/referrals'
+    | '/admin/referrers'
+    | '/admin/rewards'
+    | '/admin/users'
+    | '/auth/callback'
+    | '/auth/login'
     | '/settings'
     | '/forgot-password'
     | '/sign-in-2'
@@ -592,6 +908,7 @@ export interface FileRouteTypes {
     | '/403'
     | '/404'
     | '/503'
+    | '/auth/register'
     | '/'
     | '/settings/account'
     | '/settings/appearance'
@@ -605,9 +922,23 @@ export interface FileRouteTypes {
     | '/users'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | ''
+    | '/admin'
+    | '/auth'
+    | '/dashboard'
+    | '/login'
+    | '/register'
     | '/500'
     | '/otp'
     | '/sign-in'
+    | '/admin/events'
+    | '/admin/raffles'
+    | '/admin/referrals'
+    | '/admin/referrers'
+    | '/admin/rewards'
+    | '/admin/users'
+    | '/auth/callback'
+    | '/auth/login'
     | '/forgot-password'
     | '/sign-in-2'
     | '/sign-up'
@@ -615,6 +946,7 @@ export interface FileRouteTypes {
     | '/403'
     | '/404'
     | '/503'
+    | '/auth/register'
     | '/'
     | '/settings/account'
     | '/settings/appearance'
@@ -629,9 +961,24 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_authenticated'
+    | '/_index'
+    | '/admin'
+    | '/auth'
+    | '/dashboard'
+    | '/login'
+    | '/register'
     | '/(auth)/500'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
+    | '/admin/_index'
+    | '/admin/events'
+    | '/admin/raffles'
+    | '/admin/referrals'
+    | '/admin/referrers'
+    | '/admin/rewards'
+    | '/admin/users'
+    | '/auth/callback'
+    | '/auth/login'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
     | '/(auth)/sign-in-2'
@@ -641,6 +988,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/auth/register'
     | '/_authenticated/'
     | '/_authenticated/settings/account'
     | '/_authenticated/settings/appearance'
@@ -657,6 +1005,12 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
+  AuthRoute: typeof AuthRouteWithChildren
+  DashboardRoute: typeof DashboardRoute
+  LoginLazyRoute: typeof LoginLazyRoute
+  RegisterLazyRoute: typeof RegisterLazyRoute
   auth500Route: typeof auth500Route
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
@@ -672,6 +1026,12 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
+  AuthRoute: AuthRouteWithChildren,
+  DashboardRoute: DashboardRoute,
+  LoginLazyRoute: LoginLazyRoute,
+  RegisterLazyRoute: RegisterLazyRoute,
   auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
@@ -696,6 +1056,12 @@ export const routeTree = rootRoute
       "filePath": "__root.tsx",
       "children": [
         "/_authenticated",
+        "/_index",
+        "/admin",
+        "/auth",
+        "/dashboard",
+        "/login",
+        "/register",
         "/(auth)/500",
         "/(auth)/otp",
         "/(auth)/sign-in",
@@ -721,6 +1087,38 @@ export const routeTree = rootRoute
         "/_authenticated/users/"
       ]
     },
+    "/_index": {
+      "filePath": "_index.tsx"
+    },
+    "/admin": {
+      "filePath": "admin.tsx",
+      "children": [
+        "/admin/_index",
+        "/admin/events",
+        "/admin/raffles",
+        "/admin/referrals",
+        "/admin/referrers",
+        "/admin/rewards",
+        "/admin/users"
+      ]
+    },
+    "/auth": {
+      "filePath": "auth.tsx",
+      "children": [
+        "/auth/callback",
+        "/auth/login",
+        "/auth/register"
+      ]
+    },
+    "/dashboard": {
+      "filePath": "dashboard.tsx"
+    },
+    "/login": {
+      "filePath": "login.lazy.tsx"
+    },
+    "/register": {
+      "filePath": "register.lazy.tsx"
+    },
     "/(auth)/500": {
       "filePath": "(auth)/500.tsx"
     },
@@ -729,6 +1127,42 @@ export const routeTree = rootRoute
     },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"
+    },
+    "/admin/_index": {
+      "filePath": "admin/_index.tsx",
+      "parent": "/admin"
+    },
+    "/admin/events": {
+      "filePath": "admin/events.tsx",
+      "parent": "/admin"
+    },
+    "/admin/raffles": {
+      "filePath": "admin/raffles.tsx",
+      "parent": "/admin"
+    },
+    "/admin/referrals": {
+      "filePath": "admin/referrals.tsx",
+      "parent": "/admin"
+    },
+    "/admin/referrers": {
+      "filePath": "admin/referrers.tsx",
+      "parent": "/admin"
+    },
+    "/admin/rewards": {
+      "filePath": "admin/rewards.tsx",
+      "parent": "/admin"
+    },
+    "/admin/users": {
+      "filePath": "admin/users.tsx",
+      "parent": "/admin"
+    },
+    "/auth/callback": {
+      "filePath": "auth/callback.tsx",
+      "parent": "/auth"
+    },
+    "/auth/login": {
+      "filePath": "auth/login.tsx",
+      "parent": "/auth"
     },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings/route.lazy.tsx",
@@ -764,6 +1198,10 @@ export const routeTree = rootRoute
     },
     "/(errors)/503": {
       "filePath": "(errors)/503.lazy.tsx"
+    },
+    "/auth/register": {
+      "filePath": "auth/register.lazy.tsx",
+      "parent": "/auth"
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",

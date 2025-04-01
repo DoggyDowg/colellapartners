@@ -169,7 +169,7 @@ function AdminEvents() {
 
   const handleCreateEvent = async () => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('events')
         .insert([
           {

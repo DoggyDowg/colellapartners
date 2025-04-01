@@ -172,7 +172,7 @@ function AdminRaffles() {
 
   const handleCreateRaffle = async () => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('raffles')
         .insert([
           {
@@ -244,7 +244,7 @@ function AdminRaffles() {
     
     try {
       // Select a random ticket as the winner
-      const { data, error } = await supabase.rpc('draw_raffle_winner', {
+      const { error } = await supabase.rpc('draw_raffle_winner', {
         raffle_id_param: raffleId
       });
       

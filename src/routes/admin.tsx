@@ -1,143 +1,124 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import { useNavigate } from '@tanstack/react-router';
-import { Outlet } from '@tanstack/react-router';
-import { useAuth } from '../context/AuthContext';
+import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import { AppSidebar } from '../components/layout/app-sidebar';
+import { Header } from '../components/layout/header';
+import { SidebarProvider } from '../components/ui/sidebar';
+import { SearchProvider } from '../context/search-context';
+import SkipToMain from '../components/skip-to-main';
+import { cn } from '../lib/utils';
+import Cookies from 'js-cookie';
 import supabase from '../lib/supabase';
+
+// A more robust session check that uses localStorage as a fallback
+const getSessionAndCheckAdmin = async () => {
+  try {
+    // First try to get session from Supabase
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // If no session from Supabase, check localStorage
+    if (!session) {
+      const storedSession = localStorage.getItem('supabase_auth_session');
+      if (!storedSession) {
+        console.log('No stored session found');
+        return null;
+      }
+      
+      // If we have a stored session, refresh it with Supabase
+      try {
+        const parsedSession = JSON.parse(storedSession);
+        await supabase.auth.setSession({
+          access_token: parsedSession.access_token,
+          refresh_token: parsedSession.refresh_token,
+        });
+      } catch (err) {
+        console.error('Error refreshing stored session:', err);
+        localStorage.removeItem('supabase_auth_session');
+        return null;
+      }
+      
+      // Re-fetch the session after refreshing
+      const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+      if (!refreshedSession) {
+        localStorage.removeItem('supabase_auth_session');
+        console.log('No refreshed session found');
+        return null;
+      }
+      
+      // Check if user is admin with refreshed session
+      const { data: isAdmin, error } = await supabase.rpc('is_admin');
+      console.log('Admin check with refreshed session:', isAdmin, error);
+      return isAdmin ? refreshedSession : null;
+    }
+    
+    // If we have a session directly from Supabase, check if user is admin
+    const { data: isAdmin, error } = await supabase.rpc('is_admin');
+    console.log('Admin check with direct session:', isAdmin, error);
+    return isAdmin ? session : null;
+  } catch (error) {
+    console.error('Error checking admin session:', error);
+    return null;
+  }
+};
+
+// Don't require re-authentication for admin child routes
+// Store this value in window for persistence
+let isAuthenticated = false;
 
 export const Route = createFileRoute('/admin')({
   component: AdminLayout,
+  // Use loader to check admin status with robust session checking
+  loader: async ({ location }) => {
+    console.log('Running admin loader, isAuthenticated:', isAuthenticated);
+    
+    // Skip authentication check if already authenticated and not on initial load
+    // This prevents re-authentication on navigation between admin pages
+    if (isAuthenticated && location.pathname !== '/admin') {
+      console.log('Already authenticated, skipping check');
+      return {};
+    }
+    
+    const session = await getSessionAndCheckAdmin();
+    if (!session) {
+      console.log('No valid admin session, redirecting to login');
+      throw redirect({ to: '/auth/login' });
+    }
+    
+    // Mark as authenticated
+    isAuthenticated = true;
+    console.log('Authentication successful, setting isAuthenticated to true');
+    
+    return {};
+  },
+  // This helps prevent unnecessary re-renders
+  loaderDeps: ({ search }) => [search],
 });
 
 function AdminLayout() {
-  const { user, loading } = useAuth();
-  const navigate = useNavigate();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [checkingRole, setCheckingRole] = useState(true);
-
-  useEffect(() => {
-    // First check if the user is authenticated
-    if (!loading && !user) {
-      navigate({ to: '/auth/login' });
-      return;
-    }
-
-    // If authenticated, check if user is admin
-    const checkAdminRole = async () => {
-      try {
-        const { data, error } = await supabase.rpc('is_admin');
-        
-        if (error) {
-          console.error('Error checking admin role:', error);
-          setIsAdmin(false);
-        } else {
-          setIsAdmin(data);
-        }
-      } catch (error) {
-        console.error('Error checking admin role:', error);
-        setIsAdmin(false);
-      } finally {
-        setCheckingRole(false);
-      }
-    };
-
-    if (user) {
-      checkAdminRole();
-    }
-  }, [user, loading, navigate]);
-
-  // Show loading state
-  if (loading || checkingRole) {
-    return <div className="flex h-screen items-center justify-center">Loading...</div>;
-  }
-
-  // If not admin, redirect to dashboard
-  if (isAdmin === false) {
-    navigate({ to: '/dashboard' });
-    return null;
-  }
-
-  // Render admin layout
-  return (
-    <div className="flex h-screen bg-background">
-      <AdminSidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <AdminHeader />
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
-        </main>
-      </div>
-    </div>
-  );
-}
-
-function AdminSidebar() {
-  return (
-    <div className="w-64 bg-card border-r h-full">
-      <div className="p-6">
-        <h1 className="text-xl font-bold">Colella Partners</h1>
-        <p className="text-sm text-muted-foreground">Admin Portal</p>
-      </div>
-      <nav className="px-3 py-2">
-        <ul className="space-y-1">
-          <li>
-            <a href="/admin" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Dashboard
-            </a>
-          </li>
-          <li>
-            <a href="/admin/referrals" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Referrals
-            </a>
-          </li>
-          <li>
-            <a href="/admin/referrers" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Partners
-            </a>
-          </li>
-          <li>
-            <a href="/admin/rewards" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Rewards
-            </a>
-          </li>
-          <li>
-            <a href="/admin/events" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Events
-            </a>
-          </li>
-          <li>
-            <a href="/admin/raffles" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              Raffles
-            </a>
-          </li>
-          <li>
-            <a href="/admin/users" className="flex items-center px-3 py-2 text-sm rounded-md hover:bg-accent">
-              User Management
-            </a>
-          </li>
-        </ul>
-      </nav>
-    </div>
-  );
-}
-
-function AdminHeader() {
-  const { signOut } = useAuth();
+  const defaultOpen = Cookies.get('sidebar:state') !== 'false';
   
   return (
-    <header className="border-b p-4 bg-card">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Admin Dashboard</h2>
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={() => signOut()}
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            Sign Out
-          </button>
+    <SearchProvider>
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <SkipToMain />
+        <AppSidebar />
+        <div
+          id='content'
+          className={cn(
+            'ml-auto w-full max-w-full',
+            'peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)]',
+            'peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]',
+            'transition-[width] duration-200 ease-linear',
+            'flex h-svh flex-col',
+            'group-data-[scroll-locked=1]/body:h-full',
+            'group-data-[scroll-locked=1]/body:has-[main.fixed-main]:h-svh'
+          )}
+        >
+          <Header title="Admin Portal" />
+          <main className="flex-1 p-4 md:p-6">
+            <Outlet />
+          </main>
         </div>
-      </div>
-    </header>
+      </SidebarProvider>
+    </SearchProvider>
   );
 }
 

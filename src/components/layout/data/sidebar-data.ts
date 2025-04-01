@@ -2,15 +2,12 @@ import {
   IconBarrierBlock,
   IconBrowserCheck,
   IconBug,
-  IconChecklist,
   IconError404,
   IconHelp,
   IconLayoutDashboard,
   IconLock,
   IconLockAccess,
-  IconMessages,
   IconNotification,
-  IconPackages,
   IconPalette,
   IconServerOff,
   IconSettings,
@@ -18,21 +15,25 @@ import {
   IconUserCog,
   IconUserOff,
   IconUsers,
+  IconTicket,
+  IconUserPlus,
+  IconGift,
+  IconCalendarEvent,
 } from '@tabler/icons-react'
 import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
   user: {
-    name: 'satnaing',
-    email: 'satnaingdev@gmail.com',
+    name: 'admin',
+    email: 'admin@colellapartners.com',
     avatar: '/avatars/shadcn.jpg',
   },
   teams: [
     {
-      name: 'Shadcn Admin',
+      name: 'Colella Partners',
       logo: Command,
-      plan: 'Vite + ShadcnUI',
+      plan: 'Real Estate Referrals',
     },
     {
       name: 'Acme Inc',
@@ -47,33 +48,52 @@ export const sidebarData: SidebarData = {
   ],
   navGroups: [
     {
+      title: 'Admin',
+      items: [
+        {
+          title: 'Admin Dashboard',
+          url: '/admin',
+          icon: IconLayoutDashboard,
+        },
+        {
+          title: 'Referrals',
+          url: '/admin/referrals',
+          icon: IconTicket,
+        },
+        {
+          title: 'Partners',
+          url: '/admin/referrers',
+          icon: IconUserPlus,
+        },
+        {
+          title: 'Rewards',
+          url: '/admin/rewards',
+          icon: IconGift,
+        },
+        {
+          title: 'Events',
+          url: '/admin/events',
+          icon: IconCalendarEvent,
+        },
+        {
+          title: 'Raffles',
+          url: '/admin/raffles',
+          icon: IconTicket,
+        },
+        {
+          title: 'User Management',
+          url: '/admin/users',
+          icon: IconUsers,
+        },
+      ],
+    },
+    {
       title: 'General',
       items: [
         {
           title: 'Dashboard',
           url: '/',
           icon: IconLayoutDashboard,
-        },
-        {
-          title: 'Tasks',
-          url: '/tasks',
-          icon: IconChecklist,
-        },
-        {
-          title: 'Apps',
-          url: '/apps',
-          icon: IconPackages,
-        },
-        {
-          title: 'Chats',
-          url: '/chats',
-          badge: '3',
-          icon: IconMessages,
-        },
-        {
-          title: 'Users',
-          url: '/users',
-          icon: IconUsers,
         },
       ],
     },

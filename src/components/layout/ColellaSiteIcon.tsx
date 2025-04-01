@@ -1,6 +1,4 @@
-import React from 'react';
-
-export function ColellaSiteIcon(props: React.SVGProps<SVGSVGElement>) {
+export function ColellaSiteIcon() {
   return (
     <div className="flex items-center justify-center">
       <img 

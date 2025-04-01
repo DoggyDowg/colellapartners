@@ -20,8 +20,9 @@ import {
   IconGift,
   IconCalendarEvent,
 } from '@tabler/icons-react'
-import { AudioWaveform, Command, GalleryVerticalEnd } from 'lucide-react'
+import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
+import { ColellaSiteIcon } from '../ColellaSiteIcon'
 
 export const sidebarData: SidebarData = {
   user: {
@@ -32,7 +33,7 @@ export const sidebarData: SidebarData = {
   teams: [
     {
       name: 'Colella Partners',
-      logo: Command,
+      logo: ColellaSiteIcon,
       plan: 'Real Estate Referrals',
     },
     {
@@ -94,6 +95,11 @@ export const sidebarData: SidebarData = {
           title: 'Dashboard',
           url: '/',
           icon: IconLayoutDashboard,
+        },
+        {
+          title: 'My Rewards',
+          url: '/rewards',
+          icon: IconGift,
         },
       ],
     },

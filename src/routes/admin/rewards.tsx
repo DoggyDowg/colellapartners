@@ -36,7 +36,7 @@ interface Referral {
   referee_name: string;
   referee_type: string;
   referrer_id: string;
-  referrers: Referrer;
+  referrers?: Referrer;
 }
 
 interface Reward {
@@ -50,8 +50,8 @@ interface Reward {
   payment_date?: string;
   created_at: string;
   updated_at: string;
-  referrers: Referrer;
-  referrals: Referral;
+  referrers?: Referrer;
+  referrals?: Referral;
 }
 
 export const Route = createFileRoute('/admin/rewards')({
@@ -63,10 +63,11 @@ function AdminRewards() {
   const [loading, setLoading] = useState(true);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   // Filters
-  const [statusFilter, setStatusFilter] = useState<string>('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Status options
@@ -82,6 +83,7 @@ function AdminRewards() {
 
   const fetchRewards = async () => {
     setLoading(true);
+    setError(null);
     try {
       let query = supabase
         .from('rewards')
@@ -103,18 +105,20 @@ function AdminRewards() {
         .order('created_at', { ascending: false });
       
       // Apply filters
-      if (statusFilter) {
+      if (statusFilter && statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
       }
       
-      if (typeFilter) {
+      if (typeFilter && typeFilter !== 'all') {
         query = query.eq('reward_type', typeFilter);
       }
 
       const { data, error } = await query;
       
       if (error) {
-        throw error;
+        console.error('Supabase error:', error);
+        setError(`Error fetching rewards: ${error.message}`);
+        return;
       }
       
       if (data) {
@@ -125,9 +129,9 @@ function AdminRewards() {
           const query = searchQuery.toLowerCase();
           filteredData = filteredData.filter(
             reward => 
-              reward.referrers.full_name.toLowerCase().includes(query) ||
-              reward.referrers.email.toLowerCase().includes(query) ||
-              reward.referrals.referee_name.toLowerCase().includes(query)
+              (reward.referrers?.full_name?.toLowerCase().includes(query) || false) ||
+              (reward.referrers?.email?.toLowerCase().includes(query) || false) ||
+              (reward.referrals?.referee_name?.toLowerCase().includes(query) || false)
           );
         }
         
@@ -135,6 +139,7 @@ function AdminRewards() {
       }
     } catch (error) {
       console.error('Error fetching rewards:', error);
+      setError('An unexpected error occurred when fetching rewards.');
     } finally {
       setLoading(false);
     }
@@ -160,7 +165,8 @@ function AdminRewards() {
         .eq('id', rewardId);
       
       if (error) {
-        throw error;
+        console.error('Error updating reward status:', error);
+        return;
       }
       
       // Update local state
@@ -191,11 +197,38 @@ function AdminRewards() {
   };
 
   const resetFilters = () => {
-    setStatusFilter('');
-    setTypeFilter('');
+    setStatusFilter('all');
+    setTypeFilter('all');
     setSearchQuery('');
     fetchRewards();
   };
+
+  // Function to handle adding a new reward (placeholder for now)
+  const handleAddReward = () => {
+    alert('Add reward functionality to be implemented');
+  };
+
+  if (error) {
+    return (
+      <div>
+        <h1 className="text-3xl font-bold mb-6">Rewards Management</h1>
+        <Card className="p-6">
+          <div className="flex flex-col items-center justify-center h-64 text-center">
+            <h2 className="text-xl font-medium mb-2">Error</h2>
+            <p className="text-muted-foreground mb-4">
+              {error}
+            </p>
+            <p className="text-sm text-muted-foreground mb-6">
+              Please check your database configuration or try again later.
+            </p>
+            <Button onClick={() => fetchRewards()}>
+              Retry
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -217,7 +250,7 @@ function AdminRewards() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All statuses</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   {statusOptions.map(status => (
                     <SelectItem key={status} value={status}>
                       {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -237,7 +270,7 @@ function AdminRewards() {
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All types</SelectItem>
+                  <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="seller">Seller ($500)</SelectItem>
                   <SelectItem value="landlord">Landlord ($200)</SelectItem>
                 </SelectContent>
@@ -289,7 +322,7 @@ function AdminRewards() {
             
             <Button 
               size="sm"
-              onClick={() => alert('Add reward functionality to be implemented')}
+              onClick={handleAddReward}
             >
               Add Reward
             </Button>
@@ -322,12 +355,12 @@ function AdminRewards() {
                   {rewards.map((reward) => (
                     <TableRow key={reward.id}>
                       <TableCell>
-                        <div className="font-medium">{reward.referrers?.full_name}</div>
-                        <div className="text-sm text-muted-foreground">{reward.referrers?.email}</div>
+                        <div className="font-medium">{reward.referrers?.full_name || 'Unknown'}</div>
+                        <div className="text-sm text-muted-foreground">{reward.referrers?.email || 'No email'}</div>
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{reward.referrals?.referee_name}</div>
-                        <div className="text-sm text-muted-foreground">{reward.referrals?.referee_type}</div>
+                        <div className="font-medium">{reward.referrals?.referee_name || 'Unknown'}</div>
+                        <div className="text-sm text-muted-foreground">{reward.referrals?.referee_type || 'Unknown'}</div>
                       </TableCell>
                       <TableCell className="font-medium">
                         ${reward.amount.toFixed(2)}
@@ -351,7 +384,7 @@ function AdminRewards() {
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {reward.status}
+                          {reward.status || 'pending'}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -382,7 +415,7 @@ function AdminRewards() {
               <DialogHeader>
                 <DialogTitle>Reward Details</DialogTitle>
                 <DialogDescription>
-                  Manage reward for {selectedReward.referrals?.referee_name}'s referral
+                  Manage reward for {selectedReward.referrals?.referee_name || 'Unknown'}'s referral
                 </DialogDescription>
               </DialogHeader>
               
@@ -406,7 +439,7 @@ function AdminRewards() {
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {selectedReward.status}
+                          {selectedReward.status || 'pending'}
                         </span>
                       </p>
                     </div>
@@ -415,9 +448,9 @@ function AdminRewards() {
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Partner Information</h3>
                     <div className="mt-1 space-y-2">
-                      <p><span className="font-medium">Name:</span> {selectedReward.referrers?.full_name}</p>
-                      <p><span className="font-medium">Email:</span> {selectedReward.referrers?.email}</p>
-                      <p><span className="font-medium">Phone:</span> {selectedReward.referrers?.phone}</p>
+                      <p><span className="font-medium">Name:</span> {selectedReward.referrers?.full_name || 'Unknown'}</p>
+                      <p><span className="font-medium">Email:</span> {selectedReward.referrers?.email || 'No email'}</p>
+                      <p><span className="font-medium">Phone:</span> {selectedReward.referrers?.phone || 'No phone'}</p>
                     </div>
                   </div>
                 </div>
@@ -426,8 +459,8 @@ function AdminRewards() {
                   <div>
                     <h3 className="text-sm font-medium text-muted-foreground">Referral Information</h3>
                     <div className="mt-1 space-y-2">
-                      <p><span className="font-medium">Referee Name:</span> {selectedReward.referrals?.referee_name}</p>
-                      <p><span className="font-medium">Referral Type:</span> {selectedReward.referrals?.referee_type}</p>
+                      <p><span className="font-medium">Referee Name:</span> {selectedReward.referrals?.referee_name || 'Unknown'}</p>
+                      <p><span className="font-medium">Referral Type:</span> {selectedReward.referrals?.referee_type || 'Unknown'}</p>
                       <p><span className="font-medium">Referral ID:</span> {selectedReward.referral_id}</p>
                     </div>
                   </div>

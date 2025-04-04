@@ -259,7 +259,7 @@ function AdminDashboard() {
   };
   
   // Calculate percentage change (for demonstration)
-  const getPercentageChange = (value: number): string => {
+  const getPercentageChange = (_value: number): string => {
     // This would normally come from comparing current value with previous period
     // For demo purposes, we're generating random but plausible values
     const isPositive = Math.random() > 0.3; // 70% chance of positive change

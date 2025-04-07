@@ -1,13 +1,5 @@
-import ContentSection from '../components/content-section'
-import { DisplayForm } from './display-form'
+import { Navigate } from '@tanstack/react-router'
 
 export default function SettingsDisplay() {
-  return (
-    <ContentSection
-      title='Display'
-      desc="Turn items on or off to control what's displayed in the app."
-    >
-      <DisplayForm />
-    </ContentSection>
-  )
-}
+  return <Navigate to="/settings" />
+} 

@@ -14,14 +14,8 @@ import {
   TableHeader, 
   TableRow 
 } from '../../components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../components/ui/dialog';
+import { toast } from 'sonner';
+import RewardDetailsDialog from '../../components/rewards/RewardDetailsDialog';
 
 // Define interfaces for our data
 interface Referrer {
@@ -35,8 +29,6 @@ interface Referral {
   id: string;
   referee_name: string;
   referee_type: string;
-  referrer_id: string;
-  referrers?: Referrer;
 }
 
 interface Reward {
@@ -44,8 +36,8 @@ interface Reward {
   referral_id: string;
   referrer_id: string;
   amount: number;
-  status: string;
-  reward_type: string;
+  status: 'pending' | 'approved' | 'paid';
+  reward_type: 'cash' | 'gift_card';
   gift_card_details?: any;
   payment_date?: string;
   created_at: string;
@@ -152,10 +144,18 @@ function AdminRewards() {
 
   const updateRewardStatus = async (rewardId: string, newStatus: string) => {
     try {
-      let updateData: any = { status: newStatus };
+      // Validate the status is one of our expected values
+      if (!['pending', 'approved', 'paid'].includes(newStatus)) {
+        console.error('Invalid status:', newStatus);
+        toast.error('Invalid status value');
+        return;
+      }
+      
+      const validStatus = newStatus as 'pending' | 'approved' | 'paid';
+      let updateData: any = { status: validStatus };
       
       // If status is changed to 'paid', update payment date
-      if (newStatus === 'paid') {
+      if (validStatus === 'paid') {
         updateData.payment_date = new Date().toISOString();
       }
       
@@ -171,23 +171,24 @@ function AdminRewards() {
       
       // Update local state
       setRewards(prevRewards => 
-        prevRewards.map(reward => 
-          reward.id === rewardId 
-            ? { 
-                ...reward, 
-                status: newStatus,
-                payment_date: newStatus === 'paid' ? new Date().toISOString() : reward.payment_date
-              } 
-            : reward
-        )
+        prevRewards.map(reward => {
+          if (reward.id === rewardId) {
+            return { 
+              ...reward, 
+              status: validStatus,
+              payment_date: validStatus === 'paid' ? new Date().toISOString() : reward.payment_date
+            };
+          }
+          return reward;
+        })
       );
       
       // If this is the selected reward, update it too
       if (selectedReward && selectedReward.id === rewardId) {
         setSelectedReward({
           ...selectedReward,
-          status: newStatus,
-          payment_date: newStatus === 'paid' ? new Date().toISOString() : selectedReward.payment_date
+          status: validStatus,
+          payment_date: validStatus === 'paid' ? new Date().toISOString() : selectedReward.payment_date
         });
       }
       
@@ -366,7 +367,7 @@ function AdminRewards() {
                         ${reward.amount.toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        {reward.reward_type === 'seller' ? 'Seller' : 'Landlord'}
+                        {reward.reward_type === 'gift_card' ? 'Gift Card' : 'Cash'}
                       </TableCell>
                       <TableCell>
                         <div>{new Date(reward.created_at).toLocaleDateString()}</div>
@@ -384,7 +385,7 @@ function AdminRewards() {
                             ? 'bg-blue-100 text-blue-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {reward.status || 'pending'}
+                          {(reward.status || 'pending').charAt(0).toUpperCase() + (reward.status || 'pending').slice(1)}
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
@@ -407,103 +408,14 @@ function AdminRewards() {
         </CardContent>
       </Card>
       
-      {/* Reward Details Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          {selectedReward && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Reward Details</DialogTitle>
-                <DialogDescription>
-                  Manage reward for {selectedReward.referrals?.referee_name || 'Unknown'}'s referral
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Reward Information</h3>
-                    <div className="mt-1 space-y-2">
-                      <p><span className="font-medium">Amount:</span> ${selectedReward.amount.toFixed(2)}</p>
-                      <p><span className="font-medium">Type:</span> {selectedReward.reward_type === 'seller' ? 'Seller Referral' : 'Landlord Referral'}</p>
-                      <p><span className="font-medium">Created:</span> {new Date(selectedReward.created_at).toLocaleString()}</p>
-                      {selectedReward.payment_date && (
-                        <p><span className="font-medium">Payment Date:</span> {new Date(selectedReward.payment_date).toLocaleString()}</p>
-                      )}
-                      <p>
-                        <span className="font-medium">Status:</span>
-                        <span className={`ml-2 inline-flex rounded-full px-2 py-1 text-xs ${
-                          selectedReward.status === 'paid' 
-                            ? 'bg-green-100 text-green-800' 
-                            : selectedReward.status === 'approved'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {selectedReward.status || 'pending'}
-                        </span>
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Partner Information</h3>
-                    <div className="mt-1 space-y-2">
-                      <p><span className="font-medium">Name:</span> {selectedReward.referrers?.full_name || 'Unknown'}</p>
-                      <p><span className="font-medium">Email:</span> {selectedReward.referrers?.email || 'No email'}</p>
-                      <p><span className="font-medium">Phone:</span> {selectedReward.referrers?.phone || 'No phone'}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-sm font-medium text-muted-foreground">Referral Information</h3>
-                    <div className="mt-1 space-y-2">
-                      <p><span className="font-medium">Referee Name:</span> {selectedReward.referrals?.referee_name || 'Unknown'}</p>
-                      <p><span className="font-medium">Referral Type:</span> {selectedReward.referrals?.referee_type || 'Unknown'}</p>
-                      <p><span className="font-medium">Referral ID:</span> {selectedReward.referral_id}</p>
-                    </div>
-                  </div>
-                  
-                  {selectedReward.gift_card_details && (
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Gift Card Details</h3>
-                      <div className="mt-1 space-y-2">
-                        <pre className="text-xs bg-muted p-2 rounded-md overflow-auto">
-                          {JSON.stringify(selectedReward.gift_card_details, null, 2)}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              
-              <div className="border-t pt-4">
-                <h3 className="text-sm font-medium mb-2">Update Status</h3>
-                <div className="flex flex-wrap gap-2">
-                  {statusOptions.map((status) => (
-                    <Button
-                      key={status}
-                      variant={selectedReward.status === status ? "default" : "outline"}
-                      size="sm"
-                      disabled={selectedReward.status === 'paid' && status !== 'paid'} // Can't revert from paid
-                      onClick={() => updateRewardStatus(selectedReward.id, status)}
-                    >
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Close
-                </Button>
-              </DialogFooter>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Use the shared RewardDetailsDialog component */}
+      <RewardDetailsDialog
+        reward={selectedReward}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        statusOptions={statusOptions}
+        updateRewardStatus={updateRewardStatus}
+      />
     </div>
   );
 }

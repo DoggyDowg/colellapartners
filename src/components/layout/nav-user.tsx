@@ -23,6 +23,7 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { useAuth } from '@/context/AuthContext'
+import { useUserProfile } from '@/hooks/use-user-profile'
 
 // Accept fallback data in case auth context isn't loaded yet
 export function NavUser({
@@ -36,11 +37,13 @@ export function NavUser({
 }) {
   const { isMobile } = useSidebar()
   const { signOut, user } = useAuth()
+  const { getProfilePicture, profile } = useUserProfile()
   const navigate = useNavigate()
 
   // Use real user data from auth context if available
   // First try user_metadata.name, then try to extract display name from email
   const displayName = 
+    profile?.name || 
     user?.user_metadata?.full_name || 
     user?.user_metadata?.name ||
     user?.user_metadata?.preferred_username ||
@@ -48,8 +51,8 @@ export function NavUser({
     fallbackUser?.name || 
     'User'
     
-  const email = user?.email || fallbackUser?.email || ''
-  const avatarSrc = user?.user_metadata?.avatar_url || fallbackUser?.avatar || '' 
+  const email = profile?.email || user?.email || fallbackUser?.email || ''
+  const avatarSrc = getProfilePicture()
   
   // Generate initials for avatar fallback
   const initials = displayName
@@ -72,9 +75,9 @@ export function NavUser({
               size='lg'
               className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
             >
-              <Avatar className='h-8 w-8 rounded-lg'>
-                <AvatarImage src={avatarSrc} alt={displayName} />
-                <AvatarFallback className='rounded-lg'>{initials}</AvatarFallback>
+              <Avatar className='h-8 w-8'>
+                <AvatarImage src={avatarSrc} alt={displayName} className="scale-125" />
+                <AvatarFallback>{initials}</AvatarFallback>
               </Avatar>
               <div className='grid flex-1 text-left text-sm leading-tight'>
                 <span className='truncate font-semibold'>{displayName}</span>
@@ -91,9 +94,9 @@ export function NavUser({
           >
             <DropdownMenuLabel className='p-0 font-normal'>
               <div className='flex items-center gap-2 px-1 py-1.5 text-left text-sm'>
-                <Avatar className='h-8 w-8 rounded-lg'>
-                  <AvatarImage src={avatarSrc} alt={displayName} />
-                  <AvatarFallback className='rounded-lg'>{initials}</AvatarFallback>
+                <Avatar className='h-8 w-8'>
+                  <AvatarImage src={avatarSrc} alt={displayName} className="scale-125" />
+                  <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className='grid flex-1 text-left text-sm leading-tight'>
                   <span className='truncate font-semibold'>{displayName}</span>
@@ -104,13 +107,13 @@ export function NavUser({
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
               <DropdownMenuItem asChild>
-                <Link to='/settings/account'>
+                <Link to='/dashboard'>
                   <BadgeCheck />
                   Account
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link to='/settings/notifications'>
+                <Link to='/dashboard'>
                   <Bell />
                   Notifications
                 </Link>

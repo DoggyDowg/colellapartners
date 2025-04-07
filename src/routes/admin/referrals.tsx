@@ -6,7 +6,6 @@ import { Input } from '../../components/ui/input';
 import { Button } from '../../components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Label } from '../../components/ui/label';
-import { Textarea } from '../../components/ui/textarea';
 import { 
   Table, 
   TableBody, 
@@ -23,16 +22,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog';
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { useAuth } from '../../context/AuthContext';
-import { Avatar, AvatarFallback } from '../../components/ui/avatar';
-import { TrashIcon, ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
+import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,6 +36,7 @@ import {
   AlertDialogTitle,
 } from '../../components/ui/alert-dialog';
 import { toast } from 'sonner';
+import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
 
 // Define interfaces for our data
 interface Referrer {
@@ -122,7 +115,8 @@ function AdminReferrals() {
   const getLandlordStatusOptions = () => [
     'New',
     'Contacted',
-    'Signed Up'
+    'Signed Up',
+    'Ineligible'
   ];
 
   const getSellerStatusOptions = () => [
@@ -131,7 +125,8 @@ function AdminReferrals() {
     'Appraised',
     'Listed',
     'Sold',
-    'Settled'
+    'Settled',
+    'Ineligible'
   ];
 
   // Get status options based on referral type
@@ -153,7 +148,8 @@ function AdminReferrals() {
     'Appraised',
     'Listed',
     'Sold',
-    'Settled'
+    'Settled',
+    'Ineligible'
   ];
 
   useEffect(() => {
@@ -506,10 +502,11 @@ function AdminReferrals() {
     fetchReferrals();
   };
   
-  // Helper function for status badge styling
+  // Get status badge styling
   const getStatusBadgeClass = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'settled':
+      case 'signed up':
         return 'bg-green-100 text-green-800';
       case 'sold':
         return 'bg-blue-100 text-blue-800';
@@ -519,8 +516,8 @@ function AdminReferrals() {
         return 'bg-yellow-100 text-yellow-800';
       case 'contacted':
         return 'bg-orange-100 text-orange-800';
-      case 'signed up':
-        return 'bg-teal-100 text-teal-800';
+      case 'ineligible':
+        return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -836,7 +833,7 @@ function AdminReferrals() {
                             <div className="text-sm text-muted-foreground">{referral.referrers?.email}</div>
                           </TableCell>
                           <TableCell className="whitespace-nowrap">
-                            {referral.referee_type}
+                            {referral.referee_type.charAt(0).toUpperCase() + referral.referee_type.slice(1)}
                           </TableCell>
                           <TableCell>
                             <Badge className={getStatusBadgeClass(referral.status)}>
@@ -861,198 +858,25 @@ function AdminReferrals() {
             </CardContent>
           </Card>
           
-          {/* Referral Details Dialog */}
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogContent className="max-w-4xl">
-              {selectedReferral && (
-                <>
-                  <DialogHeader>
-                    <DialogTitle>Referral Details</DialogTitle>
-                    <DialogDescription>
-                      Manage the referral for {selectedReferral.referee_name}
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <Tabs defaultValue="details" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="details">Details</TabsTrigger>
-                      <TabsTrigger value="notes">Notes</TabsTrigger>
-                      <TabsTrigger value="history">History</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="details" className="space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium text-muted-foreground">Referee Information</h3>
-                            <div className="mt-1 space-y-2">
-                              <p><span className="font-medium">Name:</span> {selectedReferral.referee_name}</p>
-                              <p><span className="font-medium">Email:</span> {selectedReferral.referee_email}</p>
-                              <p><span className="font-medium">Phone:</span> {selectedReferral.referee_phone}</p>
-                              <p><span className="font-medium">Type:</span> {selectedReferral.referee_type}</p>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <h3 className="text-sm font-medium text-muted-foreground">Referrer Information</h3>
-                            <div className="mt-1 space-y-2">
-                              <p><span className="font-medium">Name:</span> {selectedReferral.referrers?.full_name}</p>
-                              <p><span className="font-medium">Email:</span> {selectedReferral.referrers?.email}</p>
-                              <p><span className="font-medium">Phone:</span> {selectedReferral.referrers?.phone}</p>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="text-sm font-medium text-muted-foreground">Referral Details</h3>
-                            <div className="mt-1 space-y-2">
-                              <p><span className="font-medium">Created:</span> {formatDate(selectedReferral.created_at)}</p>
-                              <p>
-                                <span className="font-medium">Status:</span>
-                                <Badge className={`ml-2 ${getStatusBadgeClass(selectedReferral.status)}`}>
-                                  {selectedReferral.status || 'New'}
-                                </Badge>
-                              </p>
-                            </div>
-                          </div>
-                          
-                          {selectedReferral.situation_description && (
-                            <div>
-                              <h3 className="text-sm font-medium text-muted-foreground">Situation Description</h3>
-                              <p className="mt-1">{selectedReferral.situation_description}</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="border-t pt-4">
-                        <h3 className="text-sm font-medium mb-2">Update Status</h3>
-                        <div className="flex flex-wrap gap-2">
-                          {getStatusOptionsForType(selectedReferral.referee_type).map((status) => (
-                            <Button
-                              key={status}
-                              variant={selectedReferral.status === status ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => updateReferralStatus(selectedReferral.id, status)}
-                            >
-                              {status}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="notes" className="space-y-4">
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="text-sm font-medium">Add Note</h3>
-                          <div className="mt-2 flex gap-2">
-                            <Textarea 
-                              placeholder="Enter your notes here..." 
-                              value={statusNote}
-                              onChange={(e) => setStatusNote(e.target.value)}
-                              className="h-24"
-                            />
-                          </div>
-                          <div className="mt-2 flex justify-end">
-                            <Button 
-                              onClick={() => addNote(selectedReferral.id)}
-                              disabled={!statusNote.trim()}
-                            >
-                              Add Note
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        <div className="border-t pt-4">
-                          <h3 className="text-sm font-medium mb-2">Notes History</h3>
-                          {selectedReferral.additional_notes ? (
-                            <div className="space-y-3">
-                              {parseNotes(selectedReferral.additional_notes).map((note, index) => (
-                                <Card key={index} className="p-4">
-                                  <div className="flex items-start gap-3">
-                                    <Avatar className="h-10 w-10">
-                                      <AvatarFallback>{getInitials(note.user)}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1">
-                                      <div className="flex justify-between items-start">
-                                        <div className="font-medium text-base">{note.user}</div>
-                                        <div className="flex items-center gap-2">
-                                          <div className="text-xs text-muted-foreground">{formatTimeAgo(note.date)}</div>
-                                          <Button 
-                                            variant="ghost" 
-                                            size="icon" 
-                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                                            onClick={() => confirmNoteDelete(index)}
-                                          >
-                                            <TrashIcon className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </div>
-                                      <div className="text-sm text-muted-foreground mt-1">{note.content}</div>
-                                    </div>
-                                  </div>
-                                </Card>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-muted-foreground text-sm">No notes available</p>
-                          )}
-                        </div>
-                      </div>
-                    </TabsContent>
-                    
-                    <TabsContent value="history" className="space-y-4">
-                      {loadingHistory ? (
-                        <div className="flex justify-center items-center h-32">
-                          <p>Loading history...</p>
-                        </div>
-                      ) : statusHistory.length > 0 ? (
-                        <div className="space-y-2">
-                          {statusHistory.map((item) => (
-                            <div key={item.id} className="border-b pb-2">
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="text-sm">
-                                    <span className="font-medium">Status changed from </span>
-                                    <Badge className={`ml-1 ${getStatusBadgeClass(item.previous_status || 'New')}`}>
-                                      {item.previous_status || 'New'}
-                                    </Badge>
-                                    <span className="font-medium ml-1">to</span>
-                                    <Badge className={`ml-1 ${getStatusBadgeClass(item.new_status)}`}>
-                                      {item.new_status}
-                                    </Badge>
-                                    {item.user_full_name && (
-                                      <span className="font-medium ml-1">by {item.user_full_name}</span>
-                                    )}
-                                  </p>
-                                  {item.notes && (
-                                    <p className="text-sm mt-1">{item.notes}</p>
-                                  )}
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatDate(item.created_at)}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground text-sm">No status history available</p>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                      Close
-                    </Button>
-                  </DialogFooter>
-                </>
-              )}
-            </DialogContent>
-          </Dialog>
+          {/* Use the shared ReferralDetailsDialog component */}
+          <ReferralDetailsDialog
+            referral={selectedReferral}
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            statusHistory={statusHistory}
+            loadingHistory={loadingHistory}
+            statusNote={statusNote}
+            onStatusNoteChange={(value) => setStatusNote(value)}
+            onAddNote={addNote}
+            onConfirmNoteDelete={confirmNoteDelete}
+            onUpdateStatus={updateReferralStatus}
+            getStatusOptionsForType={getStatusOptionsForType}
+            getStatusBadgeClass={getStatusBadgeClass}
+            formatDate={formatDate}
+            formatTimeAgo={formatTimeAgo}
+            parseNotes={parseNotes}
+            getInitials={getInitials}
+          />
           
           {/* Delete Note Confirmation Dialog */}
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

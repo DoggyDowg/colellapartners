@@ -16,6 +16,9 @@ interface BaseNavItem {
   title: string
   badge?: string
   icon?: React.ElementType
+  disabled?: boolean
+  tooltip?: string
+  rightIcon?: React.ElementType
 }
 
 type NavLink = BaseNavItem & {
@@ -24,7 +27,7 @@ type NavLink = BaseNavItem & {
 }
 
 type NavCollapsible = BaseNavItem & {
-  items: (BaseNavItem & { url: LinkProps['to'] })[]
+  items: (BaseNavItem & { url: LinkProps['to'], disabled?: boolean, tooltip?: string, rightIcon?: React.ElementType })[]
   url?: never
 }
 

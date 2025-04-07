@@ -11,10 +11,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/context/AuthContext'
+import { useUserProfile } from '@/hooks/use-user-profile'
 import { BadgeCheck, Bell, LogOut } from 'lucide-react'
 
 export function ProfileDropdown() {
   const { signOut, user } = useAuth()
+  const { getProfilePicture } = useUserProfile()
   const navigate = useNavigate()
 
   // Use real user data from auth context if available
@@ -26,7 +28,7 @@ export function ProfileDropdown() {
     'User'
     
   const email = user?.email || ''
-  const avatarSrc = user?.user_metadata?.avatar_url || '/avatars/01.png'
+  const avatarSrc = getProfilePicture()
   
   // Generate initials for avatar fallback
   const initials = displayName
@@ -62,13 +64,13 @@ export function ProfileDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link to='/settings/account'>
+            <Link to='/dashboard'>
               <BadgeCheck className="mr-2 h-4 w-4" />
               Account
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to='/settings/notifications'>
+            <Link to='/dashboard'>
               <Bell className="mr-2 h-4 w-4" />
               Notifications
             </Link>

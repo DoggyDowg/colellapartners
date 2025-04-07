@@ -10,6 +10,8 @@ import {
   IconGift,
   IconCalendarEvent,
   IconClock,
+  IconTrophy,
+  IconUserCircle,
 } from '@tabler/icons-react'
 import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -92,6 +94,16 @@ export const sidebarData: SidebarData = {
           title: 'My Rewards',
           url: '/rewards',
           icon: IconGift,
+        },
+        {
+          title: 'My Referrals',
+          url: '/referrals',
+          icon: IconUserCircle,
+        },
+        {
+          title: 'Achievements',
+          url: '/achievements',
+          icon: IconTrophy,
         },
       ],
     },

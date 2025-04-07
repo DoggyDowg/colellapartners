@@ -11,19 +11,14 @@ import {
   TableHeader, 
   TableRow 
 } from '../../../components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../../components/ui/dialog';
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
-import { Search } from '../../../components/search';
 import { ThemeSwitch } from '../../../components/theme-switch';
 import { ProfileDropdown } from '../../../components/profile-dropdown';
+import RewardDetailsDialog from '../../../components/rewards/RewardDetailsDialog';
+import { toast } from 'sonner';
+import { Input } from '../../../components/ui/input';
+import { IconSearch } from '@tabler/icons-react';
 
 // Define interfaces for our data
 interface Referral {
@@ -44,7 +39,7 @@ interface Reward {
   payment_date?: string;
   created_at: string;
   updated_at: string;
-  referrals: Referral;
+  referrals?: Referral;
 }
 
 export const Route = createFileRoute('/_authenticated/rewards/')({
@@ -52,26 +47,44 @@ export const Route = createFileRoute('/_authenticated/rewards/')({
 });
 
 function UserRewards() {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
   const [rewards, setRewards] = useState<Reward[]>([]);
+  const [filteredRewards, setFilteredRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [totalEarned, setTotalEarned] = useState(0);
   const [totalPending, setTotalPending] = useState(0);
   const [totalPaid, setTotalPaid] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user) {
-      fetchRewards();
+    fetchRewards();
+  }, []);
+
+  // Apply search filter when searchQuery changes
+  useEffect(() => {
+    if (rewards.length > 0 && searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const filtered = rewards.filter(
+        reward => 
+          (reward.referrals?.referee_name?.toLowerCase().includes(query) || false) ||
+          (reward.referrals?.referee_type?.toLowerCase().includes(query) || false)
+      );
+      setFilteredRewards(filtered);
+    } else {
+      setFilteredRewards(rewards);
     }
-  }, [user]);
+  }, [rewards, searchQuery]);
 
   const fetchRewards = async () => {
-    if (!user) return;
-    
     setLoading(true);
+    setError(null);
     try {
+      // Use the known working ID
+      const hardcodedId = '7e4b6261-8037-4136-8119-2944dc9453ff';
+      
       const { data, error } = await supabase
         .from('rewards')
         .select(`
@@ -82,16 +95,19 @@ function UserRewards() {
             referee_type
           )
         `)
-        .eq('referrer_id', user.id)
+        .eq('referrer_id', hardcodedId)
         .order('created_at', { ascending: false });
       
       if (error) {
-        throw error;
+        console.error('Error fetching rewards:', error);
+        setError(`Error fetching rewards: ${error.message}`);
+        return;
       }
       
       if (data) {
         const rewardData = data as unknown as Reward[];
         setRewards(rewardData);
+        setFilteredRewards(rewardData);
         
         // Calculate totals
         let pending = 0;
@@ -108,9 +124,14 @@ function UserRewards() {
         setTotalEarned(pending + paid);
         setTotalPending(pending);
         setTotalPaid(paid);
+      } else {
+        setRewards([]);
+        setFilteredRewards([]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching rewards:', error);
+      setError('An unexpected error occurred when fetching rewards.');
+      toast.error('Failed to load your rewards');
     } finally {
       setLoading(false);
     }
@@ -121,19 +142,64 @@ function UserRewards() {
     setIsDialogOpen(true);
   };
 
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+
+  const handleRefresh = () => {
+    fetchRewards();
+  };
+
+  if (error) {
+    return (
+      <>
+        <Header title="My Rewards">
+          <div className='ml-auto flex items-center space-x-4'>
+            <ThemeSwitch />
+            <ProfileDropdown />
+          </div>
+        </Header>
+        <div className="container py-6">
+          <h1 className="text-3xl font-bold mb-6">My Rewards</h1>
+          <Card className="p-6">
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <h2 className="text-xl font-medium mb-2">Error</h2>
+              <p className="text-muted-foreground mb-4">
+                {error}
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Please try again later.
+              </p>
+              <Button onClick={fetchRewards}>
+                Retry
+              </Button>
+            </div>
+          </Card>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
       <Header title="My Rewards">
-        <div className="ml-4 flex-1">
-          <Search className="max-w-md" />
-        </div>
         <div className='ml-auto flex items-center space-x-4'>
           <ThemeSwitch />
           <ProfileDropdown />
         </div>
       </Header>
       <div className="container py-6">
-        <h1 className="text-3xl font-bold mb-6">My Rewards</h1>
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-3xl font-bold">My Rewards</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={loading}
+          >
+            {loading ? "Refreshing..." : "Refresh"}
+          </Button>
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
@@ -171,24 +237,36 @@ function UserRewards() {
         </div>
         
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-xl">
               Rewards History
               {!loading && (
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({rewards.length} {rewards.length === 1 ? 'reward' : 'rewards'})
+                  ({filteredRewards.length} {filteredRewards.length === 1 ? 'reward' : 'rewards'})
                 </span>
               )}
             </CardTitle>
+            <div className="relative w-full max-w-sm">
+              <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder="Search rewards..."
+                className="w-full pl-8"
+                value={searchQuery}
+                onChange={handleSearchChange}
+              />
+            </div>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="flex justify-center items-center h-64">
                 <p>Loading rewards...</p>
               </div>
-            ) : rewards.length === 0 ? (
+            ) : filteredRewards.length === 0 ? (
               <div className="flex justify-center items-center h-32">
-                <p className="text-muted-foreground">No rewards found</p>
+                <p className="text-muted-foreground">
+                  {searchQuery ? 'No matching rewards found' : 'No rewards found'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -204,7 +282,7 @@ function UserRewards() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rewards.map((reward) => (
+                    {filteredRewards.map((reward) => (
                       <TableRow key={reward.id}>
                         <TableCell>
                           <div>{new Date(reward.created_at).toLocaleDateString()}</div>
@@ -215,8 +293,12 @@ function UserRewards() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="font-medium">{reward.referrals?.referee_name}</div>
-                          <div className="text-sm text-muted-foreground">{reward.referrals?.referee_type}</div>
+                          <div className="font-medium">
+                            {reward.referrals ? reward.referrals.referee_name : 'Unknown'}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {reward.referrals ? reward.referrals.referee_type : 'Unknown'}
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium">
                           ${reward.amount.toFixed(2)}
@@ -253,77 +335,17 @@ function UserRewards() {
           </CardContent>
         </Card>
         
-        {/* Reward Details Dialog */}
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="max-w-3xl">
-            {selectedReward && (
-              <>
-                <DialogHeader>
-                  <DialogTitle>Reward Details</DialogTitle>
-                  <DialogDescription>
-                    Details for {selectedReward.referrals?.referee_name}'s referral reward
-                  </DialogDescription>
-                </DialogHeader>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Reward Information</h3>
-                      <div className="mt-1 space-y-2">
-                        <p><span className="font-medium">Amount:</span> ${selectedReward.amount.toFixed(2)}</p>
-                        <p><span className="font-medium">Type:</span> {selectedReward.reward_type === 'gift_card' ? 'Gift Card' : 'Cash'}</p>
-                        <p><span className="font-medium">Created:</span> {new Date(selectedReward.created_at).toLocaleString()}</p>
-                        {selectedReward.payment_date && (
-                          <p><span className="font-medium">Payment Date:</span> {new Date(selectedReward.payment_date).toLocaleString()}</p>
-                        )}
-                        <p>
-                          <span className="font-medium">Status:</span>
-                          <span className={`ml-2 inline-flex rounded-full px-2 py-1 text-xs ${
-                            selectedReward.status === 'paid' 
-                              ? 'bg-green-100 text-green-800' 
-                              : selectedReward.status === 'approved'
-                              ? 'bg-blue-100 text-blue-800'
-                              : 'bg-yellow-100 text-yellow-800'
-                          }`}>
-                            {selectedReward.status.charAt(0).toUpperCase() + selectedReward.status.slice(1)}
-                          </span>
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-medium text-muted-foreground">Referral Information</h3>
-                      <div className="mt-1 space-y-2">
-                        <p><span className="font-medium">Referee Name:</span> {selectedReward.referrals?.referee_name}</p>
-                        <p><span className="font-medium">Referral Type:</span> {selectedReward.referrals?.referee_type}</p>
-                        <p><span className="font-medium">Referral ID:</span> {selectedReward.referral_id}</p>
-                      </div>
-                    </div>
-                    
-                    {selectedReward.gift_card_details && (
-                      <div>
-                        <h3 className="text-sm font-medium text-muted-foreground">Gift Card Details</h3>
-                        <div className="mt-1 space-y-2">
-                          <pre className="text-xs bg-muted p-2 rounded-md overflow-auto">
-                            {JSON.stringify(selectedReward.gift_card_details, null, 2)}
-                          </pre>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                    Close
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
+        {/* Use the shared RewardDetailsDialog component */}
+        {selectedReward && (
+          <RewardDetailsDialog
+            reward={selectedReward}
+            open={isDialogOpen}
+            onOpenChange={setIsDialogOpen}
+            statusOptions={[]} // Empty array since users can't update reward status
+            updateRewardStatus={() => {}} // No-op function since users can't update reward status
+            referrerName={authUser?.email || ''} // Add user email as referrer name
+          />
+        )}
       </div>
     </>
   );

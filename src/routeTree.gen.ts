@@ -32,6 +32,8 @@ import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedRewardsIndexImport } from './routes/_authenticated/rewards/index'
+import { Route as AuthenticatedReferralsIndexImport } from './routes/_authenticated/referrals/index'
+import { Route as AuthenticatedAchievementsIndexImport } from './routes/_authenticated/achievements/index'
 
 // Create Virtual Routes
 
@@ -345,6 +347,26 @@ const AuthenticatedRewardsIndexRoute = AuthenticatedRewardsIndexImport.update({
   import('./routes/_authenticated/rewards/index.lazy').then((d) => d.Route),
 )
 
+const AuthenticatedReferralsIndexRoute =
+  AuthenticatedReferralsIndexImport.update({
+    id: '/referrals/',
+    path: '/referrals/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/referrals/index.lazy').then((d) => d.Route),
+  )
+
+const AuthenticatedAchievementsIndexRoute =
+  AuthenticatedAchievementsIndexImport.update({
+    id: '/achievements/',
+    path: '/achievements/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/achievements/index.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
 const AuthenticatedSettingsNotificationsLazyRoute =
   AuthenticatedSettingsNotificationsLazyImport.update({
     id: '/notifications',
@@ -613,6 +635,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsNotificationsLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
+    '/_authenticated/achievements/': {
+      id: '/_authenticated/achievements/'
+      path: '/achievements'
+      fullPath: '/achievements'
+      preLoaderRoute: typeof AuthenticatedAchievementsIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/referrals/': {
+      id: '/_authenticated/referrals/'
+      path: '/referrals'
+      fullPath: '/referrals'
+      preLoaderRoute: typeof AuthenticatedReferralsIndexImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
     '/_authenticated/rewards/': {
       id: '/_authenticated/rewards/'
       path: '/rewards'
@@ -693,6 +729,8 @@ const AuthenticatedSettingsRouteLazyRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedAchievementsIndexRoute: typeof AuthenticatedAchievementsIndexRoute
+  AuthenticatedReferralsIndexRoute: typeof AuthenticatedReferralsIndexRoute
   AuthenticatedRewardsIndexRoute: typeof AuthenticatedRewardsIndexRoute
   AuthenticatedAppsIndexLazyRoute: typeof AuthenticatedAppsIndexLazyRoute
   AuthenticatedChatsIndexLazyRoute: typeof AuthenticatedChatsIndexLazyRoute
@@ -705,6 +743,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedAchievementsIndexRoute: AuthenticatedAchievementsIndexRoute,
+  AuthenticatedReferralsIndexRoute: AuthenticatedReferralsIndexRoute,
   AuthenticatedRewardsIndexRoute: AuthenticatedRewardsIndexRoute,
   AuthenticatedAppsIndexLazyRoute: AuthenticatedAppsIndexLazyRoute,
   AuthenticatedChatsIndexLazyRoute: AuthenticatedChatsIndexLazyRoute,
@@ -784,6 +824,8 @@ export interface FileRoutesByFullPath {
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/achievements': typeof AuthenticatedAchievementsIndexRoute
+  '/referrals': typeof AuthenticatedReferralsIndexRoute
   '/rewards': typeof AuthenticatedRewardsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
@@ -823,6 +865,8 @@ export interface FileRoutesByTo {
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/achievements': typeof AuthenticatedAchievementsIndexRoute
+  '/referrals': typeof AuthenticatedReferralsIndexRoute
   '/rewards': typeof AuthenticatedRewardsIndexRoute
   '/apps': typeof AuthenticatedAppsIndexLazyRoute
   '/chats': typeof AuthenticatedChatsIndexLazyRoute
@@ -867,6 +911,8 @@ export interface FileRoutesById {
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
+  '/_authenticated/achievements/': typeof AuthenticatedAchievementsIndexRoute
+  '/_authenticated/referrals/': typeof AuthenticatedReferralsIndexRoute
   '/_authenticated/rewards/': typeof AuthenticatedRewardsIndexRoute
   '/_authenticated/apps/': typeof AuthenticatedAppsIndexLazyRoute
   '/_authenticated/chats/': typeof AuthenticatedChatsIndexLazyRoute
@@ -910,6 +956,8 @@ export interface FileRouteTypes {
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/achievements'
+    | '/referrals'
     | '/rewards'
     | '/apps'
     | '/chats'
@@ -948,6 +996,8 @@ export interface FileRouteTypes {
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
+    | '/achievements'
+    | '/referrals'
     | '/rewards'
     | '/apps'
     | '/chats'
@@ -990,6 +1040,8 @@ export interface FileRouteTypes {
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
+    | '/_authenticated/achievements/'
+    | '/_authenticated/referrals/'
     | '/_authenticated/rewards/'
     | '/_authenticated/apps/'
     | '/_authenticated/chats/'
@@ -1077,6 +1129,8 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated/settings",
         "/_authenticated/",
+        "/_authenticated/achievements/",
+        "/_authenticated/referrals/",
         "/_authenticated/rewards/",
         "/_authenticated/apps/",
         "/_authenticated/chats/",
@@ -1215,6 +1269,14 @@ export const routeTree = rootRoute
     "/_authenticated/settings/notifications": {
       "filePath": "_authenticated/settings/notifications.lazy.tsx",
       "parent": "/_authenticated/settings"
+    },
+    "/_authenticated/achievements/": {
+      "filePath": "_authenticated/achievements/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/referrals/": {
+      "filePath": "_authenticated/referrals/index.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/rewards/": {
       "filePath": "_authenticated/rewards/index.tsx",

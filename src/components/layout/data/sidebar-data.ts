@@ -12,6 +12,7 @@ import {
   IconClock,
   IconTrophy,
   IconUserCircle,
+  IconBuilding,
 } from '@tabler/icons-react'
 import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -89,6 +90,11 @@ export const sidebarData: SidebarData = {
           title: 'Dashboard',
           url: '/',
           icon: IconLayoutDashboard,
+        },
+        {
+          title: 'For Sale',
+          url: '/for-sale',
+          icon: IconBuilding,
         },
         {
           title: 'My Rewards',

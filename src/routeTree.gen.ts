@@ -14,12 +14,14 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/_index'
+import { Route as ForSaleImport } from './routes/for-sale'
 import { Route as DashboardImport } from './routes/dashboard'
 import { Route as AuthImport } from './routes/auth'
 import { Route as AdminImport } from './routes/admin'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as AdminIndexImport } from './routes/admin/index'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
+import { Route as PropertyIdImport } from './routes/property.$id'
 import { Route as AuthLoginImport } from './routes/auth/login'
 import { Route as AuthCallbackImport } from './routes/auth/callback'
 import { Route as AdminUsersImport } from './routes/admin/users'
@@ -27,6 +29,7 @@ import { Route as AdminRewardsImport } from './routes/admin/rewards'
 import { Route as AdminReferrersImport } from './routes/admin/referrers'
 import { Route as AdminReferralsImport } from './routes/admin/referrals'
 import { Route as AdminRafflesImport } from './routes/admin/raffles'
+import { Route as AdminPropertiesImport } from './routes/admin/properties'
 import { Route as AdminEventsImport } from './routes/admin/events'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
@@ -34,6 +37,7 @@ import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedRewardsIndexImport } from './routes/_authenticated/rewards/index'
 import { Route as AuthenticatedReferralsIndexImport } from './routes/_authenticated/referrals/index'
 import { Route as AuthenticatedAchievementsIndexImport } from './routes/_authenticated/achievements/index'
+import { Route as AdminPropertyIdImport } from './routes/admin/property.$id'
 
 // Create Virtual Routes
 
@@ -80,6 +84,9 @@ const AuthenticatedSettingsDisplayLazyImport = createFileRoute(
 const AuthenticatedSettingsAppearanceLazyImport = createFileRoute(
   '/_authenticated/settings/appearance',
 )()
+const AuthenticatedPropertyIdLazyImport = createFileRoute(
+  '/_authenticated/property/$id',
+)()
 
 // Create/Update Routes
 
@@ -99,6 +106,12 @@ const LoginLazyRoute = LoginLazyImport.update({
   path: '/login',
   getParentRoute: () => rootRoute,
 } as any).lazy(() => import('./routes/login.lazy').then((d) => d.Route))
+
+const ForSaleRoute = ForSaleImport.update({
+  id: '/for-sale',
+  path: '/for-sale',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/for-sale.lazy').then((d) => d.Route))
 
 const DashboardRoute = DashboardImport.update({
   id: '/dashboard',
@@ -216,6 +229,12 @@ const AuthenticatedSettingsRouteLazyRoute =
     import('./routes/_authenticated/settings/route.lazy').then((d) => d.Route),
   )
 
+const PropertyIdRoute = PropertyIdImport.update({
+  id: '/property/$id',
+  path: '/property/$id',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/property.$id.lazy').then((d) => d.Route))
+
 const AuthLoginRoute = AuthLoginImport.update({
   id: '/login',
   path: '/login',
@@ -255,6 +274,12 @@ const AdminReferralsRoute = AdminReferralsImport.update({
 const AdminRafflesRoute = AdminRafflesImport.update({
   id: '/raffles',
   path: '/raffles',
+  getParentRoute: () => AdminRoute,
+} as any)
+
+const AdminPropertiesRoute = AdminPropertiesImport.update({
+  id: '/properties',
+  path: '/properties',
   getParentRoute: () => AdminRoute,
 } as any)
 
@@ -400,6 +425,23 @@ const AuthenticatedSettingsAppearanceLazyRoute =
     ),
   )
 
+const AuthenticatedPropertyIdLazyRoute =
+  AuthenticatedPropertyIdLazyImport.update({
+    id: '/property/$id',
+    path: '/property/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/property.$id.lazy').then((d) => d.Route),
+  )
+
+const AdminPropertyIdRoute = AdminPropertyIdImport.update({
+  id: '/property/$id',
+  path: '/property/$id',
+  getParentRoute: () => AdminRoute,
+} as any).lazy(() =>
+  import('./routes/admin/property.$id.lazy').then((d) => d.Route),
+)
+
 // Populate the FileRoutesByPath interface
 
 declare module '@tanstack/react-router' {
@@ -437,6 +479,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardImport
+      parentRoute: typeof rootRoute
+    }
+    '/for-sale': {
+      id: '/for-sale'
+      path: '/for-sale'
+      fullPath: '/for-sale'
+      preLoaderRoute: typeof ForSaleImport
       parentRoute: typeof rootRoute
     }
     '/login': {
@@ -479,6 +528,13 @@ declare module '@tanstack/react-router' {
       path: '/events'
       fullPath: '/admin/events'
       preLoaderRoute: typeof AdminEventsImport
+      parentRoute: typeof AdminImport
+    }
+    '/admin/properties': {
+      id: '/admin/properties'
+      path: '/properties'
+      fullPath: '/admin/properties'
+      preLoaderRoute: typeof AdminPropertiesImport
       parentRoute: typeof AdminImport
     }
     '/admin/raffles': {
@@ -529,6 +585,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/auth/login'
       preLoaderRoute: typeof AuthLoginImport
       parentRoute: typeof AuthImport
+    }
+    '/property/$id': {
+      id: '/property/$id'
+      path: '/property/$id'
+      fullPath: '/property/$id'
+      preLoaderRoute: typeof PropertyIdImport
+      parentRoute: typeof rootRoute
     }
     '/_authenticated/settings': {
       id: '/_authenticated/settings'
@@ -613,6 +676,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexImport
       parentRoute: typeof AdminImport
+    }
+    '/admin/property/$id': {
+      id: '/admin/property/$id'
+      path: '/property/$id'
+      fullPath: '/admin/property/$id'
+      preLoaderRoute: typeof AdminPropertyIdImport
+      parentRoute: typeof AdminImport
+    }
+    '/_authenticated/property/$id': {
+      id: '/_authenticated/property/$id'
+      path: '/property/$id'
+      fullPath: '/property/$id'
+      preLoaderRoute: typeof AuthenticatedPropertyIdLazyImport
+      parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/settings/appearance': {
       id: '/_authenticated/settings/appearance'
@@ -729,6 +806,7 @@ const AuthenticatedSettingsRouteLazyRouteWithChildren =
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedPropertyIdLazyRoute: typeof AuthenticatedPropertyIdLazyRoute
   AuthenticatedAchievementsIndexRoute: typeof AuthenticatedAchievementsIndexRoute
   AuthenticatedReferralsIndexRoute: typeof AuthenticatedReferralsIndexRoute
   AuthenticatedRewardsIndexRoute: typeof AuthenticatedRewardsIndexRoute
@@ -743,6 +821,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedPropertyIdLazyRoute: AuthenticatedPropertyIdLazyRoute,
   AuthenticatedAchievementsIndexRoute: AuthenticatedAchievementsIndexRoute,
   AuthenticatedReferralsIndexRoute: AuthenticatedReferralsIndexRoute,
   AuthenticatedRewardsIndexRoute: AuthenticatedRewardsIndexRoute,
@@ -758,22 +837,26 @@ const AuthenticatedRouteRouteWithChildren =
 
 interface AdminRouteChildren {
   AdminEventsRoute: typeof AdminEventsRoute
+  AdminPropertiesRoute: typeof AdminPropertiesRoute
   AdminRafflesRoute: typeof AdminRafflesRoute
   AdminReferralsRoute: typeof AdminReferralsRoute
   AdminReferrersRoute: typeof AdminReferrersRoute
   AdminRewardsRoute: typeof AdminRewardsRoute
   AdminUsersRoute: typeof AdminUsersRoute
   AdminIndexRoute: typeof AdminIndexRoute
+  AdminPropertyIdRoute: typeof AdminPropertyIdRoute
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
   AdminEventsRoute: AdminEventsRoute,
+  AdminPropertiesRoute: AdminPropertiesRoute,
   AdminRafflesRoute: AdminRafflesRoute,
   AdminReferralsRoute: AdminReferralsRoute,
   AdminReferrersRoute: AdminReferrersRoute,
   AdminRewardsRoute: AdminRewardsRoute,
   AdminUsersRoute: AdminUsersRoute,
   AdminIndexRoute: AdminIndexRoute,
+  AdminPropertyIdRoute: AdminPropertyIdRoute,
 }
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
@@ -797,12 +880,14 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/for-sale': typeof ForSaleRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/referrers': typeof AdminReferrersRoute
@@ -810,6 +895,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
@@ -821,6 +907,7 @@ export interface FileRoutesByFullPath {
   '/auth/register': typeof AuthRegisterLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/property/$id': typeof AdminPropertyIdRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
@@ -839,12 +926,14 @@ export interface FileRoutesByTo {
   '': typeof IndexRoute
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/for-sale': typeof ForSaleRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/referrers': typeof AdminReferrersRoute
@@ -852,6 +941,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
   '/sign-up': typeof authSignUpLazyRoute
@@ -862,6 +952,7 @@ export interface FileRoutesByTo {
   '/auth/register': typeof AuthRegisterLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin': typeof AdminIndexRoute
+  '/admin/property/$id': typeof AdminPropertyIdRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
@@ -883,12 +974,14 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/for-sale': typeof ForSaleRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/admin/events': typeof AdminEventsRoute
+  '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
   '/admin/referrals': typeof AdminReferralsRoute
   '/admin/referrers': typeof AdminReferrersRoute
@@ -896,6 +989,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
+  '/property/$id': typeof PropertyIdRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
   '/(auth)/sign-in-2': typeof authSignIn2LazyRoute
@@ -908,6 +1002,8 @@ export interface FileRoutesById {
   '/auth/register': typeof AuthRegisterLazyRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/admin/': typeof AdminIndexRoute
+  '/admin/property/$id': typeof AdminPropertyIdRoute
+  '/_authenticated/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
   '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
@@ -929,12 +1025,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/for-sale'
     | '/login'
     | '/register'
     | '/500'
     | '/otp'
     | '/sign-in'
     | '/admin/events'
+    | '/admin/properties'
     | '/admin/raffles'
     | '/admin/referrals'
     | '/admin/referrers'
@@ -942,6 +1040,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/auth/login'
+    | '/property/$id'
     | '/settings'
     | '/forgot-password'
     | '/sign-in-2'
@@ -953,6 +1052,7 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/'
     | '/admin/'
+    | '/admin/property/$id'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
@@ -970,12 +1070,14 @@ export interface FileRouteTypes {
     | ''
     | '/auth'
     | '/dashboard'
+    | '/for-sale'
     | '/login'
     | '/register'
     | '/500'
     | '/otp'
     | '/sign-in'
     | '/admin/events'
+    | '/admin/properties'
     | '/admin/raffles'
     | '/admin/referrals'
     | '/admin/referrers'
@@ -983,6 +1085,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/auth/login'
+    | '/property/$id'
     | '/forgot-password'
     | '/sign-in-2'
     | '/sign-up'
@@ -993,6 +1096,7 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/'
     | '/admin'
+    | '/admin/property/$id'
     | '/settings/appearance'
     | '/settings/display'
     | '/settings/notifications'
@@ -1012,12 +1116,14 @@ export interface FileRouteTypes {
     | '/admin'
     | '/auth'
     | '/dashboard'
+    | '/for-sale'
     | '/login'
     | '/register'
     | '/(auth)/500'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
     | '/admin/events'
+    | '/admin/properties'
     | '/admin/raffles'
     | '/admin/referrals'
     | '/admin/referrers'
@@ -1025,6 +1131,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/auth/callback'
     | '/auth/login'
+    | '/property/$id'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
     | '/(auth)/sign-in-2'
@@ -1037,6 +1144,8 @@ export interface FileRouteTypes {
     | '/auth/register'
     | '/_authenticated/'
     | '/admin/'
+    | '/admin/property/$id'
+    | '/_authenticated/property/$id'
     | '/_authenticated/settings/appearance'
     | '/_authenticated/settings/display'
     | '/_authenticated/settings/notifications'
@@ -1058,11 +1167,13 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRoute
+  ForSaleRoute: typeof ForSaleRoute
   LoginLazyRoute: typeof LoginLazyRoute
   RegisterLazyRoute: typeof RegisterLazyRoute
   auth500Route: typeof auth500Route
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
+  PropertyIdRoute: typeof PropertyIdRoute
   authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
   authSignIn2LazyRoute: typeof authSignIn2LazyRoute
   authSignUpLazyRoute: typeof authSignUpLazyRoute
@@ -1079,11 +1190,13 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRoute,
+  ForSaleRoute: ForSaleRoute,
   LoginLazyRoute: LoginLazyRoute,
   RegisterLazyRoute: RegisterLazyRoute,
   auth500Route: auth500Route,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
+  PropertyIdRoute: PropertyIdRoute,
   authForgotPasswordLazyRoute: authForgotPasswordLazyRoute,
   authSignIn2LazyRoute: authSignIn2LazyRoute,
   authSignUpLazyRoute: authSignUpLazyRoute,
@@ -1109,11 +1222,13 @@ export const routeTree = rootRoute
         "/admin",
         "/auth",
         "/dashboard",
+        "/for-sale",
         "/login",
         "/register",
         "/(auth)/500",
         "/(auth)/otp",
         "/(auth)/sign-in",
+        "/property/$id",
         "/(auth)/forgot-password",
         "/(auth)/sign-in-2",
         "/(auth)/sign-up",
@@ -1129,6 +1244,7 @@ export const routeTree = rootRoute
       "children": [
         "/_authenticated/settings",
         "/_authenticated/",
+        "/_authenticated/property/$id",
         "/_authenticated/achievements/",
         "/_authenticated/referrals/",
         "/_authenticated/rewards/",
@@ -1146,12 +1262,14 @@ export const routeTree = rootRoute
       "filePath": "admin.tsx",
       "children": [
         "/admin/events",
+        "/admin/properties",
         "/admin/raffles",
         "/admin/referrals",
         "/admin/referrers",
         "/admin/rewards",
         "/admin/users",
-        "/admin/"
+        "/admin/",
+        "/admin/property/$id"
       ]
     },
     "/auth": {
@@ -1164,6 +1282,9 @@ export const routeTree = rootRoute
     },
     "/dashboard": {
       "filePath": "dashboard.tsx"
+    },
+    "/for-sale": {
+      "filePath": "for-sale.tsx"
     },
     "/login": {
       "filePath": "login.lazy.tsx"
@@ -1182,6 +1303,10 @@ export const routeTree = rootRoute
     },
     "/admin/events": {
       "filePath": "admin/events.tsx",
+      "parent": "/admin"
+    },
+    "/admin/properties": {
+      "filePath": "admin/properties.tsx",
       "parent": "/admin"
     },
     "/admin/raffles": {
@@ -1211,6 +1336,9 @@ export const routeTree = rootRoute
     "/auth/login": {
       "filePath": "auth/login.tsx",
       "parent": "/auth"
+    },
+    "/property/$id": {
+      "filePath": "property.$id.tsx"
     },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings/route.lazy.tsx",
@@ -1257,6 +1385,14 @@ export const routeTree = rootRoute
     "/admin/": {
       "filePath": "admin/index.tsx",
       "parent": "/admin"
+    },
+    "/admin/property/$id": {
+      "filePath": "admin/property.$id.tsx",
+      "parent": "/admin"
+    },
+    "/_authenticated/property/$id": {
+      "filePath": "_authenticated/property.$id.lazy.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/settings/appearance": {
       "filePath": "_authenticated/settings/appearance.lazy.tsx",

@@ -37,6 +37,7 @@ import {
 } from '../../components/ui/alert-dialog';
 import { toast } from 'sonner';
 import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
+import { AdminCheck } from '../../components/admin/AdminCheck';
 
 // Define interfaces for our data
 interface Referrer {
@@ -691,320 +692,323 @@ function AdminReferrals() {
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Referrals Management</h1>
-      
-      {error ? (
-        <Card className="p-6">
-          <div className="flex flex-col items-center justify-center h-64 text-center">
-            <h2 className="text-xl font-medium mb-2">Database Setup Required</h2>
-            <p className="text-muted-foreground mb-4">
-              {error}
-            </p>
-            <p className="text-sm text-muted-foreground mb-6">
-              Please create the necessary tables in your Supabase database or check your database configuration.
-            </p>
-            <Button onClick={() => fetchReferrals()}>
-              Retry
-            </Button>
-          </div>
-        </Card>
-      ) : (
-        <>
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="text-xl">Filters</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={setStatusFilter}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All statuses</SelectItem>
-                      {statusOptions.map(status => (
-                        <SelectItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="type">Type</Label>
-                  <Select 
-                    value={typeFilter}
-                    onValueChange={setTypeFilter}
-                  >
-                    <SelectTrigger id="type">
-                      <SelectValue placeholder="All types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All types</SelectItem>
-                      <SelectItem value="seller">Seller</SelectItem>
-                      <SelectItem value="landlord">Landlord</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="search">Search</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      id="search"
-                      placeholder="Search by name or email..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                    <Button
-                      variant="outline"
-                      onClick={() => fetchReferrals()}
+    <>
+      <AdminCheck />
+      <div>
+        <h1 className="text-3xl font-bold mb-6">Referrals Management</h1>
+        
+        {error ? (
+          <Card className="p-6">
+            <div className="flex flex-col items-center justify-center h-64 text-center">
+              <h2 className="text-xl font-medium mb-2">Database Setup Required</h2>
+              <p className="text-muted-foreground mb-4">
+                {error}
+              </p>
+              <p className="text-sm text-muted-foreground mb-6">
+                Please create the necessary tables in your Supabase database or check your database configuration.
+              </p>
+              <Button onClick={() => fetchReferrals()}>
+                Retry
+              </Button>
+            </div>
+          </Card>
+        ) : (
+          <>
+            <Card className="mb-6">
+              <CardHeader>
+                <CardTitle className="text-xl">Filters</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Status</Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={setStatusFilter}
                     >
-                      Search
+                      <SelectTrigger id="status">
+                        <SelectValue placeholder="All statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All statuses</SelectItem>
+                        {statusOptions.map(status => (
+                          <SelectItem key={status} value={status}>
+                            {status.charAt(0).toUpperCase() + status.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="type">Type</Label>
+                    <Select 
+                      value={typeFilter}
+                      onValueChange={setTypeFilter}
+                    >
+                      <SelectTrigger id="type">
+                        <SelectValue placeholder="All types" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All types</SelectItem>
+                        <SelectItem value="seller">Seller</SelectItem>
+                        <SelectItem value="landlord">Landlord</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="search">Search</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="search"
+                        placeholder="Search by name or email..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                      <Button
+                        variant="outline"
+                        onClick={() => fetchReferrals()}
+                      >
+                        Search
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-end">
+                    <Button 
+                      variant="outline"
+                      onClick={resetFilters}
+                      className="w-full"
+                    >
+                      Reset Filters
                     </Button>
                   </div>
                 </div>
-                
-                <div className="flex items-end">
-                  <Button 
-                    variant="outline"
-                    onClick={resetFilters}
-                    className="w-full"
-                  >
-                    Reset Filters
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-xl">
-                Referrals
-                {!loading && (
-                  <span className="ml-2 text-sm font-normal text-muted-foreground">
-                    ({referrals.length} {referrals.length === 1 ? 'referral' : 'referrals'})
-                  </span>
-                )}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex justify-center items-center h-64">
-                  <p>Loading referrals...</p>
-                </div>
-              ) : referrals.length === 0 ? (
-                <div className="flex justify-center items-center h-32">
-                  <p className="text-muted-foreground">No referrals found</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Referee</TableHead>
-                        <TableHead>Referrer</TableHead>
-                        <TableHead>Type</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {referrals.map((referral) => (
-                        <TableRow key={referral.id}>
-                          <TableCell className="whitespace-nowrap">
-                            {formatDate(referral.created_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{referral.referee_name}</div>
-                            <div className="text-sm text-muted-foreground">{referral.referee_email}</div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">{referral.referrers?.full_name}</div>
-                            <div className="text-sm text-muted-foreground">{referral.referrers?.email}</div>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap">
-                            {referral.referee_type.charAt(0).toUpperCase() + referral.referee_type.slice(1)}
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={getStatusBadgeClass(referral.status)}>
-                              {referral.status || 'New'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => openReferralDetails(referral)}
-                            >
-                              Manage
-                            </Button>
-                          </TableCell>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-xl">
+                  Referrals
+                  {!loading && (
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({referrals.length} {referrals.length === 1 ? 'referral' : 'referrals'})
+                    </span>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex justify-center items-center h-64">
+                    <p>Loading referrals...</p>
+                  </div>
+                ) : referrals.length === 0 ? (
+                  <div className="flex justify-center items-center h-32">
+                    <p className="text-muted-foreground">No referrals found</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Referee</TableHead>
+                          <TableHead>Referrer</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-          
-          {/* Use the shared ReferralDetailsDialog component */}
-          <ReferralDetailsDialog
-            referral={selectedReferral}
-            open={isDialogOpen}
-            onOpenChange={setIsDialogOpen}
-            statusHistory={statusHistory}
-            loadingHistory={loadingHistory}
-            statusNote={statusNote}
-            onStatusNoteChange={(value) => setStatusNote(value)}
-            onAddNote={addNote}
-            onConfirmNoteDelete={confirmNoteDelete}
-            onUpdateStatus={updateReferralStatus}
-            getStatusOptionsForType={getStatusOptionsForType}
-            getStatusBadgeClass={getStatusBadgeClass}
-            formatDate={formatDate}
-            formatTimeAgo={formatTimeAgo}
-            parseNotes={parseNotes}
-            getInitials={getInitials}
-          />
-          
-          {/* Delete Note Confirmation Dialog */}
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete
-                  the note from our servers.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setNoteToDelete(null)}>Cancel</AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={() => {
-                    if (noteToDelete !== null) {
-                      deleteNote(noteToDelete);
-                    }
-                    setIsDeleteDialogOpen(false);
-                  }}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                >
-                  Delete
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          
-          {/* Reward Dialog */}
-          <Dialog open={isRewardDialogOpen} onOpenChange={(open) => {
-            if (!open) {
-              handleCloseRewardDialog();
-            } else {
-              setIsRewardDialogOpen(true);
-            }
-          }}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create Reward</DialogTitle>
-                <DialogDescription>
-                  {selectedReferral && `Create a reward for referring ${selectedReferral.referee_name}`}
-                </DialogDescription>
-              </DialogHeader>
-              
-              <div className="space-y-4 py-4">
-                {selectedReferral && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="referrer">Referrer</Label>
-                      <Input 
-                        id="referrer" 
-                        value={selectedReferral.referrers?.full_name || ''} 
-                        disabled 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="reward-type">Reward Type</Label>
-                      <Select 
-                        value={rewardType}
-                        onValueChange={(value) => setRewardType(value as 'cash' | 'gift_card')}
-                      >
-                        <SelectTrigger id="reward-type">
-                          <SelectValue placeholder="Select reward type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="gift_card">Gift Card</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="amount">Reward Amount</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                        <div className="flex">
-                          <Input 
-                            id="amount" 
-                            type="number" 
-                            value={rewardAmount}
-                            onChange={(e) => setRewardAmount(Number(e.target.value))} 
-                            className="pl-7 pr-12" 
-                          />
-                          <div className="absolute right-0 inset-y-0 flex flex-col border-l">
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-1/2 rounded-none rounded-tr-md border-b" 
-                              onClick={incrementReward}
-                            >
-                              <ChevronUpIcon className="h-3 w-3" />
-                            </Button>
-                            <Button 
-                              type="button" 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-1/2 rounded-none rounded-br-md" 
-                              onClick={decrementReward}
-                            >
-                              <ChevronDownIcon className="h-3 w-3" />
-                            </Button>
+                      </TableHeader>
+                      <TableBody>
+                        {referrals.map((referral) => (
+                          <TableRow key={referral.id}>
+                            <TableCell className="whitespace-nowrap">
+                              {formatDate(referral.created_at)}
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{referral.referee_name}</div>
+                              <div className="text-sm text-muted-foreground">{referral.referee_email}</div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="font-medium">{referral.referrers?.full_name}</div>
+                              <div className="text-sm text-muted-foreground">{referral.referrers?.email}</div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
+                              {referral.referee_type.charAt(0).toUpperCase() + referral.referee_type.slice(1)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge className={getStatusBadgeClass(referral.status)}>
+                                {referral.status || 'New'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => openReferralDetails(referral)}
+                              >
+                                Manage
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            
+            {/* Use the shared ReferralDetailsDialog component */}
+            <ReferralDetailsDialog
+              referral={selectedReferral}
+              open={isDialogOpen}
+              onOpenChange={setIsDialogOpen}
+              statusHistory={statusHistory}
+              loadingHistory={loadingHistory}
+              statusNote={statusNote}
+              onStatusNoteChange={(value) => setStatusNote(value)}
+              onAddNote={addNote}
+              onConfirmNoteDelete={confirmNoteDelete}
+              onUpdateStatus={updateReferralStatus}
+              getStatusOptionsForType={getStatusOptionsForType}
+              getStatusBadgeClass={getStatusBadgeClass}
+              formatDate={formatDate}
+              formatTimeAgo={formatTimeAgo}
+              parseNotes={parseNotes}
+              getInitials={getInitials}
+            />
+            
+            {/* Delete Note Confirmation Dialog */}
+            <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete
+                    the note from our servers.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setNoteToDelete(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction 
+                    onClick={() => {
+                      if (noteToDelete !== null) {
+                        deleteNote(noteToDelete);
+                      }
+                      setIsDeleteDialogOpen(false);
+                    }}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+            
+            {/* Reward Dialog */}
+            <Dialog open={isRewardDialogOpen} onOpenChange={(open) => {
+              if (!open) {
+                handleCloseRewardDialog();
+              } else {
+                setIsRewardDialogOpen(true);
+              }
+            }}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Create Reward</DialogTitle>
+                  <DialogDescription>
+                    {selectedReferral && `Create a reward for referring ${selectedReferral.referee_name}`}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-4">
+                  {selectedReferral && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="referrer">Referrer</Label>
+                        <Input 
+                          id="referrer" 
+                          value={selectedReferral.referrers?.full_name || ''} 
+                          disabled 
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="reward-type">Reward Type</Label>
+                        <Select 
+                          value={rewardType}
+                          onValueChange={(value) => setRewardType(value as 'cash' | 'gift_card')}
+                        >
+                          <SelectTrigger id="reward-type">
+                            <SelectValue placeholder="Select reward type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="gift_card">Gift Card</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="amount">Reward Amount</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                          <div className="flex">
+                            <Input 
+                              id="amount" 
+                              type="number" 
+                              value={rewardAmount}
+                              onChange={(e) => setRewardAmount(Number(e.target.value))} 
+                              className="pl-7 pr-12" 
+                            />
+                            <div className="absolute right-0 inset-y-0 flex flex-col border-l">
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-1/2 rounded-none rounded-tr-md border-b" 
+                                onClick={incrementReward}
+                              >
+                                <ChevronUpIcon className="h-3 w-3" />
+                              </Button>
+                              <Button 
+                                type="button" 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-1/2 rounded-none rounded-br-md" 
+                                onClick={decrementReward}
+                              >
+                                <ChevronDownIcon className="h-3 w-3" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={handleCloseRewardDialog}>
-                  Cancel
-                </Button>
-                <Button 
-                  type="button" 
-                  onClick={createReward} 
-                  disabled={isProcessingReward}
-                >
-                  {isProcessingReward ? 'Creating...' : 'Create Reward'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-    </div>
+                    </>
+                  )}
+                </div>
+                
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={handleCloseRewardDialog}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="button" 
+                    onClick={createReward} 
+                    disabled={isProcessingReward}
+                  >
+                    {isProcessingReward ? 'Creating...' : 'Create Reward'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+      </div>
+    </>
   );
 }
 

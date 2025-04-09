@@ -28,6 +28,12 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      keyframes: {
+        shimmer: {
+          '0%': { transform: 'translateX(-100%) rotate(-45deg)' },
+          '100%': { transform: 'translateX(100%) rotate(-45deg)' }
+        },
+      },
       colors: {
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

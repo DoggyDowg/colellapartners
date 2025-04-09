@@ -523,7 +523,15 @@ function PropertyCard({ property }: { property: Property }) {
   const externalUrl = property.externalLinks && property.externalLinks.length > 0 
     ? property.externalLinks[0].url 
     : null;
-                      
+  
+  // Helper function to get badge variant
+  const getStatusBadgeVariant = (status: string | undefined | null) => {
+    if (status === 'listing') return 'for-sale';
+    if (status === 'conditional') return 'under-offer';
+    if (status === 'unconditional') return 'sold';
+    return 'default';
+  };
+
   return (
     // Use external URL if available, otherwise link to internal property page
     externalUrl 
@@ -543,7 +551,12 @@ function PropertyCard({ property }: { property: Property }) {
                 </div>
               )}
               {/* Status badge positioned over image */}
-              <Badge className="absolute top-2 right-2">{statusDisplay}</Badge>
+              <Badge 
+                className="absolute top-2 right-2" 
+                variant={getStatusBadgeVariant(property.status)}
+              >
+                {statusDisplay}
+              </Badge>
             </div>
             
             <CardHeader>
@@ -609,7 +622,12 @@ function PropertyCard({ property }: { property: Property }) {
                 </div>
               )}
               {/* Status badge positioned over image */}
-              <Badge className="absolute top-2 right-2">{statusDisplay}</Badge>
+              <Badge 
+                className="absolute top-2 right-2" 
+                variant={getStatusBadgeVariant(property.status)}
+              >
+                {statusDisplay}
+              </Badge>
             </div>
             
             <CardHeader>

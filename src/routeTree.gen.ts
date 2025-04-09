@@ -146,7 +146,9 @@ const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
+} as any).lazy(() =>
+  import('./routes/_authenticated/index.lazy').then((d) => d.Route),
+)
 
 const AuthRegisterLazyRoute = AuthRegisterLazyImport.update({
   id: '/register',

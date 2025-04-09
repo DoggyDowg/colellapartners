@@ -23,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../../components/ui/dialog';
+import { AdminCheck } from '@/components/admin/AdminCheck';
 
 // Define interfaces for our data
 interface Event {
@@ -260,6 +261,7 @@ function AdminEvents() {
 
   return (
     <div>
+      <AdminCheck />
       <h1 className="text-3xl font-bold mb-6">Events Management</h1>
       
       <Card className="mb-6">

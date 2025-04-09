@@ -84,7 +84,7 @@ export const sidebarData: SidebarData = {
       ],
     },
     {
-      title: 'General',
+      title: 'Partner Hub',
       items: [
         {
           title: 'Dashboard',

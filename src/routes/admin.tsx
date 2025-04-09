@@ -22,7 +22,7 @@ const getSessionAndCheckAdmin = async () => {
       const storedSession = localStorage.getItem('supabase_auth_session');
       if (!storedSession) {
         console.log('No stored session found');
-        return null;
+        return { isAuthenticated: false, isAdmin: false, session: null };
       }
       
       // If we have a stored session, refresh it with Supabase
@@ -35,7 +35,7 @@ const getSessionAndCheckAdmin = async () => {
       } catch (err) {
         console.error('Error refreshing stored session:', err);
         localStorage.removeItem('supabase_auth_session');
-        return null;
+        return { isAuthenticated: false, isAdmin: false, session: null };
       }
       
       // Re-fetch the session after refreshing
@@ -43,53 +43,88 @@ const getSessionAndCheckAdmin = async () => {
       if (!refreshedSession) {
         localStorage.removeItem('supabase_auth_session');
         console.log('No refreshed session found');
-        return null;
+        return { isAuthenticated: false, isAdmin: false, session: null };
       }
       
       // Check if user is admin with refreshed session
       const { data: isAdmin, error } = await supabase.rpc('is_admin');
       console.log('Admin check with refreshed session:', isAdmin, error);
-      return isAdmin ? refreshedSession : null;
+      return { 
+        isAuthenticated: true, 
+        isAdmin: !!isAdmin, 
+        session: refreshedSession 
+      };
     }
     
     // If we have a session directly from Supabase, check if user is admin
     const { data: isAdmin, error } = await supabase.rpc('is_admin');
     console.log('Admin check with direct session:', isAdmin, error);
-    return isAdmin ? session : null;
+    return { 
+      isAuthenticated: true, 
+      isAdmin: !!isAdmin, 
+      session 
+    };
   } catch (error) {
     console.error('Error checking admin session:', error);
-    return null;
+    return { isAuthenticated: false, isAdmin: false, session: null };
   }
 };
 
 // Don't require re-authentication for admin child routes
-// Store this value in window for persistence
+// Store these values globally for persistence across route changes
 let isAuthenticated = false;
+let isAdminUser = false;
 
 export const Route = createFileRoute('/admin')({
   component: AdminLayout,
   // Use loader to check admin status with robust session checking
   loader: async ({ location }) => {
-    console.log('Running admin loader, isAuthenticated:', isAuthenticated);
+    console.log('Running admin loader, isAuthenticated:', isAuthenticated, 'isAdmin:', isAdminUser);
     
-    // Skip authentication check if already authenticated and not on initial load
-    // This prevents re-authentication on navigation between admin pages
-    if (isAuthenticated && location.pathname !== '/admin') {
-      console.log('Already authenticated, skipping check');
+    try {
+      // Skip authentication check if already verified and not on initial load
+      if ((isAuthenticated && isAdminUser) && location.pathname !== '/admin') {
+        console.log('Already verified as admin, skipping check');
+        return {};
+      }
+      
+      const { isAuthenticated: hasAuth, isAdmin } = await getSessionAndCheckAdmin();
+      
+      // Update global flags
+      isAuthenticated = hasAuth;
+      isAdminUser = isAdmin;
+      
+      console.log('Auth check results:', { hasAuth, isAdmin });
+      
+      if (!hasAuth) {
+        console.log('User is not authenticated, redirecting to login');
+        throw redirect({ to: '/auth/login' });
+      }
+      
+      if (!isAdmin) {
+        console.log('User is authenticated but not admin, redirecting to dashboard');
+        throw redirect({ to: '/' });
+      }
+      
+      console.log('Admin authentication successful');
       return {};
+    } catch (error: any) {
+      console.error('Admin auth error:', error);
+      
+      // If we have an explicit redirect, use it
+      if (error.toString().includes('redirect')) {
+        throw error;
+      }
+      
+      // For unexpected errors, decide based on authentication state
+      if (isAuthenticated) {
+        console.log('Error during admin check but user is authenticated, redirecting to dashboard');
+        throw redirect({ to: '/' });
+      } else {
+        console.log('Error during admin check and user is not authenticated, redirecting to login');
+        throw redirect({ to: '/auth/login' });
+      }
     }
-    
-    const session = await getSessionAndCheckAdmin();
-    if (!session) {
-      console.log('No valid admin session, redirecting to login');
-      throw redirect({ to: '/auth/login' });
-    }
-    
-    // Mark as authenticated
-    isAuthenticated = true;
-    console.log('Authentication successful, setting isAuthenticated to true');
-    
-    return {};
   },
   // This helps prevent unnecessary re-renders
   loaderDeps: ({ search }) => [search],

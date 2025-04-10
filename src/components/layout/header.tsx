@@ -4,6 +4,8 @@ import { Separator } from '@/components/ui/separator'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
+import { ReferralCTAButton } from '@/components/referrals/ReferralCTAButton'
+import supabase from '../../lib/supabase'
 
 interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean
@@ -19,6 +21,7 @@ export const Header = ({
   ...props
 }: HeaderProps) => {
   const [offset, setOffset] = React.useState(0)
+  const [isAdmin, setIsAdmin] = React.useState(false)
 
   React.useEffect(() => {
     const onScroll = () => {
@@ -27,6 +30,19 @@ export const Header = ({
 
     // Add scroll listener to the body
     document.addEventListener('scroll', onScroll, { passive: true })
+
+    // Check if user is admin
+    const checkAdminStatus = async () => {
+      try {
+        const { data } = await supabase.rpc('is_admin')
+        setIsAdmin(!!data)
+      } catch (error) {
+        console.error('Error checking admin status:', error)
+        setIsAdmin(false)
+      }
+    }
+
+    checkAdminStatus()
 
     // Clean up the event listener on unmount
     return () => document.removeEventListener('scroll', onScroll)
@@ -49,15 +65,19 @@ export const Header = ({
         <h1 className="text-xl font-semibold">{title}</h1>
       )}
       
-      {children}
-      
-      {/* Add profile dropdown if no children are provided */}
-      {!children && (
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
+      {/* Only show custom content (search bar) for admin users */}
+      {isAdmin && children && (
+        <div className="flex-1">
+          {children}
         </div>
       )}
+      
+      {/* Always include these components on the right */}
+      <div className={cn('flex items-center space-x-4', !isAdmin || !children ? 'ml-auto' : '')}>
+        <ReferralCTAButton />
+        <ThemeSwitch />
+        <ProfileDropdown />
+      </div>
     </header>
   )
 }

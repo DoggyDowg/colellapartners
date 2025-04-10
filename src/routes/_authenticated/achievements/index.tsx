@@ -271,19 +271,19 @@ function UserAchievements() {
             </div>
           ) : (
             achievements.map((achievement) => (
-              <Card key={achievement.id} className={`${achievement.completed ? 'border-green-200 bg-green-50' : ''}`}>
+              <Card key={achievement.id} className={`${achievement.completed ? 'border-green-500/30 dark:border-green-500/50 bg-green-50 dark:bg-green-950/30' : ''}`}>
                 <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className={`p-2 rounded-full ${
-                        achievement.completed ? 'bg-green-100' : 'bg-muted'
+                        achievement.completed ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' : 'bg-muted'
                       }`}>
                         {getIconForAchievement(achievement.icon)}
                       </div>
                       <CardTitle className="text-lg">{achievement.title}</CardTitle>
                     </div>
                     {achievement.completed && (
-                      <Badge className="bg-green-500">Completed</Badge>
+                      <Badge className="bg-green-500 hover:bg-green-600">Completed</Badge>
                     )}
                   </div>
                   <CardDescription>{achievement.description}</CardDescription>
@@ -292,14 +292,14 @@ function UserAchievements() {
                   <div className="space-y-4">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{achievement.progress} / {achievement.target}</span>
+                        <span className={`${achievement.completed ? 'text-green-800 dark:text-green-300' : ''}`}>Progress</span>
+                        <span className={`${achievement.completed ? 'text-green-800 dark:text-green-300' : ''}`}>{achievement.progress} / {achievement.target}</span>
                       </div>
-                      <Progress value={(achievement.progress / achievement.target) * 100} />
+                      <Progress value={(achievement.progress / achievement.target) * 100} className={achievement.completed ? 'bg-green-200 dark:bg-green-950' : ''} />
                     </div>
                     
                     {achievement.completed && achievement.completed_date && (
-                      <div className="pt-2 text-xs text-muted-foreground">
+                      <div className="pt-2 text-xs text-green-700 dark:text-green-400">
                         Completed on {new Date(achievement.completed_date).toLocaleDateString()}
                       </div>
                     )}

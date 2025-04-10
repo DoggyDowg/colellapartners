@@ -24,7 +24,7 @@ import {
 } from '../../components/ui/dialog';
 import { Badge } from '../../components/ui/badge';
 import { useAuth } from '../../context/AuthContext';
-import { ChevronUpIcon, ChevronDownIcon } from 'lucide-react';
+import { ChevronUpIcon, ChevronDownIcon, UserPlus, Loader2 } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -38,6 +38,7 @@ import {
 import { toast } from 'sonner';
 import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
 import { AdminCheck } from '../../components/admin/AdminCheck';
+import { AdminReferralForm } from '../../components/referrals/AdminReferralForm';
 
 // Define interfaces for our data
 interface Referrer {
@@ -58,7 +59,7 @@ interface Referral {
   status: string;
   situation_description?: string;
   additional_notes?: string;
-  referrers: Referrer;
+  referrers?: Referrer;
 }
 
 interface StatusHistoryItem {
@@ -155,32 +156,16 @@ function AdminReferrals() {
 
   useEffect(() => {
     fetchReferrals();
-  }, [statusFilter, typeFilter]);
+  }, [statusFilter, typeFilter, searchQuery]);
 
   const fetchReferrals = async () => {
     setLoading(true);
     setError(null);
     try {
+      // Step 1: Get all referrals based on filters
       let query = supabase
         .from('referrals')
-        .select(`
-          id,
-          referrer_id,
-          referee_name,
-          referee_email,
-          referee_phone,
-          referee_type,
-          status,
-          created_at,
-          situation_description,
-          additional_notes,
-          referrers (
-            id,
-            full_name,
-            email,
-            phone
-          )
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
       
       // Apply filters
@@ -192,35 +177,103 @@ function AdminReferrals() {
         query = query.eq('referee_type', typeFilter);
       }
 
-      const { data, error: queryError } = await query;
+      const { data: referralsData, error: referralsError } = await query;
       
-      if (queryError) {
-        console.warn('Error fetching referrals:', queryError);
+      if (referralsError) {
+        console.error('Error fetching referrals:', referralsError);
         setError('Unable to load referrals data. The database tables may not exist yet.');
         return;
       }
       
-      if (data) {
-        let filteredData = data as unknown as Referral[];
-        
-        // Apply search filter client-side
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          filteredData = filteredData.filter(
-            ref => ref.referee_name.toLowerCase().includes(query) ||
-                  ref.referee_email.toLowerCase().includes(query) ||
-                  ref.referrers.full_name.toLowerCase().includes(query)
-          );
-        }
-        
-        setReferrals(filteredData);
+      // Early return if no referrals
+      if (!referralsData || referralsData.length === 0) {
+        setReferrals([]);
+        setLoading(false);
+        return;
       }
+      
+      // Step 2: Get all relevant referrers in a single query
+      const referrerIds = [...new Set(
+        referralsData
+          .filter(r => r.referrer_id)
+          .map(r => r.referrer_id)
+      )];
+      
+      // If no referrer IDs, just return the referrals without referrer data
+      if (referrerIds.length === 0) {
+        const processedReferrals = referralsData.map(referral => ({
+          ...referral,
+          referrers: undefined
+        }));
+        
+        const filteredReferrals = applySearchFilter(processedReferrals);
+        setReferrals(filteredReferrals);
+        setLoading(false);
+        return;
+      }
+      
+      // Fetch all relevant referrers in one go
+      const { data: referrersData, error: referrersError } = await supabase
+        .from('referrers')
+        .select('id, full_name, email, phone')
+        .in('id', referrerIds);
+      
+      if (referrersError) {
+        console.error('Error fetching referrers:', referrersError);
+        
+        // Even if referrers fetch fails, we can still show referrals
+        const processedReferrals = referralsData.map(referral => ({
+          ...referral,
+          referrers: undefined
+        }));
+        
+        const filteredReferrals = applySearchFilter(processedReferrals);
+        setReferrals(filteredReferrals);
+        setLoading(false);
+        return;
+      }
+      
+      // Create a map for quick referrer lookup
+      const referrersMap = new Map();
+      if (referrersData) {
+        referrersData.forEach(referrer => {
+          referrersMap.set(referrer.id, referrer);
+        });
+      }
+      
+      // Combine the data
+      const processedReferrals = referralsData.map(referral => ({
+        ...referral,
+        referrers: referral.referrer_id ? referrersMap.get(referral.referrer_id) : undefined
+      }));
+      
+      // Apply search filter if needed
+      const filteredReferrals = applySearchFilter(processedReferrals);
+      setReferrals(filteredReferrals);
     } catch (error) {
       console.error('Error fetching referrals:', error);
-      setError('An unexpected error occurred while loading referrals.');
+      setError('An unexpected error occurred. Please try again later.');
     } finally {
       setLoading(false);
     }
+  };
+  
+  // Helper function to apply search filter
+  const applySearchFilter = (referrals: Referral[]): Referral[] => {
+    if (!searchQuery || referrals.length === 0) return referrals;
+    
+    const query = searchQuery.toLowerCase();
+    return referrals.filter(
+      referral => 
+        (referral.referee_name && referral.referee_name.toLowerCase().includes(query)) ||
+        (referral.referee_email && referral.referee_email.toLowerCase().includes(query)) ||
+        (referral.referee_type && referral.referee_type.toLowerCase().includes(query)) ||
+        (referral.referrers && referral.referrers.full_name && 
+         referral.referrers.full_name.toLowerCase().includes(query)) ||
+        (referral.referrers && referral.referrers.email && 
+         referral.referrers.email.toLowerCase().includes(query)) ||
+        (referral.status && referral.status.toLowerCase().includes(query))
+    );
   };
 
   const fetchStatusHistory = async (referralId: string) => {
@@ -247,9 +300,19 @@ function AdminReferrals() {
   };
 
   const openReferralDetails = async (referral: Referral) => {
+    // We now get all referrer details efficiently in the initial fetchReferrals query
+    // so we only need to fetch status history here
     setSelectedReferral(referral);
     setIsDialogOpen(true);
     await fetchStatusHistory(referral.id);
+  };
+
+  // Add new function to navigate to referrer details
+  const navigateToReferrerDetails = (referrerId: string) => {
+    if (!referrerId) return;
+    
+    // Navigate to the partner details page in the same window
+    window.location.href = `/admin/referrers?partner=${referrerId}`;
   };
 
   // Get reward amount based on referral type
@@ -719,7 +782,7 @@ function AdminReferrals() {
                 <CardTitle className="text-xl">Filters</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="status">Status</Label>
                     <Select
@@ -757,24 +820,6 @@ function AdminReferrals() {
                     </Select>
                   </div>
                   
-                  <div className="space-y-2">
-                    <Label htmlFor="search">Search</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="search"
-                        placeholder="Search by name or email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                      />
-                      <Button
-                        variant="outline"
-                        onClick={() => fetchReferrals()}
-                      >
-                        Search
-                      </Button>
-                    </div>
-                  </div>
-                  
                   <div className="flex items-end">
                     <Button 
                       variant="outline"
@@ -790,19 +835,45 @@ function AdminReferrals() {
             
             <Card>
               <CardHeader>
-                <CardTitle className="text-xl">
-                  Referrals
-                  {!loading && (
-                    <span className="ml-2 text-sm font-normal text-muted-foreground">
-                      ({referrals.length} {referrals.length === 1 ? 'referral' : 'referrals'})
+                <CardTitle className="text-xl flex items-center justify-between">
+                  <div className="flex items-center gap-4 w-full">
+                    <span>
+                      Referrals
+                      {!loading && (
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          ({referrals.length} {referrals.length === 1 ? 'referral' : 'referrals'})
+                        </span>
+                      )}
                     </span>
-                  )}
+                    
+                    <AdminReferralForm 
+                      onSubmitSuccess={fetchReferrals}
+                      triggerButton={
+                        <Button
+                          className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Add Referral
+                        </Button>
+                      }
+                    />
+                    
+                    <div className="flex-1 max-w-md ml-auto">
+                      <Input
+                        placeholder="Search by name, email, type..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="font-normal"
+                      />
+                    </div>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <div className="flex justify-center items-center h-64">
-                    <p>Loading referrals...</p>
+                  <div className="flex flex-col justify-center items-center h-64 space-y-4">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <p className="text-muted-foreground">Loading referrals...</p>
                   </div>
                 ) : referrals.length === 0 ? (
                   <div className="flex justify-center items-center h-32">
@@ -818,7 +889,6 @@ function AdminReferrals() {
                           <TableHead>Referrer</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Status</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -828,12 +898,38 @@ function AdminReferrals() {
                               {formatDate(referral.created_at)}
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{referral.referee_name}</div>
-                              <div className="text-sm text-muted-foreground">{referral.referee_email}</div>
+                              <div 
+                                className="cursor-pointer hover:text-primary group" 
+                                onClick={() => openReferralDetails(referral)}
+                                title="Click to manage referee details"
+                              >
+                                <div className="font-medium group-hover:underline">
+                                  {referral.referee_name}
+                                </div>
+                                <div className="text-sm text-muted-foreground group-hover:text-primary">
+                                  {referral.referee_email}
+                                </div>
+                              </div>
                             </TableCell>
                             <TableCell>
-                              <div className="font-medium">{referral.referrers?.full_name}</div>
-                              <div className="text-sm text-muted-foreground">{referral.referrers?.email}</div>
+                              {referral.referrer_id && referral.referrers ? (
+                                <div 
+                                  className="cursor-pointer hover:text-primary group"
+                                  onClick={() => navigateToReferrerDetails(referral.referrer_id)}
+                                  title="Click to view partner details"
+                                >
+                                  <div className="font-medium group-hover:underline">
+                                    {referral.referrers?.full_name}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground group-hover:text-primary">
+                                    {referral.referrers?.email}
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-muted-foreground">
+                                  No referrer
+                                </div>
+                              )}
                             </TableCell>
                             <TableCell className="whitespace-nowrap">
                               {referral.referee_type.charAt(0).toUpperCase() + referral.referee_type.slice(1)}
@@ -842,15 +938,6 @@ function AdminReferrals() {
                               <Badge className={getStatusBadgeClass(referral.status)}>
                                 {referral.status || 'New'}
                               </Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => openReferralDetails(referral)}
-                              >
-                                Manage
-                              </Button>
                             </TableCell>
                           </TableRow>
                         ))}
@@ -920,7 +1007,7 @@ function AdminReferrals() {
                 <DialogHeader>
                   <DialogTitle>Create Reward</DialogTitle>
                   <DialogDescription>
-                    {selectedReferral && `Create a reward for referring ${selectedReferral.referee_name}`}
+                    {selectedReferral ? `Create a reward for referring ${selectedReferral.referee_name}` : 'Create reward'}
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -931,7 +1018,7 @@ function AdminReferrals() {
                         <Label htmlFor="referrer">Referrer</Label>
                         <Input 
                           id="referrer" 
-                          value={selectedReferral.referrers?.full_name || ''} 
+                          value={selectedReferral.referrers?.full_name || 'Unknown'} 
                           disabled 
                         />
                       </div>

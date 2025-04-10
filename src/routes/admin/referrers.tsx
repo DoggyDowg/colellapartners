@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -34,6 +34,12 @@ import { useAuth } from '../../context/AuthContext';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
 import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
 import RewardDetailsDialog from '../../components/rewards/RewardDetailsDialog';
+import { AdminPartnerForm } from '../../components/referrals/AdminPartnerForm';
+import { UserPlus } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { Textarea } from '../../components/ui/textarea';
+import { Avatar, AvatarFallback } from '../../components/ui/avatar';
+import { TrashIcon } from '@radix-ui/react-icons';
 
 // Define interfaces for our data
 interface Referrer {
@@ -49,6 +55,7 @@ interface Referrer {
   partner_code?: string;
   active: boolean;
   partnership_start_date: string;
+  additional_notes?: string;
 }
 
 // Add Referral interface for displaying partner's referrals
@@ -117,6 +124,8 @@ function AdminReferrers() {
   const { user } = useAuth();
   const [referrers, setReferrers] = useState<Referrer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [, setError] = useState<string | null>(null);
+  const urlPartnerIdRef = useRef<string | null>(null);
   const [selectedReferrer, setSelectedReferrer] = useState<Referrer | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
@@ -140,9 +149,9 @@ function AdminReferrers() {
   const [isRewardDialogOpen, setIsRewardDialogOpen] = useState(false);
   
   // Filters
-  const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeFilter, setActiveFilter] = useState<boolean | null>(null);
   const [businessFilter, setBusinessFilter] = useState<boolean | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   
   // Status options for rewards
   const rewardStatusOptions = [
@@ -151,12 +160,34 @@ function AdminReferrers() {
     'paid'
   ];
 
+  const [partnerCodeValid, setPartnerCodeValid] = useState<boolean | null>(null);
+  const [partnerCodeChecking, setPartnerCodeChecking] = useState(false);
+  const [invalidCharDetected, setInvalidCharDetected] = useState(false);
+
+  const [partnerNote, setPartnerNote] = useState('');
+
+  // Add new state variables near the other state declarations
+  const [statusToggleNote, setStatusToggleNote] = useState('');
+  const [isStatusToggleDialogOpen, setIsStatusToggleDialogOpen] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{referrerId: string, newStatus: boolean} | null>(null);
+
+  // Check for partner ID in URL when component mounts
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const partnerId = urlParams.get('partner');
+    if (partnerId) {
+      urlPartnerIdRef.current = partnerId;
+    }
+  }, []);
+
   useEffect(() => {
     fetchReferrers();
-  }, [activeFilter, businessFilter]);
+  }, [activeFilter, businessFilter, searchQuery]);
 
   const fetchReferrers = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
       let query = supabase
         .from('referrers')
@@ -172,11 +203,7 @@ function AdminReferrers() {
         query = query.eq('is_business', businessFilter);
       }
 
-      const { data, error } = await query;
-      
-      if (error) {
-        throw error;
-      }
+      const { data } = await query;
       
       if (data) {
         let filteredData = data as Referrer[];
@@ -196,6 +223,7 @@ function AdminReferrers() {
       }
     } catch (error) {
       console.error('Error fetching referrers:', error);
+      setError('Failed to load partners. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -272,10 +300,28 @@ function AdminReferrers() {
     // Initialize edit form with current values
     setEditedReferrer({...selectedReferrer});
     setIsEditMode(true);
+    
+    // Reset partner code validation state
+    setPartnerCodeValid(null);
+    setPartnerCodeChecking(false);
+    setInvalidCharDetected(false);
   };
   
   const savePartnerChanges = async () => {
     if (!editedReferrer) return;
+    
+    // Validate partner code for business partners
+    if (editedReferrer.is_business && editedReferrer.partner_code) {
+      if (invalidCharDetected) {
+        toast.error("Partner code contains invalid characters");
+        return;
+      }
+      
+      if (partnerCodeValid === false) {
+        toast.error("This partner code is already in use");
+        return;
+      }
+    }
     
     try {
       const { error } = await supabase
@@ -285,10 +331,8 @@ function AdminReferrers() {
           email: editedReferrer.email,
           phone: editedReferrer.phone,
           is_business: editedReferrer.is_business,
-          business_name: editedReferrer.business_name,
-          contact_person: editedReferrer.contact_person,
-          address: editedReferrer.address,
-          partner_code: editedReferrer.partner_code,
+          business_name: editedReferrer.is_business ? editedReferrer.business_name : null,
+          partner_code: editedReferrer.is_business ? editedReferrer.partner_code : null,
           active: editedReferrer.active
         })
         .eq('id', editedReferrer.id);
@@ -346,43 +390,106 @@ function AdminReferrers() {
     return new Date(dateString).toLocaleDateString();
   };
 
-  const togglePartnerStatus = async (referrerId: string, isActive: boolean) => {
+  const initiateTogglePartnerStatus = (referrerId: string, isActive: boolean) => {
+    setPendingStatusChange({ referrerId, newStatus: isActive });
+    setStatusToggleNote('');
+    setIsStatusToggleDialogOpen(true);
+  };
+
+  const confirmTogglePartnerStatus = async () => {
+    if (!pendingStatusChange) {
+      setIsStatusToggleDialogOpen(false);
+      return;
+    }
+
+    const { referrerId, newStatus } = pendingStatusChange;
+    
     try {
+      // Update the partner status
       const { error } = await supabase
         .from('referrers')
-        .update({ active: isActive })
+        .update({ active: newStatus })
         .eq('id', referrerId);
       
       if (error) {
         throw error;
       }
       
+      // Find the referrer to get their details
+      const referrer = referrers.find(r => r.id === referrerId);
+      if (!referrer) {
+        throw new Error('Partner not found');
+      }
+      
+      // Create note with status change information
+      const statusChangeType = newStatus ? 'Partner Activated' : 'Partner Deactivated';
+      const noteText = statusToggleNote.trim() 
+        ? `${statusChangeType}: ${statusToggleNote}` 
+        : statusChangeType;
+      
+      // Create note object
+      const note = {
+        user: user?.user_metadata?.full_name || 'Unknown User',
+        content: noteText,
+        date: new Date().toISOString()
+      };
+      
+      // Parse existing notes or create new array
+      let notes: Note[] = [];
+      if (referrer.additional_notes) {
+        try {
+          notes = JSON.parse(referrer.additional_notes);
+        } catch (e) {
+          console.error('Error parsing notes:', e);
+        }
+      }
+      
+      // Add new note
+      notes.unshift(note);
+      
+      // Update in database with the new note
+      const { error: notesError } = await supabase
+        .from('referrers')
+        .update({ additional_notes: JSON.stringify(notes) })
+        .eq('id', referrerId);
+      
+      if (notesError) {
+        console.error('Error updating notes:', notesError);
+      }
+      
       // Update local state
+      const updatedReferrer = {
+        ...referrer,
+        active: newStatus,
+        additional_notes: JSON.stringify(notes)
+      };
+      
       setReferrers(prevReferrers => 
         prevReferrers.map(ref => 
-          ref.id === referrerId ? { ...ref, active: isActive } : ref
+          ref.id === referrerId ? updatedReferrer : ref
         )
       );
       
       // If this is the selected referrer, update it too
       if (selectedReferrer && selectedReferrer.id === referrerId) {
-        setSelectedReferrer({ ...selectedReferrer, active: isActive });
+        setSelectedReferrer(updatedReferrer);
       }
       
+      toast.success(`Partner ${newStatus ? 'activated' : 'deactivated'} successfully`);
     } catch (error) {
       console.error('Error updating partner status:', error);
+      toast.error('Error updating partner status');
+    } finally {
+      setIsStatusToggleDialogOpen(false);
+      setPendingStatusChange(null);
+      setStatusToggleNote('');
     }
   };
 
-  const handleSearch = () => {
-    fetchReferrers();
-  };
-
   const resetFilters = () => {
-    setSearchQuery('');
     setActiveFilter(null);
     setBusinessFilter(null);
-    fetchReferrers();
+    setSearchQuery('');
   };
 
   // Add these new functions for handling referral details
@@ -554,8 +661,8 @@ function AdminReferrers() {
     setIsDeleteDialogOpen(true);
   };
 
-  const deleteNote = async () => {
-    if (noteToDelete === null || !selectedReferral) {
+  const deletePartnerNote = async () => {
+    if (noteToDelete === null || !selectedReferrer) {
       setIsDeleteDialogOpen(false);
       return;
     }
@@ -563,9 +670,9 @@ function AdminReferrers() {
     try {
       // Parse existing notes
       let notes: Note[] = [];
-      if (selectedReferral.additional_notes) {
+      if (selectedReferrer.additional_notes) {
         try {
-          notes = JSON.parse(selectedReferral.additional_notes);
+          notes = JSON.parse(selectedReferrer.additional_notes);
         } catch (e) {
           console.error('Error parsing notes:', e);
           setIsDeleteDialogOpen(false);
@@ -578,22 +685,22 @@ function AdminReferrers() {
       
       // Update in database
       const { error } = await supabase
-        .from('referrals')
+        .from('referrers')
         .update({ additional_notes: notes.length ? JSON.stringify(notes) : null })
-        .eq('id', selectedReferral.id);
+        .eq('id', selectedReferrer.id);
       
       if (error) throw error;
       
-      // Update selected referral in state
-      setSelectedReferral({
-        ...selectedReferral,
+      // Update selected referrer in state
+      setSelectedReferrer({
+        ...selectedReferrer,
         additional_notes: notes.length ? JSON.stringify(notes) : undefined
       });
       
-      // Update in the referrerReferrals list
-      setReferrerReferrals(prevReferrals =>
-        prevReferrals.map(ref =>
-          ref.id === selectedReferral.id
+      // Update in the referrers list
+      setReferrers(prevReferrers =>
+        prevReferrers.map(ref =>
+          ref.id === selectedReferrer.id
             ? { 
                 ...ref, 
                 additional_notes: notes.length ? JSON.stringify(notes) : undefined 
@@ -708,6 +815,150 @@ function AdminReferrers() {
     }
   };
 
+  // Helper to check if a partner code is unique
+  const checkPartnerCodeUnique = async (code: string, currentPartnerId?: string): Promise<boolean> => {
+    if (!code || code.length < 3) return false;
+    
+    setPartnerCodeChecking(true);
+    try {
+      const { data, error } = await supabase
+        .from('referrers')
+        .select('id')
+        .eq('partner_code', code);
+      
+      if (error) throw error;
+      
+      // If the only match is the current partner, it's still valid
+      if (currentPartnerId && data.length === 1 && data[0].id === currentPartnerId) {
+        return true;
+      }
+      
+      // Otherwise, it should not exist in the database
+      return data.length === 0;
+    } catch (error) {
+      console.error('Error checking partner code:', error);
+      return false;
+    } finally {
+      setPartnerCodeChecking(false);
+    }
+  };
+
+  // Check for invalid characters in partner code
+  const checkInvalidChars = (code: string): boolean => {
+    return !/^[A-Z0-9]*$/.test(code);
+  };
+
+  // Force uppercase and handle input restrictions for partner code
+  const handlePartnerCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.toUpperCase();
+    
+    // Check for invalid characters
+    const hasInvalidChars = checkInvalidChars(value);
+    setInvalidCharDetected(hasInvalidChars);
+    
+    // If there are invalid chars, clear the valid state
+    if (hasInvalidChars) {
+      setPartnerCodeValid(null);
+    }
+    
+    if (editedReferrer) {
+      setEditedReferrer({
+        ...editedReferrer,
+        partner_code: value
+      });
+    }
+  };
+  
+  // Handle partner code blur event to validate
+  const handlePartnerCodeBlur = async (code: string) => {
+    // If there are invalid chars, don't bother checking uniqueness
+    if (checkInvalidChars(code)) {
+      setInvalidCharDetected(true);
+      setPartnerCodeValid(null);
+      return;
+    }
+    
+    if (code && code.length >= 3) {
+      const isUnique = await checkPartnerCodeUnique(code, editedReferrer?.id);
+      setPartnerCodeValid(isUnique);
+    }
+  };
+
+  // After the component renders and referrers are loaded, check if we need to open a specific referrer's details
+  useEffect(() => {
+    if (!loading && referrers.length > 0 && urlPartnerIdRef.current) {
+      const partner = referrers.find(r => r.id === urlPartnerIdRef.current);
+      if (partner) {
+        openReferrerDetails(partner);
+        urlPartnerIdRef.current = null; // Clear the reference
+      }
+    }
+  }, [loading, referrers]);
+
+  // Add this function to handle adding notes to partners
+  const addPartnerNote = async () => {
+    if (!partnerNote.trim() || !selectedReferrer) return;
+    
+    try {
+      // Create note object
+      const note = {
+        user: user?.user_metadata?.full_name || 'Unknown User',
+        content: partnerNote,
+        date: new Date().toISOString()
+      };
+      
+      // Parse existing notes or create new array
+      let notes: Note[] = [];
+      if (selectedReferrer.additional_notes) {
+        try {
+          notes = JSON.parse(selectedReferrer.additional_notes);
+        } catch (e) {
+          console.error('Error parsing notes:', e);
+        }
+      }
+      
+      // Add new note
+      notes.unshift(note);
+      
+      // Update in database
+      const { error } = await supabase
+        .from('referrers')
+        .update({ additional_notes: JSON.stringify(notes) })
+        .eq('id', selectedReferrer.id);
+      
+      if (error) throw error;
+      
+      // Update selected referrer in state
+      setSelectedReferrer({
+        ...selectedReferrer,
+        additional_notes: JSON.stringify(notes)
+      });
+      
+      // Update in the referrers list
+      setReferrers(prevReferrers =>
+        prevReferrers.map(ref =>
+          ref.id === selectedReferrer.id
+            ? { ...ref, additional_notes: JSON.stringify(notes) }
+            : ref
+        )
+      );
+      
+      // Clear input
+      setPartnerNote('');
+      
+      toast.success('Note added successfully');
+    } catch (error) {
+      console.error('Error adding note:', error);
+      toast.error('Error adding note');
+    }
+  };
+
+  // Add function to confirm note deletion
+  const confirmPartnerNoteDelete = (index: number) => {
+    setNoteToDelete(index);
+    setIsDeleteDialogOpen(true);
+  };
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Partner Management</h1>
@@ -717,25 +968,7 @@ function AdminReferrers() {
           <CardTitle className="text-xl">Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <Label htmlFor="search">Search</Label>
-              <div className="flex gap-2 mt-2">
-                <Input
-                  id="search"
-                  placeholder="Search by name, email, business..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-                <Button
-                  variant="outline"
-                  onClick={handleSearch}
-                >
-                  Search
-                </Button>
-              </div>
-            </div>
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-4">
               <div className="flex items-center space-x-2">
                 <Switch 
@@ -800,21 +1033,44 @@ function AdminReferrers() {
       <Card>
         <CardHeader>
           <CardTitle className="text-xl flex items-center justify-between">
-            <span>
-              Partners
-              {!loading && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({referrers.length} {referrers.length === 1 ? 'partner' : 'partners'})
-                </span>
-              )}
-            </span>
-            
-            <Button 
-              size="sm"
-              onClick={() => alert('Add partner functionality to be implemented')}
-            >
-              Add Partner
-            </Button>
+            <div className="flex items-center gap-4 w-full">
+              <span>
+                Partners
+                {!loading && (
+                  <span className="ml-2 text-sm font-normal text-muted-foreground">
+                    ({referrers.length} {referrers.length === 1 ? 'partner' : 'partners'})
+                  </span>
+                )}
+              </span>
+              
+              <AdminPartnerForm 
+                onSubmitSuccess={fetchReferrers} 
+                onViewPartner={(partnerId) => {
+                  // Find the partner in the referrers array
+                  const partner = referrers.find(r => r.id === partnerId);
+                  if (partner) {
+                    openReferrerDetails(partner);
+                  }
+                }}
+                triggerButton={
+                  <Button
+                    className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                  >
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Partner
+                  </Button>
+                }
+              />
+              
+              <div className="flex-1 max-w-md ml-auto">
+                <Input
+                  placeholder="Search by name, email, business..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="font-normal"
+                />
+              </div>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -837,25 +1093,36 @@ function AdminReferrers() {
                     <TableHead>Partner Code</TableHead>
                     <TableHead>Since</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {referrers.map((referrer) => (
                     <TableRow key={referrer.id}>
                       <TableCell>
-                        <div className="font-medium">
-                          {referrer.is_business ? referrer.business_name : referrer.full_name}
-                        </div>
-                        {referrer.is_business && (
-                          <div className="text-sm text-muted-foreground">
-                            Contact: {referrer.contact_person}
+                        <div 
+                          className="cursor-pointer hover:text-primary group" 
+                          onClick={() => openReferrerDetails(referrer)}
+                          title="Click to view partner details"
+                        >
+                          <div className="font-medium group-hover:underline">
+                            {referrer.is_business ? referrer.business_name : referrer.full_name}
                           </div>
-                        )}
+                          {referrer.is_business && (
+                            <div className="text-sm text-muted-foreground group-hover:text-primary">
+                              {referrer.full_name}
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">{referrer.email}</div>
-                        <div className="text-sm">{referrer.phone}</div>
+                        <div 
+                          className="cursor-pointer hover:text-primary group" 
+                          onClick={() => openReferrerDetails(referrer)}
+                          title="Click to view partner details"
+                        >
+                          <div className="text-sm group-hover:text-primary">{referrer.email}</div>
+                          <div className="text-sm group-hover:text-primary">{referrer.phone}</div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         {referrer.is_business ? 'Business' : 'Individual'}
@@ -867,29 +1134,20 @@ function AdminReferrers() {
                         {new Date(referrer.partnership_start_date || referrer.created_at).toLocaleDateString()}
                       </TableCell>
                       <TableCell>
-                        <span className={`inline-flex rounded-full px-2 py-1 text-xs ${
-                          referrer.active
-                            ? 'bg-green-100 text-green-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {referrer.active ? 'Active' : 'Inactive'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`inline-flex rounded-full px-2 py-1 text-xs ${
+                            referrer.active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {referrer.active ? 'Active' : 'Inactive'}
+                          </span>
                           <Button 
-                            variant="outline" 
+                            variant={referrer.active ? "outline" : "default"}
                             size="sm"
-                            onClick={() => togglePartnerStatus(referrer.id, !referrer.active)}
+                            onClick={() => initiateTogglePartnerStatus(referrer.id, !referrer.active)}
                           >
                             {referrer.active ? 'Deactivate' : 'Activate'}
-                          </Button>
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openReferrerDetails(referrer)}
-                          >
-                            View
                           </Button>
                         </div>
                       </TableCell>
@@ -918,8 +1176,9 @@ function AdminReferrers() {
               </DialogHeader>
               
               <Tabs defaultValue="details" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="details">Details</TabsTrigger>
+                  <TabsTrigger value="notes">Notes</TabsTrigger>
                   <TabsTrigger value="referrals">Referrals</TabsTrigger>
                   <TabsTrigger value="rewards">Rewards</TabsTrigger>
                 </TabsList>
@@ -928,9 +1187,30 @@ function AdminReferrers() {
                   {isEditMode ? (
                     // Edit Form
                     <div className="space-y-4">
-                      {editedReferrer?.is_business ? (
-                        <>
-                          <div className="space-y-2">
+                      <div className="space-y-4">
+                        <div className="font-medium text-base mb-2">Partner Type</div>
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="is_business" 
+                            checked={editedReferrer?.is_business || false}
+                            onCheckedChange={(checked) => {
+                              if (editedReferrer) {
+                                setEditedReferrer({
+                                  ...editedReferrer,
+                                  is_business: checked
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor="is_business">
+                            {editedReferrer?.is_business ? 'Business Partner' : 'Individual Partner'}
+                          </Label>
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {editedReferrer?.is_business && (
+                          <div className="space-y-2 md:col-span-2">
                             <Label htmlFor="business_name">Business Name</Label>
                             <Input 
                               id="business_name" 
@@ -945,24 +1225,8 @@ function AdminReferrers() {
                               }}
                             />
                           </div>
-                          
-                          <div className="space-y-2">
-                            <Label htmlFor="contact_person">Contact Person</Label>
-                            <Input 
-                              id="contact_person" 
-                              value={editedReferrer?.contact_person || ''} 
-                              onChange={(e) => {
-                                if (editedReferrer) {
-                                  setEditedReferrer({
-                                    ...editedReferrer,
-                                    contact_person: e.target.value
-                                  });
-                                }
-                              }}
-                            />
-                          </div>
-                        </>
-                      ) : (
+                        )}
+                        
                         <div className="space-y-2">
                           <Label htmlFor="full_name">Full Name</Label>
                           <Input 
@@ -978,94 +1242,100 @@ function AdminReferrers() {
                             }}
                           />
                         </div>
-                      )}
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
-                        <Input 
-                          id="email" 
-                          type="email"
-                          value={editedReferrer?.email || ''} 
-                          onChange={(e) => {
-                            if (editedReferrer) {
-                              setEditedReferrer({
-                                ...editedReferrer,
-                                email: e.target.value
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone</Label>
-                        <Input 
-                          id="phone" 
-                          value={editedReferrer?.phone || ''} 
-                          onChange={(e) => {
-                            if (editedReferrer) {
-                              setEditedReferrer({
-                                ...editedReferrer,
-                                phone: e.target.value
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="address">Address</Label>
-                        <Input 
-                          id="address" 
-                          value={editedReferrer?.address || ''} 
-                          onChange={(e) => {
-                            if (editedReferrer) {
-                              setEditedReferrer({
-                                ...editedReferrer,
-                                address: e.target.value
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="space-y-2">
-                        <Label htmlFor="partner_code">Partner Code</Label>
-                        <Input 
-                          id="partner_code" 
-                          value={editedReferrer?.partner_code || ''} 
-                          onChange={(e) => {
-                            if (editedReferrer) {
-                              setEditedReferrer({
-                                ...editedReferrer,
-                                partner_code: e.target.value
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                      
-                      <div className="flex items-center space-x-2">
-                        <Switch 
-                          id="active" 
-                          checked={editedReferrer?.active || false}
-                          onCheckedChange={(checked) => {
-                            if (editedReferrer) {
-                              setEditedReferrer({
-                                ...editedReferrer,
-                                active: checked
-                              });
-                            }
-                          }}
-                        />
-                        <Label htmlFor="active">Active Partner</Label>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input 
+                            id="email" 
+                            type="email"
+                            value={editedReferrer?.email || ''} 
+                            onChange={(e) => {
+                              if (editedReferrer) {
+                                setEditedReferrer({
+                                  ...editedReferrer,
+                                  email: e.target.value
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone</Label>
+                          <Input 
+                            id="phone" 
+                            value={editedReferrer?.phone || ''} 
+                            onChange={(e) => {
+                              if (editedReferrer) {
+                                setEditedReferrer({
+                                  ...editedReferrer,
+                                  phone: e.target.value
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                        
+                        {editedReferrer?.is_business && (
+                          <div className="space-y-2">
+                            <Label htmlFor="partner_code">Partner Code</Label>
+                            <div className="relative">
+                              <Input 
+                                id="partner_code" 
+                                maxLength={8}
+                                value={editedReferrer?.partner_code || ''}
+                                onChange={handlePartnerCodeChange}
+                                onBlur={() => handlePartnerCodeBlur(editedReferrer?.partner_code || '')}
+                                className={`pr-9 ${
+                                  invalidCharDetected ? 'border-red-500' :
+                                  partnerCodeValid === false ? 'border-red-500' :
+                                  partnerCodeValid === true ? 'border-green-500' : ''
+                                }`}
+                              />
+                              {partnerCodeChecking && (
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                </div>
+                              )}
+                              {partnerCodeValid === true && !partnerCodeChecking && !invalidCharDetected && (
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className={`text-xs ${invalidCharDetected ? 'text-red-500' : 'text-muted-foreground'}`}>
+                              3-8 alphanumeric characters (A-Z, 0-9)
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center space-x-2">
+                          <Switch 
+                            id="active" 
+                            checked={editedReferrer?.active || false}
+                            onCheckedChange={(checked) => {
+                              if (editedReferrer) {
+                                setEditedReferrer({
+                                  ...editedReferrer,
+                                  active: checked
+                                });
+                              }
+                            }}
+                          />
+                          <Label htmlFor="active">Active Partner</Label>
+                        </div>
                       </div>
                       
                       <div className="flex justify-end space-x-2 pt-4">
                         <Button variant="outline" onClick={cancelEdit}>
                           Cancel
                         </Button>
-                        <Button onClick={savePartnerChanges}>
+                        <Button 
+                          onClick={savePartnerChanges}
+                          className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                        >
                           Save Changes
                         </Button>
                       </div>
@@ -1129,9 +1399,9 @@ function AdminReferrers() {
                           <Button
                             variant={selectedReferrer.active ? "outline" : "default"}
                             size="sm"
-                            onClick={() => togglePartnerStatus(selectedReferrer.id, !selectedReferrer.active)}
+                            onClick={() => initiateTogglePartnerStatus(selectedReferrer.id, !selectedReferrer.active)}
                           >
-                            {selectedReferrer.active ? 'Deactivate Partner' : 'Activate Partner'}
+                            {selectedReferrer.active ? 'Deactivate' : 'Activate'}
                           </Button>
                           
                           <Button
@@ -1145,6 +1415,67 @@ function AdminReferrers() {
                       </div>
                     </div>
                   )}
+                </TabsContent>
+                
+                <TabsContent value="notes" className="space-y-4">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium">Add Note</h3>
+                      <div className="mt-2 flex gap-2">
+                        <Textarea 
+                          placeholder="Enter your notes here..." 
+                          value={partnerNote}
+                          onChange={(e) => setPartnerNote(e.target.value)}
+                          className="h-24"
+                        />
+                      </div>
+                      <div className="mt-2 flex justify-end">
+                        <Button 
+                          onClick={addPartnerNote}
+                          disabled={!partnerNote.trim()}
+                          className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200 disabled:opacity-50"
+                        >
+                          Add Note
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="border-t pt-4">
+                      <h3 className="text-sm font-medium mb-2">Notes History</h3>
+                      {selectedReferrer?.additional_notes ? (
+                        <div className="space-y-3">
+                          {parseNotes(selectedReferrer.additional_notes).map((note, index) => (
+                            <Card key={index} className="p-4">
+                              <div className="flex items-start gap-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback>{getInitials(note.user)}</AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1">
+                                  <div className="flex justify-between items-start">
+                                    <div className="font-medium text-base">{note.user}</div>
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-xs text-muted-foreground">{formatTimeAgo(note.date)}</div>
+                                      <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                        onClick={() => confirmPartnerNoteDelete(index)}
+                                      >
+                                        <TrashIcon className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  <div className="text-sm text-muted-foreground mt-1">{note.content}</div>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No notes available</p>
+                      )}
+                    </div>
+                  </div>
                 </TabsContent>
                 
                 <TabsContent value="referrals" className="space-y-4">
@@ -1275,9 +1606,11 @@ function AdminReferrers() {
               </Tabs>
               
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Close
-                </Button>
+                {!isEditMode && (
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Close
+                  </Button>
+                )}
               </DialogFooter>
             </>
           )}
@@ -1329,15 +1662,61 @@ function AdminReferrers() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setIsDeleteDialogOpen(false)}>
+            <AlertDialogCancel>
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction onClick={deleteNote}>
+            <AlertDialogAction onClick={deletePartnerNote} className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200">
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Status Change Dialog */}
+      <Dialog open={isStatusToggleDialogOpen} onOpenChange={setIsStatusToggleDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {pendingStatusChange?.newStatus ? 'Activate Partner' : 'Deactivate Partner'}
+            </DialogTitle>
+            <DialogDescription>
+              {pendingStatusChange?.newStatus 
+                ? 'Please provide a note explaining why you are activating this partner.' 
+                : 'Please provide a note explaining why you are deactivating this partner.'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <Textarea 
+              placeholder="Enter your note here (optional)..." 
+              value={statusToggleNote}
+              onChange={(e) => setStatusToggleNote(e.target.value)}
+              className="h-24"
+            />
+            
+            <div className="text-sm text-muted-foreground">
+              {pendingStatusChange?.newStatus
+                ? 'This note will be saved with the activation action.'
+                : 'This note will be saved with the deactivation action.'}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsStatusToggleDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmTogglePartnerStatus}
+              className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            >
+              {pendingStatusChange?.newStatus ? 'Activate' : 'Deactivate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

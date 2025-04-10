@@ -4,8 +4,6 @@ import supabase from '../../lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Header } from '../../components/layout/header'
-import { ThemeSwitch } from '../../components/theme-switch'
-import { ProfileDropdown } from '../../components/profile-dropdown'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '../../components/ui/badge'
 import { IconTrophy, IconUserCircle, IconGift, IconArrowRight, IconUserPlus, IconChartBar, IconCalendarStats } from '@tabler/icons-react'
@@ -154,12 +152,7 @@ function PartnerDashboard() {
   if (error) {
     return (
       <>
-        <Header title="Dashboard">
-          <div className='ml-auto flex items-center space-x-4'>
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </Header>
+        <Header title="Dashboard" />
         <div className="container py-6">
           <Card className="p-6">
             <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -175,12 +168,7 @@ function PartnerDashboard() {
 
   return (
     <>
-      <Header title="Dashboard">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="Dashboard" />
       
       <div className="container py-6">
         {/* Quick Actions */}

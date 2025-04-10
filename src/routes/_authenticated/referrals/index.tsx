@@ -12,8 +12,6 @@ import {
 } from '../../../components/ui/table';
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
-import { ThemeSwitch } from '../../../components/theme-switch';
-import { ProfileDropdown } from '../../../components/profile-dropdown';
 import { toast } from 'sonner';
 import { Input } from '../../../components/ui/input';
 import { IconSearch } from '@tabler/icons-react';
@@ -193,12 +191,7 @@ function UserReferrals() {
   if (error) {
     return (
       <>
-        <Header title="My Referrals">
-          <div className='ml-auto flex items-center space-x-4'>
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </Header>
+        <Header title="My Referrals" />
         <div className="container py-6">
           <h1 className="text-3xl font-bold mb-6">My Referrals</h1>
           <Card className="p-6">
@@ -222,12 +215,7 @@ function UserReferrals() {
 
   return (
     <>
-      <Header title="My Referrals">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="My Referrals" />
       <div className="container py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">My Referrals</h1>

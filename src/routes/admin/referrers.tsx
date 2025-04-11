@@ -1333,60 +1333,6 @@ function AdminReferrers() {
   };
 
   // Add function to try a specific category ID
-  const _trySpecificCategoryId = async (categoryId: string) => {
-    if (!categoryId.trim()) return;
-    
-    setLoadingVaultreContacts(true);
-    try {
-      console.log(`Manually trying category ID: ${categoryId}`);
-      
-      // Use the updated function to directly get contacts with this category ID
-      const contacts = await getColellaPartnerContacts([categoryId]);
-      
-      console.log(`Found ${contacts.length} contacts with manually specified category ID ${categoryId}`);
-      
-      // Log the first contact for debugging
-      if (contacts.length > 0) {
-        console.log("Sample contact:", 
-          contacts[0].fullName || `${contacts[0].firstName || ''} ${contacts[0].lastName || ''}`.trim());
-      }
-      
-      // Get existing partners to check for duplicates
-      const { data: existingPartners } = await supabase
-        .from('referrers')
-        .select('id, email, phone');
-      
-      // Mark contacts that already exist in the database
-      const contactsWithStatus = contacts.map(contact => {
-        const matchedPartner = existingPartners?.find(partner => 
-          (contact.email && partner.email === contact.email) || 
-          (contact.mobilePhone && partner.phone === contact.mobilePhone)
-        );
-        
-        return {
-          ...contact,
-          existsInDatabase: !!matchedPartner,
-          matchedPartnerId: matchedPartner?.id
-        };
-      });
-      
-      setVaultreContacts(contactsWithStatus);
-      
-      if (contacts.length > 0) {
-        toast.success(`Found ${contacts.length} contacts with category ID: ${categoryId}`);
-      } else {
-        toast.info(`No contacts found with category ID: ${categoryId}`);
-      }
-    } catch (error) {
-      console.error(`Error fetching contacts with category ID ${categoryId}:`, error);
-      setSyncError(`Failed to fetch contacts with category ID: ${categoryId}`);
-      toast.error('Error searching for contacts');
-    } finally {
-      setLoadingVaultreContacts(false);
-    }
-  };
-
-  // Add a new function to get recently modified contacts
   const searchContactsByTerms = async (_searchTerm: string) => {
     setLoadingVaultreContacts(true);
     try {

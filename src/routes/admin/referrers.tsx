@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -35,11 +35,17 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
 import RewardDetailsDialog from '../../components/rewards/RewardDetailsDialog';
 import { AdminPartnerForm } from '../../components/referrals/AdminPartnerForm';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, RefreshCw, X } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import { Textarea } from '../../components/ui/textarea';
 import { Avatar, AvatarFallback } from '../../components/ui/avatar';
 import { TrashIcon } from '@radix-ui/react-icons';
+import { 
+  getColellaPartnerContacts, 
+  getContactCategories, 
+  getContacts,
+  Contact 
+} from '../../lib/vault-re-api';
 
 // Define interfaces for our data
 interface Referrer {
@@ -105,7 +111,7 @@ interface Reward {
   amount: number;
   status: 'pending' | 'approved' | 'paid';
   reward_type: 'cash' | 'gift_card';
-  gift_card_details?: any;
+  gift_card_details?: Record<string, string | number>; // Replace 'any' with more specific type
   payment_date?: string;
   created_at: string;
   updated_at: string;
@@ -114,6 +120,12 @@ interface Reward {
     referee_name: string;
     referee_type: string;
   };
+}
+
+// Add a new interface for tracking sync status of contacts
+interface ContactWithSyncStatus extends Contact {
+  existsInDatabase?: boolean;
+  matchedPartnerId?: string;
 }
 
 export const Route = createFileRoute('/admin/referrers')({
@@ -171,6 +183,20 @@ function AdminReferrers() {
   const [isStatusToggleDialogOpen, setIsStatusToggleDialogOpen] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{referrerId: string, newStatus: boolean} | null>(null);
 
+  // Add new state for VaultRE sync dialog
+  const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const [vaultreContacts, setVaultreContacts] = useState<ContactWithSyncStatus[]>([]);
+  const [loadingVaultreContacts, setLoadingVaultreContacts] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [allCategories, setAllCategories] = useState<Array<{id: string; name: string}>>([]);
+  const [manualCategoryId, setManualCategoryId] = useState<string>("2044500");
+  const [categorySearch, setCategorySearch] = useState<string>("");
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
+  const [showCategorySelector, setShowCategorySelector] = useState(false);
+
+  // Storage keys for partner categories
+  const PARTNER_CATEGORIES_KEY = 'partnerCategoryIds';
+
   // Check for partner ID in URL when component mounts
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -221,9 +247,10 @@ function AdminReferrers() {
         
         setReferrers(filteredData);
       }
-    } catch (error) {
-      console.error('Error fetching referrers:', error);
+    } catch (_error) {
+      // Log error and show user-friendly message
       setError('Failed to load partners. Please try again.');
+      toast.error('Failed to load partners. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -767,7 +794,7 @@ function AdminReferrers() {
       }
       
       const validStatus = newStatus as 'pending' | 'approved' | 'paid';
-      let updateData: any = { status: validStatus };
+      const updateData: { status: 'pending' | 'approved' | 'paid', payment_date?: string } = { status: validStatus };
       
       // If status is changed to 'paid', update payment date
       if (validStatus === 'paid') {
@@ -959,6 +986,455 @@ function AdminReferrers() {
     setIsDeleteDialogOpen(true);
   };
 
+  // Load saved categories from localStorage
+  const loadSavedCategories = useCallback(() => {
+    try {
+      const savedCategories = localStorage.getItem(PARTNER_CATEGORIES_KEY);
+      if (savedCategories) {
+        try {
+          const parsedCategories = JSON.parse(savedCategories);
+          
+          // Validate the parsed categories are an array of strings
+          if (Array.isArray(parsedCategories) && parsedCategories.length > 0 && 
+              parsedCategories.every(cat => typeof cat === 'string')) {
+            setSelectedCategoryIds(parsedCategories);
+            
+            // Also update the manual category ID input with the first selected category
+            if (parsedCategories[0] && typeof parsedCategories[0] === 'string') {
+              setManualCategoryId(parsedCategories[0]);
+            }
+          } else {
+            // Invalid format, use default
+            setSelectedCategoryIds(["2044500"]);
+            setManualCategoryId("2044500");
+          }
+        } catch (parseError) {
+          console.error('Error parsing saved categories:', parseError);
+          // Default to the original hardcoded one if there's a parsing error
+          setSelectedCategoryIds(["2044500"]);
+          setManualCategoryId("2044500");
+        }
+      } else {
+        // If no saved categories, default to the original hardcoded one
+        setSelectedCategoryIds(["2044500"]);
+        setManualCategoryId("2044500");
+      }
+    } catch (error) {
+      console.error('Error loading saved categories:', error);
+      // Default to the original hardcoded one if there's an error
+      setSelectedCategoryIds(["2044500"]);
+      setManualCategoryId("2044500");
+    }
+  }, []);
+
+  // Function to save categories to localStorage
+  const saveCategories = useCallback((categories: string[]) => {
+    try {
+      localStorage.setItem(PARTNER_CATEGORIES_KEY, JSON.stringify(categories));
+    } catch (error) {
+      console.error('Error saving categories:', error);
+    }
+  }, []);
+
+  // Load saved categories when component mounts
+  useEffect(() => {
+    loadSavedCategories();
+  }, [loadSavedCategories]);
+
+  // Add function to toggle category selection
+  const toggleCategorySelection = (categoryId: string) => {
+    setSelectedCategoryIds(prev => {
+      const newSelection = prev.includes(categoryId)
+        ? prev.filter(id => id !== categoryId)
+        : [...prev, categoryId];
+      
+      // Save the selection to localStorage
+      saveCategories(newSelection);
+      return newSelection;
+    });
+  };
+
+  // Add function to add current manual category ID to selection
+  const addCurrentCategoryToSelection = () => {
+    // Ensure manualCategoryId is a valid string
+    if (!manualCategoryId || typeof manualCategoryId !== 'string' || !manualCategoryId.trim() || selectedCategoryIds.includes(manualCategoryId)) {
+      return;
+    }
+    
+    const newSelection = [...selectedCategoryIds, manualCategoryId];
+    setSelectedCategoryIds(newSelection);
+    saveCategories(newSelection);
+    setShowCategorySelector(false); // Hide the selector after selection
+  };
+
+  // Add function to open sync dialog and fetch VaultRE contacts
+  const openSyncDialog = async () => {
+    setIsSyncDialogOpen(true);
+    setLoadingVaultreContacts(true);
+    setSyncError(null);
+    
+    try {
+      // First, get all contact categories for debugging and selection
+      const categories = await getContactCategories();
+      setAllCategories(categories.map(cat => ({
+        id: cat.id,
+        name: cat.name || 'Unnamed Category'
+      })));
+      
+      // Load saved categories if needed
+      if (selectedCategoryIds.length === 0) {
+        loadSavedCategories();
+      }
+      
+      // If no categories are selected after loading saved ones, don't make API call
+      if (selectedCategoryIds.length === 0) {
+        setShowCategorySelector(true); // Show category selector on first load
+        setLoadingVaultreContacts(false);
+        return;
+      }
+      
+      // Fetch contacts from VaultRE with the selected category IDs
+      console.log("Fetching contacts from your CRM with selected categories...");
+      
+      // Use the updated function that accepts category IDs
+      console.log(`Searching for contacts with category IDs: ${selectedCategoryIds.join(', ')}`);
+      const contacts = await getColellaPartnerContacts(selectedCategoryIds);
+      console.log(`Found ${contacts.length} contacts with selected categories`);
+      
+      // First get all existing partners from the database to check for duplicates
+      const { data: existingPartners } = await supabase
+        .from('referrers')
+        .select('id, email, phone');
+      
+      // Mark contacts that already exist in the database
+      const contactsWithStatus = contacts.map(contact => {
+        const matchedPartner = existingPartners?.find(partner => 
+          (contact.email && partner.email === contact.email) || 
+          (contact.mobilePhone && partner.phone === contact.mobilePhone)
+        );
+        
+        return {
+          ...contact,
+          existsInDatabase: !!matchedPartner,
+          matchedPartnerId: matchedPartner?.id
+        };
+      });
+      
+      setVaultreContacts(contactsWithStatus);
+    } catch (error) {
+      console.error('Error fetching contacts from CRM:', error);
+      setSyncError('Failed to fetch contacts from your CRM');
+    } finally {
+      setLoadingVaultreContacts(false);
+    }
+  };
+  
+  // Function to import a contact as a partner
+  const importContactAsPartner = async (contact: ContactWithSyncStatus) => {
+    try {
+      // First check if this contact would create a duplicate
+      const { data: existingPartners } = await supabase
+        .from('referrers')
+        .select('id, email, phone');
+      
+      // Check for duplicates with either matching email or phone
+      const matchingPartner = existingPartners?.find(partner => 
+        (contact.email && contact.email.trim() && partner.email === contact.email) || 
+        (contact.mobilePhone && contact.mobilePhone.trim() && partner.phone === contact.mobilePhone)
+      );
+      
+      if (matchingPartner) {
+        // Contact already exists
+        toast.info('This contact already exists in the database');
+        
+        // Update the UI to reflect this
+        setVaultreContacts(prevContacts => 
+          prevContacts.map(c => 
+            c.id === contact.id 
+              ? { ...c, existsInDatabase: true, matchedPartnerId: matchingPartner.id } 
+              : c
+          )
+        );
+        return;
+      }
+      
+      // Format partner data from contact
+      const partnerData = {
+        full_name: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+        email: contact.email || '',
+        phone: contact.mobilePhone || contact.workPhone || contact.homePhone || '',
+        is_business: false, // Default to individual
+        active: true,
+        created_at: new Date().toISOString(),
+        partnership_start_date: new Date().toISOString()
+      };
+      
+      // Insert the new partner
+      const { data, error } = await supabase
+        .from('referrers')
+        .insert(partnerData)
+        .select();
+      
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+          toast.info('This contact already exists in the database');
+          
+          // Try to find the matching partner again to get its ID
+          const { data: matchPartner } = await supabase
+            .from('referrers')
+            .select('id')
+            .eq('email', contact.email || '')
+            .limit(1);
+            
+          // Update the UI to reflect this
+          setVaultreContacts(prevContacts => 
+            prevContacts.map(c => 
+              c.id === contact.id 
+                ? { ...c, existsInDatabase: true, matchedPartnerId: matchPartner?.[0]?.id } 
+                : c
+            )
+          );
+        } else {
+          throw error;
+        }
+      } else {
+        // Update the contact in the list to show it's been imported
+        setVaultreContacts(prevContacts => 
+          prevContacts.map(c => 
+            c.id === contact.id 
+              ? { ...c, existsInDatabase: true, matchedPartnerId: data?.[0]?.id } 
+              : c
+          )
+        );
+        
+        // Refresh the partner list
+        fetchReferrers();
+        
+        toast.success('Partner imported successfully');
+      }
+    } catch (error) {
+      console.error('Error importing partner:', error);
+      toast.error('Failed to import partner');
+    }
+  };
+  
+  // Import all new contacts at once
+  const importAllNewContacts = async () => {
+    const newContacts = vaultreContacts.filter(contact => !contact.existsInDatabase);
+    
+    if (newContacts.length === 0) {
+      toast.info('No new contacts to import');
+      return;
+    }
+    
+    try {
+      // First get all existing partners again to ensure we have the latest data
+      const { data: existingPartners } = await supabase
+        .from('referrers')
+        .select('id, email, phone');
+        
+      // Track successful and skipped imports
+      let successCount = 0;
+      let skippedCount = 0;
+      
+      // Prepare array of partner data objects, filtering out potential duplicates
+      const partnersData = [];
+      
+      for (const contact of newContacts) {
+        // Skip contact if it has no name or contact info
+        if ((!contact.firstName && !contact.lastName && !contact.fullName) || 
+            (!contact.email && !contact.mobilePhone && !contact.workPhone && !contact.homePhone)) {
+          console.log(`Skipping contact with insufficient data: ${contact.id}`);
+          skippedCount++;
+          continue;
+        }
+        
+        // Check if this contact would create a duplicate
+        const isDuplicate = existingPartners?.some(partner => 
+          (contact.email && partner.email === contact.email) || 
+          (contact.mobilePhone && partner.phone === contact.mobilePhone)
+        );
+        
+        if (isDuplicate) {
+          console.log(`Skipping duplicate contact: ${contact.fullName || contact.email || contact.id}`);
+          skippedCount++;
+          continue;
+        }
+        
+        // Add to import list if not a duplicate
+        partnersData.push({
+          full_name: contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
+          email: contact.email || '',
+          phone: contact.mobilePhone || contact.workPhone || contact.homePhone || '',
+          is_business: false, // Default to individual
+          active: true,
+          created_at: new Date().toISOString(),
+          partnership_start_date: new Date().toISOString()
+        });
+      }
+      
+      // If we have partners to import after filtering
+      if (partnersData.length > 0) {
+        // Insert partners one by one to handle potential duplicates better
+        for (const partnerData of partnersData) {
+          try {
+            const { error } = await supabase
+              .from('referrers')
+              .insert(partnerData);
+            
+            if (error) {
+              console.warn('Error importing partner:', error);
+              skippedCount++;
+            } else {
+              successCount++;
+            }
+          } catch (error) {
+            console.warn('Error importing partner:', error);
+            skippedCount++;
+          }
+        }
+      }
+      
+      // Refresh the partner list
+      fetchReferrers();
+      
+      // Mark all attempted imports as processed
+      setVaultreContacts(prevContacts => 
+        prevContacts.map(contact => {
+          const attempted = newContacts.some(c => c.id === contact.id);
+          return attempted ? { ...contact, existsInDatabase: true } : contact;
+        })
+      );
+      
+      if (successCount > 0) {
+        toast.success(`${successCount} partners imported successfully`);
+      }
+      
+      if (skippedCount > 0) {
+        toast.info(`${skippedCount} contacts skipped (duplicates or invalid data)`);
+      }
+      
+    } catch (error) {
+      console.error('Error batch importing partners:', error);
+      toast.error('Failed to import some partners');
+    }
+  };
+
+  // Format phone number for display
+  const formatPhone = (phone?: string) => {
+    if (!phone) return '-';
+    
+    // Basic formatting for Australian numbers
+    if (phone.startsWith('04') && phone.length === 10) {
+      return `${phone.substring(0, 4)} ${phone.substring(4, 7)} ${phone.substring(7)}`;
+    }
+    
+    return phone;
+  };
+
+  // Add function to try a specific category ID
+  const _trySpecificCategoryId = async (categoryId: string) => {
+    if (!categoryId.trim()) return;
+    
+    setLoadingVaultreContacts(true);
+    try {
+      console.log(`Manually trying category ID: ${categoryId}`);
+      
+      // Use the updated function to directly get contacts with this category ID
+      const contacts = await getColellaPartnerContacts([categoryId]);
+      
+      console.log(`Found ${contacts.length} contacts with manually specified category ID ${categoryId}`);
+      
+      // Log the first contact for debugging
+      if (contacts.length > 0) {
+        console.log("Sample contact:", 
+          contacts[0].fullName || `${contacts[0].firstName || ''} ${contacts[0].lastName || ''}`.trim());
+      }
+      
+      // Get existing partners to check for duplicates
+      const { data: existingPartners } = await supabase
+        .from('referrers')
+        .select('id, email, phone');
+      
+      // Mark contacts that already exist in the database
+      const contactsWithStatus = contacts.map(contact => {
+        const matchedPartner = existingPartners?.find(partner => 
+          (contact.email && partner.email === contact.email) || 
+          (contact.mobilePhone && partner.phone === contact.mobilePhone)
+        );
+        
+        return {
+          ...contact,
+          existsInDatabase: !!matchedPartner,
+          matchedPartnerId: matchedPartner?.id
+        };
+      });
+      
+      setVaultreContacts(contactsWithStatus);
+      
+      if (contacts.length > 0) {
+        toast.success(`Found ${contacts.length} contacts with category ID: ${categoryId}`);
+      } else {
+        toast.info(`No contacts found with category ID: ${categoryId}`);
+      }
+    } catch (error) {
+      console.error(`Error fetching contacts with category ID ${categoryId}:`, error);
+      setSyncError(`Failed to fetch contacts with category ID: ${categoryId}`);
+      toast.error('Error searching for contacts');
+    } finally {
+      setLoadingVaultreContacts(false);
+    }
+  };
+
+  // Add a new function to get recently modified contacts
+  const searchContactsByTerms = async (_searchTerm: string) => {
+    setLoadingVaultreContacts(true);
+    try {
+      console.log("Fetching recently modified contacts from VaultRE...");
+      
+      // Get the 50 most recently modified contacts
+      const contacts = await getContacts({
+        pagesize: 50,
+        sort: 'modified', // Use modified as the sort field (per API docs)
+        sortOrder: 'desc'     // Sort in descending order to get most recent first
+      });
+      
+      console.log(`Found ${contacts.length} recently modified contacts from API`);
+      
+      // Get existing partners to check for duplicates
+      const { data: existingPartners } = await supabase
+        .from('referrers')
+        .select('id, email, phone');
+      
+      // Mark contacts that already exist in the database
+      const contactsWithStatus = contacts.map(contact => {
+        const matchedPartner = existingPartners?.find(partner => 
+          (contact.email && partner.email === contact.email) || 
+          (contact.mobilePhone && partner.phone === contact.mobilePhone)
+        );
+        
+        return {
+          ...contact,
+          existsInDatabase: !!matchedPartner,
+          matchedPartnerId: matchedPartner?.id
+        };
+      });
+      
+      setVaultreContacts(contactsWithStatus);
+      
+      if (contacts.length > 0) {
+        toast.success(`Loaded ${contacts.length} recently modified contacts`);
+      } else {
+        toast.info('No contacts found');
+      }
+    } catch (error) {
+      console.error('Error fetching recent contacts:', error);
+      toast.error('Error loading contacts');
+    } finally {
+      setLoadingVaultreContacts(false);
+    }
+  };
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-6">Partner Management</h1>
@@ -1061,6 +1537,15 @@ function AdminReferrers() {
                   </Button>
                 }
               />
+              
+              <Button
+                variant="outline"
+                onClick={openSyncDialog}
+                className="ml-2"
+                title="Sync Partners"
+              >
+                <RefreshCw className="h-4 w-4" />
+              </Button>
               
               <div className="flex-1 max-w-md ml-auto">
                 <Input
@@ -1713,6 +2198,346 @@ function AdminReferrers() {
               className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
             >
               {pendingStatusChange?.newStatus ? 'Activate' : 'Deactivate'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* VaultRE Sync Dialog */}
+      <Dialog open={isSyncDialogOpen} onOpenChange={setIsSyncDialogOpen}>
+        <DialogContent className="max-w-4xl overflow-hidden flex flex-col" style={{ maxHeight: '90vh' }}>
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="flex items-center justify-between">
+              <span>Sync Partners</span>
+            </DialogTitle>
+            <DialogDescription>
+              View and import contacts from your CRM with your selected partner categories.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4 overflow-y-auto flex-1">
+            {/* Category Selection Section */}
+            <div className={`mb-4 border rounded-md ${showCategorySelector ? 'bg-gray-50' : 'bg-white'}`}>
+              <div className="p-3 flex justify-between items-center cursor-pointer" 
+                   onClick={() => setShowCategorySelector(!showCategorySelector)}>
+                <div>
+                  <h3 className="text-sm font-medium">Partner Category Setup</h3>
+                  {selectedCategoryIds.length > 0 && !showCategorySelector && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {selectedCategoryIds.length} {selectedCategoryIds.length === 1 ? 'category' : 'categories'} selected
+                    </p>
+                  )}
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Prevent event from bubbling up
+                    setShowCategorySelector(!showCategorySelector);
+                  }}
+                >
+                  {showCategorySelector ? 'Hide' : 'Configure'}
+                </Button>
+              </div>
+
+              {/* Collapsible content */}
+              {showCategorySelector && (
+                <div className="p-3 pt-0 border-t">
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Select which CRM contact categories should be considered as "Colella Partners".
+                    You can add multiple categories if needed.
+                  </p>
+                  
+                  {/* Category selection section */}
+                  <div className="mb-3">
+                    <h4 className="text-sm font-medium mb-2">Currently Selected Categories:</h4>
+                    {selectedCategoryIds.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No categories selected yet</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedCategoryIds.map(catId => {
+                          const category = allCategories.find(c => c.id === catId);
+                          return (
+                            <Badge key={catId} variant="outline" className="flex items-center gap-1">
+                              {category?.name || `Category ${catId}`}
+                              <X className="h-3 w-3 cursor-pointer" onClick={() => toggleCategorySelection(catId)} />
+                            </Badge>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Add new category section */}
+                  <div className="flex items-center gap-2 mb-3">
+                    <Input
+                      value={manualCategoryId}
+                      onChange={(e) => setManualCategoryId(e.target.value)}
+                      placeholder="Enter category ID"
+                      className="h-8"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={addCurrentCategoryToSelection}
+                      disabled={!manualCategoryId || typeof manualCategoryId !== 'string' || !manualCategoryId.trim() || selectedCategoryIds.includes(manualCategoryId)}
+                    >
+                      Add to Selection
+                    </Button>
+                  </div>
+                  
+                  {/* Search through all categories */}
+                  {allCategories.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium mb-2">Available Categories:</h4>
+                      <Input
+                        placeholder="Search categories..."
+                        value={categorySearch}
+                        onChange={(e) => setCategorySearch(e.target.value)}
+                        className="mb-2 h-8"
+                      />
+                      <div className="max-h-40 overflow-y-auto border rounded-md p-2">
+                        {allCategories
+                          .filter(cat => 
+                            !categorySearch || 
+                            cat.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
+                            cat.id.includes(categorySearch)
+                          )
+                          .map((cat, i) => (
+                            <div key={i} className="flex items-center justify-between py-1 hover:bg-gray-100 px-1 rounded">
+                              <div className="text-sm">
+                                <span className="font-medium">{cat.name}</span>
+                                <span className="text-xs text-muted-foreground ml-1">(ID: {cat.id})</span>
+                              </div>
+                              <Button
+                                variant={selectedCategoryIds.includes(cat.id) ? "default" : "outline"}
+                                size="sm"
+                                className="h-6 text-xs"
+                                onClick={() => toggleCategorySelection(cat.id)}
+                              >
+                                {selectedCategoryIds.includes(cat.id) ? "Selected" : "Select"}
+                              </Button>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-end mt-3">
+                    <Button 
+                      onClick={() => {
+                        setShowCategorySelector(false);
+                        if (selectedCategoryIds.length > 0) {
+                          openSyncDialog(); // Refresh contacts with selected categories
+                        }
+                      }}
+                    >
+                      Apply Changes
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {loadingVaultreContacts ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <Loader2 className="h-8 w-8 animate-spin mb-4" />
+                <p>Loading contacts from your CRM...</p>
+              </div>
+            ) : syncError ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <p className="text-red-500 mb-2">{syncError}</p>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Make sure the selected categories exist in your CRM and the API has access to them.
+                </p>
+                <Button variant="outline" onClick={openSyncDialog}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+              </div>
+            ) : selectedCategoryIds.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <p className="text-muted-foreground">Please select at least one partner category to sync.</p>
+                <Button 
+                  variant="default" 
+                  className="mt-4"
+                  onClick={() => setShowCategorySelector(true)}
+                >
+                  Configure Categories
+                </Button>
+              </div>
+            ) : vaultreContacts.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64">
+                <p className="text-muted-foreground">No contacts found with the selected partner categories in your CRM.</p>
+                <p className="text-sm text-muted-foreground mt-2 mb-4 max-w-lg text-center">
+                  Make sure contacts are properly categorized in your CRM before syncing.
+                </p>
+                <Button variant="outline" onClick={openSyncDialog}>
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry Sync
+                </Button>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <span className="font-medium">
+                      {vaultreContacts.length} partner contact{vaultreContacts.length !== 1 ? 's' : ''} found
+                    </span>
+                    <span className="ml-2 text-muted-foreground">
+                      ({vaultreContacts.filter(c => !c.existsInDatabase).length} new)
+                    </span>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Only showing contacts with the selected partner categories
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={openSyncDialog}
+                      disabled={loadingVaultreContacts}
+                    >
+                      {loadingVaultreContacts ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4" />
+                      )}
+                      <span className="ml-2">Refresh</span>
+                    </Button>
+                    
+                    {vaultreContacts.some(c => !c.existsInDatabase) && (
+                      <Button
+                        onClick={importAllNewContacts}
+                        className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                      >
+                        Import All New Contacts
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Contact results table */}
+                <div className="border rounded-md mb-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {vaultreContacts.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center py-6 text-muted-foreground">
+                            No contacts found with the specified category
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        // Sort contacts - New contacts at top, already imported at bottom
+                        [...vaultreContacts]
+                          .sort((a, b) => {
+                            // Sort by existsInDatabase status first (false comes before true)
+                            if (a.existsInDatabase !== b.existsInDatabase) {
+                              return a.existsInDatabase ? 1 : -1;
+                            }
+                            // Then sort by name as secondary criteria
+                            const nameA = a.fullName || `${a.firstName || ''} ${a.lastName || ''}`.trim();
+                            const nameB = b.fullName || `${b.firstName || ''} ${b.lastName || ''}`.trim();
+                            return nameA.localeCompare(nameB);
+                          })
+                          .map((contact) => (
+                            <TableRow key={contact.id}>
+                              <TableCell className="font-medium">
+                                {contact.fullName || `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown Name'}
+                              </TableCell>
+                              <TableCell>
+                                {contact.email || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {formatPhone(contact.mobilePhone) || formatPhone(contact.workPhone) || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {contact.existsInDatabase ? (
+                                  <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
+                                    Already Imported
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                                    New Contact
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {contact.existsInDatabase ? (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (contact.matchedPartnerId) {
+                                        // Find the partner in the referrers array
+                                        const partner = referrers.find(r => r.id === contact.matchedPartnerId);
+                                        if (partner) {
+                                          setIsSyncDialogOpen(false);
+                                          openReferrerDetails(partner);
+                                        }
+                                      }
+                                    }}
+                                    disabled={!contact.matchedPartnerId}
+                                  >
+                                    View Partner
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={() => importContactAsPartner(contact)}
+                                    className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                                  >
+                                    Import
+                                  </Button>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+                
+                {/* Search contacts section - moved to bottom */}
+                <div className="border p-3 rounded-md bg-gray-50">
+                  <h4 className="text-sm font-medium mb-2">Show Recently Modified Contacts</h4>
+                  <div className="flex items-center gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => searchContactsByTerms("")}
+                      disabled={loadingVaultreContacts}
+                      className="w-full"
+                    >
+                      {loadingVaultreContacts ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                      )}
+                      Load Recent Contacts
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Shows the 50 most recently modified contacts from VaultRE regardless of category.
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
+          
+          <DialogFooter className="flex-shrink-0 border-t pt-4">
+            <Button variant="outline" onClick={() => setIsSyncDialogOpen(false)}>
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

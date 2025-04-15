@@ -48,9 +48,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.hostname.includes('localhost') 
-            ? 'http://localhost:5173/auth/callback?redirect=/'
-            : 'https://colellapartners.vercel.app/auth/callback?redirect=/',
+          redirectTo: `${import.meta.env.VITE_AUTH_REDIRECT_BASE_URL}/auth/callback?redirect=/`,
         },
       });
 

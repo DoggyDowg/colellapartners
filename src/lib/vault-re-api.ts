@@ -23,6 +23,7 @@ export interface PropertyAddress {
   postcode?: string;
   unitNumber?: string;
   streetNumber?: string;
+  displayAddress?: string;
 }
 
 export interface Property {
@@ -54,6 +55,7 @@ export interface Property {
   images?: PropertyImage[];
   photos?: PropertyImage[];
   listedDate?: string;
+  dateModified?: string;
   inspectionTimes?: string[];
   agent?: {
     id: string;
@@ -218,33 +220,105 @@ export async function getProperties(params: PropertyListParams = {}): Promise<Pr
   }
 }
 
+// Helper function to determine the property status based on saleHistory
+export function determinePropertyStatus(propertyData: any): string | null {
+  const saleHistory = propertyData?.saleHistory;
+  const currentSaleLife = propertyData?.saleLife; // For fallback
+  
+  // Direct status field fallback (if any future API changes expose this)
+  if (propertyData?.status) {
+    return propertyData.status.toLowerCase();
+  }
+  
+  // Use algorithm described in documentation to determine status
+  if (!Array.isArray(saleHistory) || saleHistory.length === 0) {
+    // No history - use currentSaleLife or direct status if available
+    if (currentSaleLife?.status) {
+      return currentSaleLife.status.toLowerCase();
+    }
+    return null;
+  }
+  
+  // Define statuses considered significant for determining the active/final state
+  const significantStatuses = [
+    'listing',
+    'live',
+    'conditional',
+    'unconditional',
+    'settled',
+    'withdrawn',
+  ];
+  
+  // Filter history for significant entries
+  const significantHistory = saleHistory.filter((entry: any) =>
+    entry?.status && significantStatuses.includes(entry.status.toLowerCase())
+  );
+  
+  let statusToReturn: string | null = null;
+  
+  if (significantHistory.length > 0) {
+    // Sort significant entries by modification date, newest first
+    significantHistory.sort((a: any, b: any) => {
+      const dateA = a.modified ? new Date(a.modified).getTime() : 0;
+      const dateB = b.modified ? new Date(b.modified).getTime() : 0;
+      return dateB - dateA; // Descending
+    });
+    // The status of the most recently modified significant entry
+    statusToReturn = significantHistory[0].status.toLowerCase();
+  } else {
+    // No significant entries found (e.g., only prospect/appraisal)
+    // Fallback: Sort the *entire* history and take the latest overall status
+    saleHistory.sort((a: any, b: any) => {
+      const dateA = a.modified ? new Date(a.modified).getTime() : 0;
+      const dateB = b.modified ? new Date(b.modified).getTime() : 0;
+      return dateB - dateA; // Descending
+    });
+    statusToReturn = saleHistory[0]?.status?.toLowerCase() || null;
+  }
+  
+  return statusToReturn;
+}
+
 // GET a single property by ID
 export const getPropertyById = async (propertyId: string) => {
   try {
-    const response = await vaultREClient.get(`/property/${propertyId}`);
+    const response = await vaultREClient.get(`/properties/${propertyId}`);
     
     // Handle different response formats
+    let propertyData: any = null;
+    
     if (response.data) {
       // If the data is the property object directly
       if (response.data.id) {
-        return response.data;
+        propertyData = response.data;
       }
-      
       // If data is wrapped in a 'data' property
-      if (response.data.data && response.data.data.id) {
-        return response.data.data;
+      else if (response.data.data && response.data.data.id) {
+        propertyData = response.data.data;
       }
-      
       // If data is wrapped in a 'property' property
-      if (response.data.property && response.data.property.id) {
-        return response.data.property;
+      else if (response.data.property && response.data.property.id) {
+        propertyData = response.data.property;
       }
-      
-      console.log("Unknown property response structure:", 
-        JSON.stringify(response.data).substring(0, 200) + "...");
+      else {
+        console.log("Unknown property response structure:", 
+          JSON.stringify(response.data).substring(0, 200) + "...");
+        propertyData = response.data;
+      }
     }
     
-    return response.data;
+    // Get status using the saleHistory-based logic
+    if (propertyData) {
+      // Extract status using the dedicated function
+      const status = determinePropertyStatus(propertyData);
+      
+      // Append the status to the property data if found
+      if (status) {
+        propertyData.status = status;
+      }
+    }
+    
+    return propertyData;
   } catch (error) {
     console.error(`Error fetching property ${propertyId}:`, error);
     throw error;
@@ -316,7 +390,7 @@ export const getPropertyTypes = async () => {
 // GET property images for a specific property
 export const getPropertyImages = async (propertyId: string) => {
   try {
-    const response = await vaultREClient.get(`/property/${propertyId}/images`);
+    const response = await vaultREClient.get(`/properties/${propertyId}/images`);
     return response.data;
   } catch (error) {
     console.error(`Error fetching images for property ${propertyId}:`, error);
@@ -364,6 +438,27 @@ export interface Contact {
     suburb?: string;
     state?: string;
     postcode?: string;
+  };
+  postalAddress?: {
+    unitNumber?: string;
+    streetNumber?: string;
+    street?: string;
+    suburb?: {
+      id?: number;
+      name?: string;
+      postcode?: string;
+      state?: {
+        id?: number;
+        name?: string;
+        abbreviation?: string;
+      };
+    };
+    addressType?: string;
+    streetType?: string;
+    state?: string;
+    postcode?: string;
+    fullAddress?: string;
+    displayAddress?: string;
   };
   categories?: Array<{
     id: string;
@@ -579,6 +674,59 @@ export async function getColellaPartnerContacts(categoryIds?: string[]): Promise
   } catch (error) {
     console.error('Error fetching partner contacts:', error);
     throw error;
+  }
+}
+
+// GET properties suitable for linking to referrals
+export async function getLinkableProperties(): Promise<Property[]> {
+  const params = {
+    pagesize: 50,
+    published: true, // Assuming we only want published properties
+    sort: 'modified',
+    sortOrder: 'desc',
+    status: 'prospect,appraisal,listing,management'
+  };
+  
+  try {
+    console.log("Fetching linkable properties with params:", params);
+    const response = await vaultREClient.get('/properties/sale', { params });
+    
+    if (response.status === 200 && response.data) {
+      // Handle different response formats
+      if (Array.isArray(response.data)) {
+        return response.data;
+      }
+      if (response.data.items) {
+        return response.data.items;
+      }
+      if (response.data.properties) {
+        return response.data.properties;
+      }
+      if (response.data.data) {
+        return response.data.data;
+      }
+      // Try converting object with numeric keys
+      if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+        const values = Object.values(response.data);
+        if (values.length > 0) {
+          return values as Property[];
+        }
+      }
+    }
+    return []; // Return empty array if no data or wrong format
+  } catch (error) {
+    console.error('Error fetching linkable properties:', error);
+    if (error instanceof AxiosError) {
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
+    }
+    // Re-throw or return empty based on desired error handling
+    // For now, let's return empty to avoid crashing the UI
+    return []; 
   }
 }
 

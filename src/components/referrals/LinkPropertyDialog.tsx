@@ -99,7 +99,7 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
   const filteredProperties = properties.filter(prop =>
     !searchTerm ||
     (prop.address?.fullAddress?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (prop.displayAddress?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (prop.displayAddress && prop.displayAddress.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (prop.id?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 

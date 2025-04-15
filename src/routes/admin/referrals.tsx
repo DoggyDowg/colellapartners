@@ -1789,7 +1789,7 @@ function AdminReferrals() {
           agent_name: selectedProperty.agent?.name,
           agent_email: selectedProperty.agent?.email,
           agent_phone: selectedProperty.agent?.phone,
-          vault_last_modified: selectedProperty.dateModified || null, // Assuming dateModified exists
+          vault_last_modified: selectedProperty.dateModified || null,
           updated_at: new Date().toISOString() // Ensure updated_at is set
         };
 

@@ -188,7 +188,9 @@ function AdminUsers() {
     
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: window.location.hostname.includes('localhost')
+          ? 'http://localhost:5173/auth/reset-password'
+          : 'https://colellapartners.vercel.app/auth/reset-password',
       });
       
       if (error) {

@@ -46,6 +46,12 @@ import {
   getContacts,
   Contact 
 } from '../../lib/vault-re-api';
+import { 
+  Tooltip,
+  TooltipContent, 
+  TooltipProvider, 
+  TooltipTrigger 
+} from '../../components/ui/tooltip';
 
 // Define interfaces for our data
 interface Referrer {
@@ -147,7 +153,6 @@ function AdminReferrers() {
   
   // Added state for referral detail dialog
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
-  const [isReferralDialogOpen, setIsReferralDialogOpen] = useState(false);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [statusNote, setStatusNote] = useState('');
@@ -523,7 +528,7 @@ function AdminReferrers() {
 
   const openReferralDetails = async (referral: Referral) => {
     setSelectedReferral(referral);
-    setIsReferralDialogOpen(true);
+    setIsDialogOpen(true);
     await fetchStatusHistory(referral.id);
   };
 
@@ -1465,33 +1470,51 @@ function AdminReferrers() {
                 )}
               </span>
               
-              <AdminPartnerForm 
-                onSubmitSuccess={fetchReferrers} 
-                onViewPartner={(partnerId) => {
-                  // Find the partner in the referrers array
-                  const partner = referrers.find(r => r.id === partnerId);
-                  if (partner) {
-                    openReferrerDetails(partner);
-                  }
-                }}
-                triggerButton={
-                  <Button
-                    className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
-                  >
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Partner
-                  </Button>
-                }
-              />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <AdminPartnerForm 
+                        onSubmitSuccess={fetchReferrers} 
+                        onViewPartner={(partnerId) => {
+                          // Find the partner in the referrers array
+                          const partner = referrers.find(r => r.id === partnerId);
+                          if (partner) {
+                            openReferrerDetails(partner);
+                          }
+                        }}
+                        triggerButton={
+                          <Button
+                            className="bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
+                          >
+                            <UserPlus className="h-4 w-4" />
+                          </Button>
+                        }
+                      />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-black text-white dark:bg-white dark:text-black border">
+                    <p>Add Partner</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               
-              <Button
-                variant="outline"
-                onClick={openSyncDialog}
-                className="ml-2"
-                title="Sync Partners"
-              >
-                <RefreshCw className="h-4 w-4" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      onClick={openSyncDialog}
+                      className="ml-0.5"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-black text-white dark:bg-white dark:text-black border">
+                    <p>Sync from CRM</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               
               <div className="flex-1 max-w-md ml-auto">
                 <Input
@@ -1773,35 +1796,35 @@ function AdminReferrers() {
                     </div>
                   ) : (
                     // Details View
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-                      <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 space-y-6 md:space-y-0"> {/* Added spacing */} 
+                      <div className="space-y-6"> {/* Increased spacing */}
                         <div>
-                          <h3 className="text-sm font-medium text-muted-foreground">Basic Information</h3>
-                          <div className="mt-1 space-y-2">
+                          <h3 className="text-base font-semibold mb-2">Basic Information</h3> {/* Larger heading */}
+                          <div className="mt-1 space-y-1 text-sm text-muted-foreground"> {/* Consistent text */}
                             {selectedReferrer.is_business ? (
                               <>
-                                <p><span className="font-medium">Business Name:</span> {selectedReferrer.business_name}</p>
-                                <p><span className="font-medium">Contact Person:</span> {selectedReferrer.contact_person}</p>
+                                <p><span className="font-medium text-foreground">Business Name:</span> {selectedReferrer.business_name}</p>
+                                <p><span className="font-medium text-foreground">Contact Person:</span> {selectedReferrer.full_name || selectedReferrer.contact_person || 'N/A'}</p> {/* Use full_name as primary contact */}
                               </>
                             ) : (
-                              <p><span className="font-medium">Full Name:</span> {selectedReferrer.full_name}</p>
+                              <p><span className="font-medium text-foreground">Full Name:</span> {selectedReferrer.full_name}</p>
                             )}
-                            <p><span className="font-medium">Email:</span> {selectedReferrer.email}</p>
-                            <p><span className="font-medium">Phone:</span> {selectedReferrer.phone}</p>
+                            <p><span className="font-medium text-foreground">Email:</span> {selectedReferrer.email}</p>
+                            <p><span className="font-medium text-foreground">Phone:</span> {selectedReferrer.phone}</p>
                             {selectedReferrer.address && (
-                              <p><span className="font-medium">Address:</span> {selectedReferrer.address}</p>
+                              <p><span className="font-medium text-foreground">Address:</span> {selectedReferrer.address}</p>
                             )}
                           </div>
                         </div>
                       </div>
                       
-                      <div className="space-y-4">
+                      <div className="space-y-6"> {/* Increased spacing */}
                         <div>
-                          <h3 className="text-sm font-medium text-muted-foreground">Partnership Details</h3>
-                          <div className="mt-1 space-y-2">
-                            <p>
-                              <span className="font-medium">Status:</span>
-                              <span className={`ml-2 inline-flex rounded-full px-2 py-1 text-xs ${
+                          <h3 className="text-base font-semibold mb-2">Partnership Details</h3> {/* Larger heading */}
+                          <div className="mt-1 space-y-1 text-sm text-muted-foreground"> {/* Consistent text */}
+                            <p className="flex items-center">
+                              <span className="font-medium text-foreground">Status:</span>
+                              <span className={`ml-2 inline-flex rounded-full px-2 py-1 text-xs ${ /* Use span instead of Badge for consistency */
                                 selectedReferrer.active
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
@@ -1809,23 +1832,23 @@ function AdminReferrers() {
                                 {selectedReferrer.active ? 'Active' : 'Inactive'}
                               </span>
                             </p>
-                            <p><span className="font-medium">Partner Since:</span> {new Date(selectedReferrer.partnership_start_date || selectedReferrer.created_at).toLocaleDateString()}</p>
-                            <p><span className="font-medium">Partner Code:</span> {selectedReferrer.partner_code || 'Not assigned'}</p>
-                            <p><span className="font-medium">Partner Type:</span> {selectedReferrer.is_business ? 'Business' : 'Individual'}</p>
+                            <p><span className="font-medium text-foreground">Partner Since:</span> {new Date(selectedReferrer.partnership_start_date || selectedReferrer.created_at).toLocaleDateString()}</p>
+                            <p><span className="font-medium text-foreground">Partner Code:</span> {selectedReferrer.partner_code || 'Not assigned'}</p>
+                            <p><span className="font-medium text-foreground">Partner Type:</span> {selectedReferrer.is_business ? 'Business' : 'Individual'}</p>
                           </div>
                         </div>
                         
                         <div>
-                          <h3 className="text-sm font-medium text-muted-foreground">System Information</h3>
-                          <div className="mt-1 space-y-2">
-                            <p><span className="font-medium">Created:</span> {new Date(selectedReferrer.created_at).toLocaleString()}</p>
-                            <p><span className="font-medium">ID:</span> {selectedReferrer.id}</p>
+                          <h3 className="text-base font-semibold mb-2">System Information</h3> {/* Larger heading */}
+                          <div className="mt-1 space-y-1 text-sm text-muted-foreground"> {/* Consistent text */}
+                            <p><span className="font-medium text-foreground">Created:</span> {new Date(selectedReferrer.created_at).toLocaleString()}</p>
+                            <p><span className="font-medium text-foreground">ID:</span> {selectedReferrer.id}</p>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="col-span-1 md:col-span-2 border-t pt-4">
-                        <h3 className="text-sm font-medium mb-2">Partner Actions</h3>
+                      <div className="col-span-1 md:col-span-2 border-t pt-6"> {/* Increased padding */}
+                        <h3 className="text-base font-semibold mb-3">Partner Actions</h3> {/* Larger heading */}
                         <div className="flex flex-wrap gap-2">
                           <Button
                             variant={selectedReferrer.active ? "outline" : "default"}
@@ -2051,8 +2074,8 @@ function AdminReferrers() {
       {/* Use the shared ReferralDetailsDialog component */}
       <ReferralDetailsDialog
         referral={selectedReferral}
-        open={isReferralDialogOpen}
-        onOpenChange={setIsReferralDialogOpen}
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
         statusHistory={statusHistory}
         loadingHistory={loadingHistory}
         statusNote={statusNote}
@@ -2066,9 +2089,9 @@ function AdminReferrers() {
         formatTimeAgo={formatTimeAgo}
         parseNotes={parseNotes}
         getInitials={getInitials}
-        referrerName={selectedReferrer?.full_name}
-        referrerEmail={selectedReferrer?.email}
-        referrerPhone={selectedReferrer?.phone}
+        partnerName={selectedReferrer?.full_name}
+        partnerEmail={selectedReferrer?.email}
+        partnerPhone={selectedReferrer?.phone}
       />
       
       {/* Use the shared RewardDetailsDialog component */}
@@ -2163,7 +2186,7 @@ function AdminReferrers() {
           
           <div className="py-4 overflow-y-auto flex-1">
             {/* Category Selection Section */}
-            <div className={`mb-4 border rounded-md ${showCategorySelector ? 'bg-gray-50' : 'bg-white'}`}>
+            <div className={`mb-4 border rounded-md ${showCategorySelector ? 'bg-gray-50 dark:bg-gray-900' : 'bg-white dark:bg-gray-950'}`}>
               <div className="p-3 flex justify-between items-center cursor-pointer" 
                    onClick={() => setShowCategorySelector(!showCategorySelector)}>
                 <div>
@@ -2247,10 +2270,10 @@ function AdminReferrers() {
                           .filter(cat => 
                             !categorySearch || 
                             cat.name.toLowerCase().includes(categorySearch.toLowerCase()) ||
-                            cat.id.includes(categorySearch)
+                            String(cat.id).includes(categorySearch)
                           )
                           .map((cat, i) => (
-                            <div key={i} className="flex items-center justify-between py-1 hover:bg-gray-100 px-1 rounded">
+                            <div key={i} className="flex items-center justify-between py-1 hover:bg-gray-100 dark:hover:bg-gray-800 px-1 rounded">
                               <div className="text-sm">
                                 <span className="font-medium">{cat.name}</span>
                                 <span className="text-xs text-muted-foreground ml-1">(ID: {cat.id})</span>
@@ -2409,11 +2432,11 @@ function AdminReferrers() {
                               </TableCell>
                               <TableCell>
                                 {contact.existsInDatabase ? (
-                                  <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
+                                  <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200 dark:bg-green-900 dark:text-green-100 dark:border-green-800">
                                     Already Imported
                                   </Badge>
                                 ) : (
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200">
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 dark:bg-blue-900 dark:text-blue-100 dark:border-blue-800">
                                     New Contact
                                   </Badge>
                                 )}
@@ -2456,7 +2479,7 @@ function AdminReferrers() {
                 </div>
                 
                 {/* Search contacts section - moved to bottom */}
-                <div className="border p-3 rounded-md bg-gray-50">
+                <div className="border p-3 rounded-md bg-gray-50 dark:bg-gray-900">
                   <h4 className="text-sm font-medium mb-2">Show Recently Modified Contacts</h4>
                   <div className="flex items-center gap-2">
                     <Button 

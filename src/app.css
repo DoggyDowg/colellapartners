@@ -1,6 +1,3 @@
 @import "./styles/global.css";
 
-:root {
-  --primary: #514b82;
-  /* Other variables */
-} 
+/* Root CSS variables are defined in index.css via Tailwind */

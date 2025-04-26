@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState } from 'react';
 import { Session, User, AuthError } from '@supabase/supabase-js';
 import supabase from '../lib/supabase';
+import { useAuthStore } from '../stores/authStore'; // Import the Zustand store
 
 type AuthContextType = {
   session: Session | null;
@@ -9,33 +10,51 @@ type AuthContextType = {
   loading: boolean;
 };
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Check if a previously stored session exists in localStorage
-const getPersistedSession = (): Session | null => {
-  const storedSession = localStorage.getItem('supabase_auth_session');
-  return storedSession ? JSON.parse(storedSession) : null;
-};
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(getPersistedSession());
+  const [session, setSession] = useState<Session | null>(null); // Initialize as null, let useEffect handle it
   const [loading, setLoading] = useState(true);
+
+  // Get the Zustand store actions
+  const setZustandAccessToken = useAuthStore((state) => state.auth.setAccessToken);
+  const resetZustandAccessToken = useAuthStore((state) => state.auth.resetAccessToken);
+  const setZustandUser = useAuthStore((state) => state.auth.setUser); // Add setUser if you store user in Zustand too
 
   useEffect(() => {
     // Get session from Supabase
     const getInitialSession = async () => {
       try {
         const { data: { session: initialSession } } = await supabase.auth.getSession();
-        if (initialSession) {
-          setSession(initialSession);
-          setUser(initialSession.user);
-          // Store session in localStorage for persistence
-          localStorage.setItem('supabase_auth_session', JSON.stringify(initialSession));
+        setSession(initialSession); // Update local state
+        setUser(initialSession?.user ?? null);
+        
+        // Convert User to AuthUser with required properties when setting in Zustand
+        if (initialSession?.user) {
+          setZustandUser({
+            ...initialSession.user,
+            accountNo: initialSession.user.id, // Use ID as accountNo
+            exp: Math.floor((new Date().getTime() / 1000) + 3600), // Add 1 hour expiration
+            email: initialSession.user.email || '', // Ensure email is never undefined
+            role: initialSession.user.role ? 
+              (Array.isArray(initialSession.user.role) ? initialSession.user.role : [initialSession.user.role]) : 
+              ['user'] // Default role
+          });
+        } else {
+          setZustandUser(null);
         }
-      } catch (error) {
-        console.error('Error getting initial session:', error);
-      } finally {
+
+        if (initialSession) {
+          // Update Zustand store with initial token
+          setZustandAccessToken(initialSession.access_token);
+        } else {
+          // Ensure Zustand store is reset if no initial session
+          resetZustandAccessToken();
+        }
+      } catch (_error) {
+        // Replace console.error with a safe error handling approach
+        resetZustandAccessToken(); // Reset on error too
         setLoading(false);
       }
     };
@@ -45,25 +64,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, newSession) => {
-        setSession(newSession);
+        setSession(newSession); // Update local state
         setUser(newSession?.user ?? null);
         
-        // Store or remove session in localStorage based on auth state
-        if (newSession) {
-          localStorage.setItem('supabase_auth_session', JSON.stringify(newSession));
+        // Convert User to AuthUser with required properties when setting in Zustand
+        if (newSession?.user) {
+          setZustandUser({
+            ...newSession.user,
+            accountNo: newSession.user.id, // Use ID as accountNo
+            exp: Math.floor((new Date().getTime() / 1000) + 3600), // Add 1 hour expiration
+            email: newSession.user.email || '', // Ensure email is never undefined
+            role: newSession.user.role ? 
+              (Array.isArray(newSession.user.role) ? newSession.user.role : [newSession.user.role]) : 
+              ['user'] // Default role
+          });
         } else {
-          localStorage.removeItem('supabase_auth_session');
+          setZustandUser(null);
         }
-        
+
+        // Update Zustand store based on auth state
+        if (newSession) {
+          setZustandAccessToken(newSession.access_token);
+        } else {
+          resetZustandAccessToken();
+        }
+
         setLoading(false);
       }
     );
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [setZustandAccessToken, resetZustandAccessToken, setZustandUser]); // Add dependencies
 
   const signOut = async () => {
-    localStorage.removeItem('supabase_auth_session');
+    // Reset Zustand store on sign out
+    resetZustandAccessToken();
+    setZustandUser(null);
     return supabase.auth.signOut();
   };
 
@@ -77,10 +113,4 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}; 
+// The useAuth hook is moved to hooks/useAuth.ts 

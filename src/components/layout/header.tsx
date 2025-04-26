@@ -7,6 +7,13 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { ReferralCTAButton } from '@/components/referrals/ReferralCTAButton'
 import supabase from '../../lib/supabase'
 
+// Utility function for error handling
+const logError = (_message: string, _error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  // const errorMessage = _error instanceof Error ? _error.message : String(_error);
+  // Silent error handling for UI components
+};
+
 interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   fixed?: boolean
   ref?: React.Ref<HTMLElement>
@@ -37,7 +44,7 @@ export const Header = ({
         const { data } = await supabase.rpc('is_admin')
         setIsAdmin(!!data)
       } catch (error) {
-        console.error('Error checking admin status:', error)
+        logError('Error checking admin status:', error)
         setIsAdmin(false)
       }
     }

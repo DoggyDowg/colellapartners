@@ -17,6 +17,8 @@ These migrations can be applied directly in the Supabase dashboard:
 
 - `01_create_user_profiles.sql`: Creates the user_profiles table and associated RLS policies, as well as a storage bucket for profile pictures
 - `02_update_user_profiles.sql`: Updates existing user_profiles table to add a name field and remove bio and urls fields
+- `03_add_storage_delete_function.sql`: Adds a function to delete objects from storage buckets
+- `04_create_admin_functions.sql`: Creates users table with role column, is_admin function, and a trigger to automatically assign admin roles based on email domain
 
 ## Important Notes
 

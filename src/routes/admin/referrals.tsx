@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '../../components/ui/dialog';
 import { Badge } from '../../components/ui/badge';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { ChevronUpIcon, ChevronDownIcon, UserPlus, Loader2, RefreshCw, X, AlertCircle } from 'lucide-react';
 import {
   AlertDialog,
@@ -99,6 +99,13 @@ interface StatusHistoryItem {
   user_full_name?: string;
 }
 
+interface GiftCardDetails {
+  provider?: string;
+  code?: string;
+  value?: number;
+  expiryDate?: string;
+}
+
 interface Reward {
   id?: string;
   referral_id: string;
@@ -106,7 +113,7 @@ interface Reward {
   amount: number;
   status: 'pending' | 'paid';
   reward_type: 'cash' | 'gift_card';
-  gift_card_details?: any;
+  gift_card_details?: GiftCardDetails;
   payment_date?: string;
   created_at?: string;
   updated_at?: string;
@@ -224,12 +231,97 @@ function AdminReferrals() {
   const [selectedContact, setSelectedContact] = useState<ContactWithSyncStatus | null>(null);
   const [isLinkPropertyDialogOpen, setIsLinkPropertyDialogOpen] = useState(false);
   const [referralToLink, setReferralToLink] = useState<string | null>(null); // Store ID of referral to link
-  const [linkedPropertyDetails, setLinkedPropertyDetails] = useState<any | null>(null); // State for linked property data
+  const [linkedPropertyDetails, setLinkedPropertyDetails] = useState<Property | null>(null); // State for linked property data
   const [loadingPropertyDetails, setLoadingPropertyDetails] = useState(false); // Loading state for property data
+
+  // Helper function to apply search filter
+  const applySearchFilter = useCallback((referrals: Referral[]): Referral[] => {
+    if (!searchQuery || referrals.length === 0) return referrals;
+    
+    const query = searchQuery.toLowerCase();
+    return referrals.filter(
+      referral => 
+        (referral.referee_name && referral.referee_name.toLowerCase().includes(query)) ||
+        (referral.referee_email && referral.referee_email.toLowerCase().includes(query)) ||
+        (referral.referee_type && referral.referee_type.toLowerCase().includes(query)) ||
+        (referral.referrers && referral.referrers.full_name && 
+         referral.referrers.full_name.toLowerCase().includes(query)) ||
+        (referral.referrers && referral.referrers.email && 
+         referral.referrers.email.toLowerCase().includes(query)) ||
+        (referral.status && referral.status.toLowerCase().includes(query))
+    );
+  }, [searchQuery]);
+  
+  // Custom hook to memoize the fetchReferrals function
+  const fetchReferrals = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Step 1: Get all referrals based on filters
+      let query = supabase
+        .from('referrals')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      // Apply filters
+      if (statusFilter && statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+      
+      if (typeFilter && typeFilter !== 'all') {
+        query = query.eq('referee_type', typeFilter);
+      }
+
+      const { data: referralsData, error: referralsError } = await query;
+      
+      if (referralsError) {
+        // Removed console.error
+        setError('Unable to load referrals data. The database tables may not exist yet.');
+        return;
+      }
+      
+      // Early return if no referrals
+      if (!referralsData || referralsData.length === 0) {
+        setReferrals([]);
+        return;
+      }
+      
+      // Step 2: Get all referrers
+      const { data: referrersData, error: referrersError } = await supabase
+        .from('referrers')
+        .select('*');
+      
+      if (referrersError) {
+        // Removed console.error
+        setError('Unable to load referrers data.');
+        return;
+      }
+      
+      // Process referrals with referrer data
+      const referrersMap = new Map();
+      referrersData?.forEach(referrer => {
+        referrersMap.set(referrer.id, referrer);
+      });
+      
+      const processedReferrals = referralsData.map(referral => ({
+        ...referral,
+        referrers: referrersMap.get(referral.referrer_id) || null
+      }));
+      
+      // Apply search filter
+      const filteredReferrals = applySearchFilter(processedReferrals);
+      setReferrals(filteredReferrals);
+    } catch (_error) {
+      // Removed console.error
+      setError('An unexpected error occurred. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  }, [statusFilter, typeFilter, applySearchFilter]); // Remove searchQuery since it's in applySearchFilter
 
   useEffect(() => {
     fetchReferrals();
-  }, [statusFilter, typeFilter, searchQuery]);
+  }, [fetchReferrals]);
 
   // New handler for when sync completes and potentially updates status
   const handleSyncComplete = useCallback(async (updatedReferral: Partial<Referral>) => {
@@ -254,13 +346,14 @@ function AdminReferrals() {
             .single();
 
           if (error) {
-            console.warn(`Property details not found in DB for vault_property_id ${selectedReferral.vault_property_id}:`, error.message);
+            // Replace console.warn with toast.warning
+            toast.warning(`Property details not found in DB for vault_property_id ${selectedReferral.vault_property_id}`);
             setLinkedPropertyDetails(null);
           } else {
             setLinkedPropertyDetails(data);
           }
-        } catch (propertyError) {
-          console.error("Error fetching linked property details after sync:", propertyError);
+        } catch (_propertyError) {
+          // Removed console.error
           setLinkedPropertyDetails(null);
         } finally {
           setLoadingPropertyDetails(false);
@@ -269,142 +362,21 @@ function AdminReferrals() {
     }
   }, [selectedReferral, isDialogOpen]);
 
-  const fetchReferrals = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      // Step 1: Get all referrals based on filters
-      let query = supabase
-        .from('referrals')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      // Apply filters
-      if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-      
-      if (typeFilter && typeFilter !== 'all') {
-        query = query.eq('referee_type', typeFilter);
-      }
-
-      const { data: referralsData, error: referralsError } = await query;
-      
-      if (referralsError) {
-        console.error('Error fetching referrals:', referralsError);
-        setError('Unable to load referrals data. The database tables may not exist yet.');
-        return;
-      }
-      
-      // Early return if no referrals
-      if (!referralsData || referralsData.length === 0) {
-        setReferrals([]);
-        setLoading(false);
-        return;
-      }
-      
-      // Step 2: Get all relevant referrers in a single query
-      const referrerIds = [...new Set(
-        referralsData
-          .filter(r => r.referrer_id)
-          .map(r => r.referrer_id)
-      )];
-      
-      // If no referrer IDs, just return the referrals without referrer data
-      if (referrerIds.length === 0) {
-        const processedReferrals = referralsData.map(referral => ({
-          ...referral,
-          referrers: undefined
-        }));
-        
-        const filteredReferrals = applySearchFilter(processedReferrals);
-        setReferrals(filteredReferrals);
-        setLoading(false);
-        return;
-      }
-      
-      // Fetch all relevant referrers in one go
-      const { data: referrersData, error: referrersError } = await supabase
-        .from('referrers')
-        .select('id, full_name, email, phone')
-        .in('id', referrerIds);
-      
-      if (referrersError) {
-        console.error('Error fetching referrers:', referrersError);
-        
-        // Even if referrers fetch fails, we can still show referrals
-        const processedReferrals = referralsData.map(referral => ({
-          ...referral,
-          referrers: undefined
-        }));
-        
-        const filteredReferrals = applySearchFilter(processedReferrals);
-        setReferrals(filteredReferrals);
-        setLoading(false);
-        return;
-      }
-      
-      // Create a map for quick referrer lookup
-      const referrersMap = new Map();
-      if (referrersData) {
-        referrersData.forEach(referrer => {
-          referrersMap.set(referrer.id, referrer);
-        });
-      }
-      
-      // Combine the data
-      const processedReferrals = referralsData.map(referral => ({
-        ...referral,
-        referrers: referral.referrer_id ? referrersMap.get(referral.referrer_id) : undefined
-      }));
-      
-      // Apply search filter if needed
-      const filteredReferrals = applySearchFilter(processedReferrals);
-      setReferrals(filteredReferrals);
-    } catch (error) {
-      console.error('Error fetching referrals:', error);
-      setError('An unexpected error occurred. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Helper function to apply search filter
-  const applySearchFilter = (referrals: Referral[]): Referral[] => {
-    if (!searchQuery || referrals.length === 0) return referrals;
-    
-    const query = searchQuery.toLowerCase();
-    return referrals.filter(
-      referral => 
-        (referral.referee_name && referral.referee_name.toLowerCase().includes(query)) ||
-        (referral.referee_email && referral.referee_email.toLowerCase().includes(query)) ||
-        (referral.referee_type && referral.referee_type.toLowerCase().includes(query)) ||
-        (referral.referrers && referral.referrers.full_name && 
-         referral.referrers.full_name.toLowerCase().includes(query)) ||
-        (referral.referrers && referral.referrers.email && 
-         referral.referrers.email.toLowerCase().includes(query)) ||
-        (referral.status && referral.status.toLowerCase().includes(query))
-    );
-  };
-
   const fetchStatusHistory = async (referralId: string) => {
+    setStatusHistory([]);
     setLoadingHistory(true);
     try {
-      const { data, error } = await supabase
-        .from('referral_status_history')
-        .select('*')
+      const { data, error: historyError } = await supabase
+        .from('status_history')
+        .select('*, users(full_name)')
         .eq('referral_id', referralId)
         .order('created_at', { ascending: false });
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
+
+      if (!historyError) {
         setStatusHistory(data as StatusHistoryItem[]);
       }
-    } catch (error) {
-      console.error('Error fetching status history:', error);
+    } catch (_error) {
+      // Removed console.error
     } finally {
       setLoadingHistory(false);
     }
@@ -429,14 +401,14 @@ function AdminReferrals() {
           .single(); // Expecting only one match
           
         if (error) {
-          // Handle case where property might not be in our DB yet or other error
-          console.warn(`Property details not found in DB for vault_property_id ${referral.vault_property_id}:`, error.message);
+          // Replace console.warn with toast.warning
+          toast.warning(`Property details not found in DB for vault_property_id ${referral.vault_property_id}`);
           setLinkedPropertyDetails(null); // Ensure it's null if error
         } else {
           setLinkedPropertyDetails(data);
         }
-      } catch (propertyError) {
-        console.error("Error fetching linked property details:", propertyError);
+      } catch (_propertyError) {
+        // Removed console.error
         setLinkedPropertyDetails(null);
       } finally {
         setLoadingPropertyDetails(false);
@@ -508,8 +480,8 @@ function AdminReferrals() {
       // Show success toast instead of alert
       toast.success('Reward created successfully!');
       
-    } catch (error) {
-      console.error('Error creating reward:', error);
+    } catch (_error) {
+      // Removed console.error
       toast.error('Error creating reward. Please try again.');
     } finally {
       setIsProcessingReward(false);
@@ -602,7 +574,7 @@ function AdminReferrals() {
         });
         
       if (historyError) {
-        console.error('Error recording status history:', historyError);
+        // Removed console.error
       }
       
       // Update the referral status
@@ -646,8 +618,8 @@ function AdminReferrals() {
       // Clear status note
       setStatusNote('');
       
-    } catch (error) {
-      console.error('Error updating referral status:', error);
+    } catch (_error) {
+      // Removed console.error
     }
   };
 
@@ -663,7 +635,7 @@ function AdminReferrals() {
       const noteWithTimestamp = `${formatDate(timestamp)} - ${fullName} said: ${statusNote}`;
       
       // Add a note to the referral
-      const { error } = await supabase
+      const { error: noteError } = await supabase
         .from('referrals')
         .update({ 
           additional_notes: selectedReferral?.additional_notes 
@@ -672,8 +644,8 @@ function AdminReferrals() {
         })
         .eq('id', referralId);
       
-      if (error) {
-        throw error;
+      if (noteError) {
+        throw noteError;
       }
       
       // Update selected referral
@@ -691,8 +663,8 @@ function AdminReferrals() {
       // Clear status note
       setStatusNote('');
       
-    } catch (error) {
-      console.error('Error adding note:', error);
+    } catch (_error) {
+      // Removed console.error
     }
   };
 
@@ -808,7 +780,7 @@ function AdminReferrals() {
       }
       
       dateObj = new Date(year, month, parseInt(day || '1', 10), hours, minutes);
-    } catch (e) {
+    } catch (_e) {
       // If parsing fails, use current date
       dateObj = new Date();
     }
@@ -880,8 +852,8 @@ function AdminReferrals() {
       // Reset note to delete
       setNoteToDelete(null);
       
-    } catch (error) {
-      console.error('Error deleting note:', error);
+    } catch (_error) {
+      // Removed console.error
     }
   };
   
@@ -913,8 +885,8 @@ function AdminReferrals() {
             setSelectedCategoryIds(["2044501"]);
             setManualCategoryId("2044501");
           }
-        } catch (parseError) {
-          console.error('Error parsing saved categories:', parseError);
+        } catch (_parseError) {
+          // Removed console.error
           // Default to the original hardcoded one if there's a parsing error
           setSelectedCategoryIds(["2044501"]);
           setManualCategoryId("2044501");
@@ -924,8 +896,8 @@ function AdminReferrals() {
         setSelectedCategoryIds(["2044501"]);
         setManualCategoryId("2044501");
       }
-    } catch (error) {
-      console.error('Error loading saved categories:', error);
+    } catch (_error) {
+      // Removed console.error
       // Default to the original hardcoded one if there's an error
       setSelectedCategoryIds(["2044501"]);
       setManualCategoryId("2044501");
@@ -936,8 +908,8 @@ function AdminReferrals() {
   const saveCategories = useCallback((categories: string[]) => {
     try {
       localStorage.setItem(REFERRAL_CATEGORIES_KEY, JSON.stringify(categories));
-    } catch (error) {
-      console.error('Error saving categories:', error);
+    } catch (_error) {
+      // Removed console.error
     }
   }, []);
 
@@ -982,8 +954,8 @@ function AdminReferrals() {
       // First, get all contact categories for debugging and selection
       const categories = await getContactCategories();
       setAllCategories(categories.map(cat => ({
-        id: cat.id,
-        name: cat.name || 'Unnamed Category'
+        id: String(cat.id),
+        name: String(cat.name || 'Unnamed Category')
       })));
       
       // Load saved categories if needed
@@ -999,12 +971,12 @@ function AdminReferrals() {
       }
       
       // Fetch contacts from VaultRE with the selected category IDs
-      console.log("Fetching contacts from your CRM with selected categories...");
+      // Removed console.log
       
       // Use the updated function that accepts category IDs
-      console.log(`Searching for contacts with category IDs: ${selectedCategoryIds.join(', ')}`);
+      toast.info(`Searching for contacts with category IDs: ${selectedCategoryIds.join(', ')}`);
       const contacts = await getColellaPartnerContacts(selectedCategoryIds);
-      console.log(`Found ${contacts.length} contacts with selected categories`);
+      // Removed console.log
       
       // First get all existing referrals from the database to check for duplicates
       const { data: existingReferrals } = await supabase
@@ -1026,8 +998,8 @@ function AdminReferrals() {
       });
       
       setVaultreContacts(contactsWithStatus);
-    } catch (error) {
-      console.error('Error fetching contacts from CRM:', error);
+    } catch (_error) {
+      // Removed console.error
       setSyncError('Failed to fetch contacts from your CRM');
     } finally {
       setLoadingVaultreContacts(false);
@@ -1133,7 +1105,7 @@ function AdminReferrals() {
         // Skip contact if it has no name or contact info
         if ((!contact.firstName && !contact.lastName && !contact.fullName) || 
             (!contact.email && !contact.mobilePhone && !contact.workPhone && !contact.homePhone)) {
-          console.log(`Skipping contact with insufficient data: ${contact.id}`);
+          // Removed console.log
           skippedCount++;
           continue;
         }
@@ -1145,7 +1117,7 @@ function AdminReferrals() {
         );
         
         if (isDuplicate) {
-          console.log(`Skipping duplicate contact: ${contact.fullName || contact.email || contact.id}`);
+          // Removed console.log
           skippedCount++;
           continue;
         }
@@ -1177,13 +1149,15 @@ function AdminReferrals() {
               .insert(referralData);
             
             if (error) {
-              console.warn('Error importing referral:', error);
+              // Replace console.warn with toast.warning
+              toast.warning('Error importing referral');
               skippedCount++;
             } else {
               successCount++;
             }
-          } catch (error) {
-            console.warn('Error importing referral:', error);
+          } catch (_error) {
+            // Replace console.warn with toast.warning
+            toast.warning('Error importing referral');
             skippedCount++;
           }
         }
@@ -1208,8 +1182,8 @@ function AdminReferrals() {
         toast.info(`${skippedCount} contacts skipped (duplicates or invalid data)`);
       }
       
-    } catch (error) {
-      console.error('Error batch importing referrals:', error);
+    } catch (_error) {
+      // Removed console.error
       toast.error('Failed to import some referrals');
     }
   };
@@ -1218,7 +1192,7 @@ function AdminReferrals() {
   const searchRecentContacts = async () => {
     setLoadingVaultreContacts(true);
     try {
-      console.log("Fetching recently modified contacts from VaultRE...");
+      // Removed console.log
       
       // Get the 50 most recently modified contacts
       const contacts = await getContacts({
@@ -1227,7 +1201,7 @@ function AdminReferrals() {
         sortOrder: 'desc'  // Sort in descending order to get most recent first
       });
       
-      console.log(`Found ${contacts.length} recently modified contacts from API`);
+      // Removed console.log
       
       // Get existing referrals to check for duplicates
       const { data: existingReferrals } = await supabase
@@ -1255,8 +1229,8 @@ function AdminReferrals() {
       } else {
         toast.info('No contacts found');
       }
-    } catch (error) {
-      console.error('Error fetching recent contacts:', error);
+    } catch (_error) {
+      // Removed console.error
       toast.error('Error loading contacts');
     } finally {
       setLoadingVaultreContacts(false);
@@ -1285,8 +1259,8 @@ function AdminReferrals() {
         
         if (error) throw error;
         setSearchResults(data || []);
-      } catch (error) {
-        console.error('Error searching referrals:', error);
+      } catch (_error) {
+        // Removed console.error
         toast.error('Error searching referrals');
       } finally {
         setLoading(false);
@@ -1328,8 +1302,8 @@ function AdminReferrals() {
         toast.success('Referral imported successfully');
         onMergeComplete(data.id); // Pass the new ID back
         onOpenChange(false); // Close this dialog
-      } catch (error) {
-        console.error('Error importing referral:', error);
+      } catch (_error) {
+        // Removed console.error
         toast.error('Failed to import referral');
       } finally {
         setIsProcessing(false);
@@ -1367,8 +1341,8 @@ function AdminReferrals() {
         toast.success('Referral merged successfully');
         onMergeComplete(selectedReferral.id); // Pass the merged ID back
         onOpenChange(false); // Close this dialog
-      } catch (error) {
-        console.error('Error merging referral:', error);
+      } catch (_error) {
+        // Removed console.error
         toast.error('Failed to merge referral');
       } finally {
         setIsProcessing(false);
@@ -1406,28 +1380,73 @@ function AdminReferrals() {
         toast.success('Referrals merged successfully');
         onMergeComplete(suggestedMatch.id); // Pass the merged ID back
         onOpenChange(false); // Close this dialog
-      } catch (error) {
-        console.error('Error quick merging referrals:', error);
+      } catch (_error) {
+        // Removed console.error
         toast.error('Failed to merge referrals');
       } finally {
         setIsProcessing(false);
       }
     };
     
-    // Helper function to merge existing address data with new address data
-    const mergeAddressData = (existingAddress: any, newAddress: any) => {
-      if (!existingAddress && !newAddress) return null;
-      if (!existingAddress) return newAddress;
-      if (!newAddress) return existingAddress;
+    // Fix the address merge function with proper return type annotation
+    const mergeAddressData = (
+      existingAddress: { 
+        street_address?: string | null; 
+        suburb?: string | null; 
+        state?: string | null; 
+        post_code?: string | null; 
+        postal_address?: string | null; 
+        display_address?: string | null; 
+      } | null | undefined, 
+      newAddress: { 
+        street_address?: string | null; 
+        suburb?: string | null; 
+        state?: string | null; 
+        post_code?: string | null; 
+        postal_address?: string | null; 
+        display_address?: string | null; 
+      } | null | undefined
+    ): {
+      street_address?: string;
+      suburb?: string;
+      state?: string;
+      post_code?: string;
+      postal_address?: string;
+      display_address?: string;
+    } => {
+      if (!existingAddress) {
+        // Convert any null values to undefined or empty string
+        if (!newAddress) return {};
+        return {
+          street_address: newAddress.street_address || undefined,
+          suburb: newAddress.suburb || undefined,
+          state: newAddress.state || undefined,
+          post_code: newAddress.post_code || undefined,
+          postal_address: newAddress.postal_address || undefined,
+          display_address: newAddress.display_address || undefined
+        };
+      }
       
-      // Merge the address data, preferring existing non-empty values
+      if (!newAddress) {
+        // Convert any null values to undefined or empty string
+        return {
+          street_address: existingAddress.street_address || undefined,
+          suburb: existingAddress.suburb || undefined,
+          state: existingAddress.state || undefined,
+          post_code: existingAddress.post_code || undefined,
+          postal_address: existingAddress.postal_address || undefined,
+          display_address: existingAddress.display_address || undefined
+        };
+      }
+      
+      // Merge the address data, preferring existing non-empty values, converting nulls to undefined
       return {
-        street_address: existingAddress.street_address || newAddress.street_address,
-        suburb: existingAddress.suburb || newAddress.suburb,
-        state: existingAddress.state || newAddress.state,
-        post_code: existingAddress.post_code || newAddress.post_code,
-        postal_address: existingAddress.postal_address || newAddress.postal_address,
-        display_address: existingAddress.display_address || newAddress.display_address
+        street_address: existingAddress.street_address || newAddress.street_address || undefined,
+        suburb: existingAddress.suburb || newAddress.suburb || undefined,
+        state: existingAddress.state || newAddress.state || undefined,
+        post_code: existingAddress.post_code || newAddress.post_code || undefined,
+        postal_address: existingAddress.postal_address || newAddress.postal_address || undefined,
+        display_address: existingAddress.display_address || newAddress.display_address || undefined
       };
     };
     
@@ -1496,8 +1515,8 @@ function AdminReferrals() {
           }
           
           setSuggestedMatch(foundMatch);
-        } catch (error) {
-          console.error('Error finding matching referrals:', error);
+        } catch (_error) {
+          // Removed console.error
           setSuggestedMatch(null);
         } finally {
           setCheckingMatches(false);
@@ -1743,8 +1762,8 @@ function AdminReferrals() {
         try {
           const props = await getLinkableProperties();
           setProperties(props);
-        } catch (error) {
-          console.error("Error fetching properties for linking:", error);
+        } catch (_error) {
+          // Removed console.error
           toast.error("Failed to load properties from VaultRE");
         } finally {
           setLoading(false);
@@ -1799,7 +1818,7 @@ function AdminReferrals() {
           .upsert(propertyDataForTable, { onConflict: 'vault_property_id' });
 
         if (upsertError) {
-          console.error("Error upserting property:", upsertError);
+          // Removed console.error
           throw new Error("Failed to save property details.");
         }
 
@@ -1810,7 +1829,7 @@ function AdminReferrals() {
           .eq('id', referralId);
         
         if (referralUpdateError) {
-          console.error("Error updating referral link:", referralUpdateError);
+          // Removed console.error
           // Optional: Consider rolling back the property upsert or notifying user
           throw new Error("Failed to link property to referral.");
         }
@@ -1818,9 +1837,10 @@ function AdminReferrals() {
         toast.success("Property linked successfully!");
         onLinkComplete(); // Call the completion callback
         onOpenChange(false); // Close the dialog
-      } catch (error: any) {
-        console.error("Error linking property:", error);
-        toast.error(error.message || "Failed to link property.");
+      } catch (error: unknown) {
+        // Proper error handling with type checking
+        const errorMessage = error instanceof Error ? error.message : "Failed to link property.";
+        toast.error(errorMessage);
       } finally {
         setIsProcessing(false);
       }

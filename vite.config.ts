@@ -15,4 +15,16 @@ export default defineConfig({
       '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
     },
   },
+  // Add server proxy configuration
+  server: {
+    proxy: {
+      // Proxy requests starting with /api to target server (e.g., running on port 3001)
+      '/api': {
+        target: 'http://localhost:3001', // Target where the API functions run
+        changeOrigin: true, // Recommended for virtual hosted sites
+        // Optional: You might rewrite the path if needed, but often not necessary
+        // rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 })

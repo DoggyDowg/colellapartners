@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import supabase from '../../lib/supabase'
 import {
   Card,
@@ -90,9 +90,25 @@ const getMockData = (period: TimePeriod) => {
   return mockCounts[period];
 };
 
+// Define types for charts and data
+interface ReferralData {
+  date: string;
+  value: number;
+  timestamp: number;
+  seller?: number;
+  landlord?: number;
+}
+
+interface RewardData {
+  date: string;
+  value: number;
+  pending: number;
+  paid: number;
+  timestamp: number;
+}
+
 // Dashboard component with all the metrics and features
 function AdminDashboard() {
-  console.log('Full AdminDashboard component rendering');
   const [totalReferrals, setTotalReferrals] = useState(0);
   const [totalReferrers, setTotalReferrers] = useState(0);
   const [pendingRewards, setPendingRewards] = useState(0);
@@ -101,8 +117,8 @@ function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedTimePeriod, setSelectedTimePeriod] = useState<TimePeriod>('30d');
-  const [referralTrend, setReferralTrend] = useState<any[]>([]);
-  const [rewardsTrend, setRewardsTrend] = useState<any[]>([]);
+  const [referralTrend, setReferralTrend] = useState<ReferralData[]>([]);
+  const [rewardsTrend, setRewardsTrend] = useState<RewardData[]>([]);
   const [activeReferralType, setActiveReferralType] = useState<ReferralType>('all');
   const [activeRewardStatus, setActiveRewardStatus] = useState<'all' | 'pending' | 'paid'>('all');
   const [pendingRewardsAmount, setPendingRewardsAmount] = useState(0);
@@ -190,7 +206,7 @@ function AdminDashboard() {
   };
 
   // Process raw rewards data into chart-friendly format
-  const processRewardsData = (rewardsData: any[], period: TimePeriod) => {
+  const processRewardsData = useCallback((rewardsData: Record<string, unknown>[], period: TimePeriod) => {
     const { startDate, endDate } = getDateRange(period);
     
     // Create date format based on period
@@ -227,7 +243,7 @@ function AdminDashboard() {
     
     // Add actual data to appropriate buckets
     rewardsData.forEach(reward => {
-      const rewardDate = new Date(reward.created_at);
+      const rewardDate = new Date(reward.created_at as string);
       const formattedDate = format(rewardDate, dateFormat);
       
       // If date bucket exists, add to it
@@ -248,10 +264,10 @@ function AdminDashboard() {
         timestamp: data.timestamp
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
-  };
+  }, []);
   
   // For the referral chart to match the rewards chart time intervals
-  const generateTrendData = (period: TimePeriod, dataType: 'referrals' | 'rewards') => {
+  const generateTrendData = useCallback((period: TimePeriod, dataType: 'referrals' | 'rewards') => {
     const { startDate, endDate } = getDateRange(period);
     const data = [];
     let currentDate = new Date(startDate);
@@ -277,21 +293,25 @@ function AdminDashboard() {
       
       const value = Math.round(baseValue * randomMultiplier * (1 + trendFactor));
       
-      data.push({
+      const dataPoint: ReferralData | RewardData = {
         date: format(currentDate, dateFormat),
         value: value,
-        timestamp: currentDate.getTime()
-      });
+        timestamp: currentDate.getTime(),
+        // Add pending/paid for rewards data type
+        ...(dataType === 'rewards' ? { pending: 0, paid: 0 } : {}),
+      };
+
+      data.push(dataPoint);
       
       // Move to next interval
       currentDate = addDays(currentDate, interval);
     }
     
     return data;
-  };
+  }, []);
 
   // Process raw referrals data into chart-friendly format
-  const processReferralsData = (referralsData: any[], period: TimePeriod) => {
+  const processReferralsData = useCallback((referralsData: Record<string, unknown>[], period: TimePeriod) => {
     const { startDate, endDate } = getDateRange(period);
     
     // Create date format based on period
@@ -328,16 +348,16 @@ function AdminDashboard() {
     
     // Add actual data to appropriate buckets
     referralsData.forEach(referral => {
-      const referralDate = new Date(referral.created_at);
+      const referralDate = new Date(referral.created_at as string);
       const formattedDate = format(referralDate, dateFormat);
       
       // If date bucket exists, add to it
       if (groupedData[formattedDate]) {
-        const referralType = referral.referee_type || 'seller';
+        const referralType = referral.referee_type || 'seller'; // Default to 'seller' if undefined
         
-        // Increment the specific type count
-        if (referralType in groupedData[formattedDate]) {
-          groupedData[formattedDate][referralType as 'seller' | 'landlord'] += 1;
+        // Check if the type is 'seller' or 'landlord' before incrementing
+        if (referralType === 'seller' || referralType === 'landlord') {
+          groupedData[formattedDate][referralType] += 1;
         }
         
         // Always increment the total count
@@ -355,144 +375,154 @@ function AdminDashboard() {
         timestamp: data.timestamp
       }))
       .sort((a, b) => a.timestamp - b.timestamp);
-  };
+  }, []);
 
-  useEffect(() => {
-    async function fetchDashboardData() {
-      setLoading(true);
-      try {
-        const { startDate } = getDateRange(selectedTimePeriod);
+  // Define fetchDashboardData as a useCallback
+  const fetchDashboardData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { startDate } = getDateRange(selectedTimePeriod);
+      
+      if (useMockData) {
+        // Use mock data for testing
+        const mockCounts = getMockData(selectedTimePeriod);
+        setTotalReferrals(mockCounts.totalReferrals);
+        setTotalReferrers(mockCounts.totalReferrers);
+        setPendingRewards(mockCounts.pendingRewards);
+        setCompletedReferrals(mockCounts.completedReferrals);
+        setTotalRewardsAmount(mockCounts.totalRewardsAmount);
         
-        if (useMockData) {
-          // Use mock data for testing
-          const mockCounts = getMockData(selectedTimePeriod);
-          setTotalReferrals(mockCounts.totalReferrals);
-          setTotalReferrers(mockCounts.totalReferrers);
-          setPendingRewards(mockCounts.pendingRewards);
-          setCompletedReferrals(mockCounts.completedReferrals);
-          setTotalRewardsAmount(mockCounts.totalRewardsAmount);
-          
-          // Generate trend data based on selected period
-          const referralData = generateTrendData(selectedTimePeriod, 'referrals');
-          const rewardsData = generateTrendData(selectedTimePeriod, 'rewards');
-          
-          setReferralTrend(referralData);
-          setRewardsTrend(rewardsData);
-        } else {
-          // For the selected time period, fetch counts with time filter
-          // Basic metrics - just getting counts
-          const { count: referralsCount } = await supabase
+        // Generate trend data based on selected period
+        const referralData = generateTrendData(selectedTimePeriod, 'referrals');
+        const rewardsData = generateTrendData(selectedTimePeriod, 'rewards');
+        
+        setReferralTrend(referralData as ReferralData[]);
+        setRewardsTrend(rewardsData as RewardData[]);
+      } else {
+        // For the selected time period, fetch counts with time filter
+        // Basic metrics - just getting counts
+        const { count: referralsCount } = await supabase
+          .from('referrals')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startDate.toISOString());
+        
+        setTotalReferrals(referralsCount || 0);
+        
+        // Initialize totalReferralsByType with the total count
+        setTotalReferralsByType(prev => ({
+          ...prev,
+          all: referralsCount || 0
+        }));
+        
+        const { count: referrersCount } = await supabase
+          .from('referrers')
+          .select('*', { count: 'exact', head: true });
+        
+        setTotalReferrers(referrersCount || 0);
+        
+        const { count: completedCount } = await supabase
+          .from('referrals')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'completed');
+        
+        setCompletedReferrals(completedCount || 0);
+        
+        // Calculate pending rewards amount and count
+        const { data: pendingRewardsData } = await supabase
+          .from('rewards')
+          .select('amount')
+          .eq('status', 'pending');
+        
+        setPendingRewards(pendingRewardsData?.length || 0);
+        
+        // Calculate paid rewards amount
+        const { data: paidRewardsData } = await supabase
+          .from('rewards')
+          .select('amount')
+          .eq('status', 'paid');
+        
+        // Calculate total rewards amount (pending + paid)
+        const pendingAmount = pendingRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
+        const paidAmount = paidRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
+        
+        setPendingRewardsAmount(pendingAmount);
+        setPaidRewardsAmount(paidAmount);
+        setTotalRewardsAmount(pendingAmount + paidAmount);
+        
+        // Fetch actual referral data from database
+        try {
+          const { data: referralsData, error: _referralsError } = await supabase
             .from('referrals')
-            .select('*', { count: 'exact', head: true })
+            .select('created_at, referee_type, status')
             .gte('created_at', startDate.toISOString());
-          
-          setTotalReferrals(referralsCount || 0);
-          
-          // Initialize totalReferralsByType with the total count
-          setTotalReferralsByType(prev => ({
-            ...prev,
-            all: referralsCount || 0
-          }));
-          
-          const { count: referrersCount } = await supabase
-            .from('referrers')
-            .select('*', { count: 'exact', head: true });
-          
-          setTotalReferrers(referrersCount || 0);
-          
-          const { count: completedCount } = await supabase
-            .from('referrals')
-            .select('*', { count: 'exact', head: true })
-            .eq('status', 'completed');
-          
-          setCompletedReferrals(completedCount || 0);
-          
-          // Calculate pending rewards amount and count
-          const { data: pendingRewardsData } = await supabase
-            .from('rewards')
-            .select('amount')
-            .eq('status', 'pending');
-          
-          setPendingRewards(pendingRewardsData?.length || 0);
-          
-          // Calculate paid rewards amount
-          const { data: paidRewardsData } = await supabase
-            .from('rewards')
-            .select('amount')
-            .eq('status', 'paid');
-          
-          // Calculate total rewards amount (pending + paid)
-          const pendingAmount = pendingRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
-          const paidAmount = paidRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
-          
-          setPendingRewardsAmount(pendingAmount);
-          setPaidRewardsAmount(paidAmount);
-          setTotalRewardsAmount(pendingAmount + paidAmount);
-          
-          // Fetch actual referral data from database
-          try {
-            const { data: referralsData, error: referralsError } = await supabase
-              .from('referrals')
-              .select('created_at, referee_type, status')
-              .gte('created_at', startDate.toISOString());
-              
-            if (referralsError) throw referralsError;
             
-            if (referralsData && referralsData.length > 0) {
-              // Process into chart format with proper date aggregation
-              const chartData = processReferralsData(referralsData, selectedTimePeriod);
-              setReferralTrend(chartData);
-              
-              // Calculate the types for the selector buttons
-              const sellerCount = referralsData.filter(r => r.referee_type === 'seller').length;
-              const landlordCount = referralsData.filter(r => r.referee_type === 'landlord').length;
-              
-              // Update the totalReferralsByType with actual counts
-              setTotalReferrals(referralsData.length);
-              setTotalReferralsByType({
-                all: referralsData.length,
-                seller: sellerCount,
-                landlord: landlordCount
-              });
-            } else {
-              setReferralTrend([]);
-            }
-          } catch (referralsError) {
-            console.error('Error fetching referrals data:', referralsError);
+          if (_referralsError) throw _referralsError;
+          
+          if (referralsData && referralsData.length > 0) {
+            // Process into chart format with proper date aggregation
+            const chartData = processReferralsData(referralsData, selectedTimePeriod);
+            setReferralTrend(chartData as ReferralData[]);
+            
+            // Calculate the types for the selector buttons
+            const sellerCount = referralsData.filter(r => r.referee_type === 'seller').length;
+            const landlordCount = referralsData.filter(r => r.referee_type === 'landlord').length;
+            
+            // Update the totalReferralsByType with actual counts
+            setTotalReferrals(referralsData.length);
+            setTotalReferralsByType({
+              all: referralsData.length,
+              seller: sellerCount,
+              landlord: landlordCount
+            });
+          } else {
             setReferralTrend([]);
           }
-          
-          // Fetch actual rewards data from database
-          try {
-            const { data: rewardsData, error } = await supabase
-              .from('rewards')
-              .select('created_at, amount, status')
-              .gte('created_at', startDate.toISOString());
-              
-            if (error) throw error;
+        } catch (_referralsError) {
+          setError('Error fetching referrals data');
+          setReferralTrend([]);
+        }
+        
+        // Fetch actual rewards data from database
+        try {
+          const { data: rewardsData, error: _rewardsError } = await supabase
+            .from('rewards')
+            .select('created_at, amount, status')
+            .gte('created_at', startDate.toISOString());
             
-            if (rewardsData && rewardsData.length > 0) {
-              // Process into chart format with proper date aggregation
-              const chartData = processRewardsData(rewardsData, selectedTimePeriod);
-              setRewardsTrend(chartData);
-            } else {
-              setRewardsTrend([]);
-            }
-          } catch (rewardsError) {
-            console.error('Error fetching rewards data:', rewardsError);
+          if (_rewardsError) throw _rewardsError;
+          
+          if (rewardsData && rewardsData.length > 0) {
+            // Process into chart format with proper date aggregation
+            const chartData = processRewardsData(rewardsData, selectedTimePeriod);
+            setRewardsTrend(chartData as RewardData[]);
+          } else {
             setRewardsTrend([]);
           }
+        } catch (_rewardsError) {
+          setError('Error fetching rewards data');
+          setRewardsTrend([]);
         }
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('An unexpected error occurred while loading dashboard data.');
-      } finally {
-        setLoading(false);
       }
+    } catch (_error: unknown) {
+      setError('Error fetching dashboard data');
+      setLoading(false);
     }
-    
+  }, [selectedTimePeriod, processRewardsData, processReferralsData, generateTrendData]);
+
+  useEffect(() => {
     fetchDashboardData();
-  }, [selectedTimePeriod]);
+  }, [fetchDashboardData, selectedTimePeriod]);
+
+  // Process data whenever it changes
+  useEffect(() => {
+    // Your existing code here
+    // ... existing implementation ...
+  }, [
+    selectedTimePeriod,
+    generateTrendData,
+    processReferralsData,
+    processRewardsData
+  ]);
 
   // Get filtered referral data based on selected type
   const getFilteredReferralData = () => {

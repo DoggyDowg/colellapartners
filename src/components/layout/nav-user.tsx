@@ -22,7 +22,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useUserProfile } from '@/hooks/use-user-profile'
 
 // Accept fallback data in case auth context isn't loaded yet
@@ -63,7 +63,7 @@ export function NavUser({
 
   const handleLogout = async () => {
     await signOut()
-    navigate({ to: '/auth/login' })
+    navigate({ to: '/auth' })
   }
 
   return (

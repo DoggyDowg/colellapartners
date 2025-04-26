@@ -108,9 +108,9 @@ function PartnerDashboard() {
         icon: 'user'
       })
       
-    } catch (error: any) {
-      console.error('Error fetching dashboard data:', error)
-      setError('An unexpected error occurred when loading dashboard data.')
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`An unexpected error occurred when loading dashboard data: ${errorMessage}`);
     } finally {
       setLoading(false)
     }

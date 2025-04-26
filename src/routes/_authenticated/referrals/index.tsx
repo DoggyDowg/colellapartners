@@ -12,12 +12,13 @@ import {
 } from '../../../components/ui/table';
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
-import { toast } from 'sonner';
 import { Input } from '../../../components/ui/input';
 import { IconSearch } from '@tabler/icons-react';
 import { Badge } from '../../../components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../../../components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
+import { ErrorState } from '../../../components/ui/error-state';
+import { handleError } from '../../../utils/error-handler';
 
 // Define interfaces for our data
 interface Referral {
@@ -97,8 +98,12 @@ function UserReferrals() {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching referrals:', error);
-        setError(`Error fetching referrals: ${error.message}`);
+        const errorMessage = handleError(error, {
+          context: 'UserReferrals.fetchReferrals',
+          toastMessage: 'Error fetching referrals',
+          showToast: false // We'll handle this with the ErrorState component
+        });
+        setError(errorMessage);
         return;
       }
       
@@ -120,10 +125,13 @@ function UserReferrals() {
         setReferrals([]);
         setFilteredReferrals([]);
       }
-    } catch (error: any) {
-      console.error('Error fetching referrals:', error);
-      setError('An unexpected error occurred when fetching referrals.');
-      toast.error('Failed to load your referrals');
+    } catch (error: unknown) {
+      const errorMessage = handleError(error, {
+        context: 'UserReferrals.fetchReferrals',
+        toastMessage: 'Failed to load your referrals',
+        showToast: true
+      });
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -139,13 +147,21 @@ function UserReferrals() {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching status history:', error);
+        handleError(error, {
+          context: 'UserReferrals.fetchStatusHistory',
+          toastMessage: 'Error fetching status history',
+          showToast: true
+        });
         return;
       }
       
       setStatusHistory(data || []);
-    } catch (error) {
-      console.error('Error fetching status history:', error);
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'UserReferrals.fetchStatusHistory',
+        toastMessage: 'Error fetching status history',
+        showToast: true
+      });
     } finally {
       setLoadingHistory(false);
     }
@@ -194,20 +210,10 @@ function UserReferrals() {
         <Header title="My Referrals" />
         <div className="container py-6">
           <h1 className="text-3xl font-bold mb-6">My Referrals</h1>
-          <Card className="p-6">
-            <div className="flex flex-col items-center justify-center h-64 text-center">
-              <h2 className="text-xl font-medium mb-2">Error</h2>
-              <p className="text-muted-foreground mb-4">
-                {error}
-              </p>
-              <p className="text-sm text-muted-foreground mb-6">
-                Please try again later.
-              </p>
-              <Button onClick={fetchReferrals}>
-                Retry
-              </Button>
-            </div>
-          </Card>
+          <ErrorState 
+            message={error}
+            onRetry={fetchReferrals}
+          />
         </div>
       </>
     );

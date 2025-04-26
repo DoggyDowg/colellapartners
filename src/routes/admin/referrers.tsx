@@ -30,7 +30,7 @@ import {
 } from '../../components/ui/tabs';
 import { Badge } from '../../components/ui/badge';
 import { toast } from 'sonner';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../components/ui/alert-dialog';
 import ReferralDetailsDialog from '../../components/referrals/ReferralDetailsDialog';
 import RewardDetailsDialog from '../../components/rewards/RewardDetailsDialog';
@@ -202,20 +202,8 @@ function AdminReferrers() {
   // Storage keys for partner categories
   const PARTNER_CATEGORIES_KEY = 'partnerCategoryIds';
 
-  // Check for partner ID in URL when component mounts
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const partnerId = urlParams.get('partner');
-    if (partnerId) {
-      urlPartnerIdRef.current = partnerId;
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchReferrers();
-  }, [activeFilter, businessFilter, searchQuery]);
-
-  const fetchReferrers = async () => {
+  // Memoize the fetchReferrers function using useCallback
+  const fetchReferrers = useCallback(async () => {
     setLoading(true);
     setError(null);
     
@@ -259,7 +247,20 @@ function AdminReferrers() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeFilter, businessFilter, searchQuery]);
+
+  // Check for partner ID in URL when component mounts
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const partnerId = urlParams.get('partner');
+    if (partnerId) {
+      urlPartnerIdRef.current = partnerId;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchReferrers();
+  }, [fetchReferrers]);
 
   const fetchReferrerReferrals = async (referrerId: string) => {
     setLoadingReferrals(true);
@@ -275,8 +276,7 @@ function AdminReferrers() {
       }
       
       setReferrerReferrals(data || []);
-    } catch (error) {
-      console.error('Error fetching referrals:', error);
+    } catch (_error) {
       toast.error('Error loading referrals');
     } finally {
       setLoadingReferrals(false);
@@ -307,14 +307,15 @@ function AdminReferrers() {
       if (data) {
         setReferrerRewards(data as unknown as Reward[]);
       }
-    } catch (error) {
-      console.error('Error fetching rewards:', error);
+    } catch (_error) {
+      toast.error('Error fetching rewards');
     } finally {
       setLoadingRewards(false);
     }
   };
 
-  const openReferrerDetails = async (referrer: Referrer) => {
+  // Memoize the openReferrerDetails function using useCallback
+  const openReferrerDetails = useCallback(async (referrer: Referrer) => {
     setSelectedReferrer(referrer);
     setIsDialogOpen(true);
     setIsEditMode(false);
@@ -324,7 +325,7 @@ function AdminReferrers() {
     
     // Fetch rewards for this partner
     await fetchReferrerRewards(referrer.id);
-  };
+  }, []);
   
   const handleEditPartner = () => {
     if (!selectedReferrer) return;
@@ -387,8 +388,7 @@ function AdminReferrers() {
       setIsEditMode(false);
       
       toast.success('Partner updated successfully');
-    } catch (error) {
-      console.error('Error updating partner:', error);
+    } catch (_error) {
       toast.error('Error updating partner');
     }
   };
@@ -471,8 +471,8 @@ function AdminReferrers() {
       if (referrer.additional_notes) {
         try {
           notes = JSON.parse(referrer.additional_notes);
-        } catch (e) {
-          console.error('Error parsing notes:', e);
+        } catch (_e) {
+          toast.error("Error parsing notes");
         }
       }
       
@@ -486,7 +486,8 @@ function AdminReferrers() {
         .eq('id', referrerId);
       
       if (notesError) {
-        console.error('Error updating notes:', notesError);
+        toast.error('Error updating notes');
+        return;
       }
       
       // Update local state
@@ -508,8 +509,8 @@ function AdminReferrers() {
       }
       
       toast.success(`Partner ${newStatus ? 'activated' : 'deactivated'} successfully`);
-    } catch (error) {
-      console.error('Error updating partner status:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Error updating partner status');
     } finally {
       setIsStatusToggleDialogOpen(false);
@@ -548,8 +549,8 @@ function AdminReferrers() {
       if (data) {
         setStatusHistory(data as StatusHistoryItem[]);
       }
-    } catch (error) {
-      console.error('Error fetching status history:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
     } finally {
       setLoadingHistory(false);
     }
@@ -581,9 +582,9 @@ function AdminReferrers() {
           changed_by: user?.id,
           user_full_name: user?.user_metadata?.full_name
         });
-        
+      
       if (historyError) {
-        console.error('Error recording status history:', historyError);
+        toast.error('Error recording status history');
       }
       
       // Update the referral status
@@ -615,8 +616,8 @@ function AdminReferrers() {
       setStatusNote('');
       
       toast.success('Referral status updated successfully');
-    } catch (error) {
-      console.error('Error updating referral status:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Error updating referral status');
     }
   };
@@ -637,8 +638,8 @@ function AdminReferrers() {
       if (selectedReferral.additional_notes) {
         try {
           notes = JSON.parse(selectedReferral.additional_notes);
-        } catch (e) {
-          console.error('Error parsing notes:', e);
+        } catch (_e) {
+          toast.error("Error parsing notes");
         }
       }
       
@@ -672,8 +673,8 @@ function AdminReferrers() {
       setStatusNote('');
       
       toast.success('Note added successfully');
-    } catch (error) {
-      console.error('Error adding note:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Error adding note');
     }
   };
@@ -682,8 +683,8 @@ function AdminReferrers() {
     if (!notesJson) return [];
     try {
       return JSON.parse(notesJson);
-    } catch (e) {
-      console.error('Error parsing notes:', e);
+    } catch (_e) {
+      toast.error("Error parsing notes");
       return [];
     }
   };
@@ -705,8 +706,8 @@ function AdminReferrers() {
       if (selectedReferrer.additional_notes) {
         try {
           notes = JSON.parse(selectedReferrer.additional_notes);
-        } catch (e) {
-          console.error('Error parsing notes:', e);
+        } catch (_e) {
+          toast.error("Error parsing notes");
           setIsDeleteDialogOpen(false);
           return;
         }
@@ -742,8 +743,8 @@ function AdminReferrers() {
       );
       
       toast.success('Note deleted successfully');
-    } catch (error) {
-      console.error('Error deleting note:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Error deleting note');
     } finally {
       setIsDeleteDialogOpen(false);
@@ -793,7 +794,6 @@ function AdminReferrers() {
     try {
       // Validate the status is one of our expected values
       if (!['pending', 'approved', 'paid'].includes(newStatus)) {
-        console.error('Invalid status:', newStatus);
         toast.error('Invalid status value');
         return;
       }
@@ -812,7 +812,7 @@ function AdminReferrers() {
         .eq('id', rewardId);
       
       if (error) {
-        console.error('Error updating reward status:', error);
+        toast.error("An error occurred");
         toast.error('Failed to update reward status');
         return;
       }
@@ -841,8 +841,8 @@ function AdminReferrers() {
       }
       
       toast.success(`Reward status updated to ${validStatus}`);
-    } catch (error) {
-      console.error('Error updating reward status:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('An error occurred while updating reward status');
     }
   };
@@ -867,8 +867,8 @@ function AdminReferrers() {
       
       // Otherwise, it should not exist in the database
       return data.length === 0;
-    } catch (error) {
-      console.error('Error checking partner code:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       return false;
     } finally {
       setPartnerCodeChecking(false);
@@ -918,14 +918,15 @@ function AdminReferrers() {
 
   // After the component renders and referrers are loaded, check if we need to open a specific referrer's details
   useEffect(() => {
-    if (!loading && referrers.length > 0 && urlPartnerIdRef.current) {
-      const partner = referrers.find(r => r.id === urlPartnerIdRef.current);
-      if (partner) {
-        openReferrerDetails(partner);
-        urlPartnerIdRef.current = null; // Clear the reference
+    if (urlPartnerIdRef.current) {
+      // Find the referrer and open details
+      const referrer = referrers.find(r => r.id === urlPartnerIdRef.current);
+      if (referrer) {
+        openReferrerDetails(referrer);
+        urlPartnerIdRef.current = null; // Clear the ref after use
       }
     }
-  }, [loading, referrers]);
+  }, [referrers, openReferrerDetails]);
 
   // Add this function to handle adding notes to partners
   const addPartnerNote = async () => {
@@ -944,8 +945,8 @@ function AdminReferrers() {
       if (selectedReferrer.additional_notes) {
         try {
           notes = JSON.parse(selectedReferrer.additional_notes);
-        } catch (e) {
-          console.error('Error parsing notes:', e);
+        } catch (_e) {
+          toast.error("Error parsing notes");
         }
       }
       
@@ -979,9 +980,8 @@ function AdminReferrers() {
       setPartnerNote('');
       
       toast.success('Note added successfully');
-    } catch (error) {
-      console.error('Error adding note:', error);
-      toast.error('Error adding note');
+    } catch (_e) {
+      toast.error('Error parsing notes');
     }
   };
 
@@ -1013,8 +1013,8 @@ function AdminReferrers() {
             setSelectedCategoryIds(["2044500"]);
             setManualCategoryId("2044500");
           }
-        } catch (parseError) {
-          console.error('Error parsing saved categories:', parseError);
+        } catch (_parseError) {
+          toast.error("Error parsing saved categories");
           // Default to the original hardcoded one if there's a parsing error
           setSelectedCategoryIds(["2044500"]);
           setManualCategoryId("2044500");
@@ -1024,8 +1024,8 @@ function AdminReferrers() {
         setSelectedCategoryIds(["2044500"]);
         setManualCategoryId("2044500");
       }
-    } catch (error) {
-      console.error('Error loading saved categories:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       // Default to the original hardcoded one if there's an error
       setSelectedCategoryIds(["2044500"]);
       setManualCategoryId("2044500");
@@ -1036,8 +1036,8 @@ function AdminReferrers() {
   const saveCategories = useCallback((categories: string[]) => {
     try {
       localStorage.setItem(PARTNER_CATEGORIES_KEY, JSON.stringify(categories));
-    } catch (error) {
-      console.error('Error saving categories:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
     }
   }, []);
 
@@ -1082,8 +1082,8 @@ function AdminReferrers() {
       // First, get all contact categories for debugging and selection
       const categories = await getContactCategories();
       setAllCategories(categories.map(cat => ({
-        id: cat.id,
-        name: cat.name || 'Unnamed Category'
+        id: String(cat.id),
+        name: String(cat.name || 'Unnamed Category')
       })));
       
       // Load saved categories if needed
@@ -1099,12 +1099,12 @@ function AdminReferrers() {
       }
       
       // Fetch contacts from VaultRE with the selected category IDs
-      console.log("Fetching contacts from your CRM with selected categories...");
+      toast.error("Fetching contacts from your CRM with selected categories...");
       
       // Use the updated function that accepts category IDs
-      console.log(`Searching for contacts with category IDs: ${selectedCategoryIds.join(', ')}`);
+      toast.error("${selectedCategoryIds.join(', ')}`");
       const contacts = await getColellaPartnerContacts(selectedCategoryIds);
-      console.log(`Found ${contacts.length} contacts with selected categories`);
+      toast.error(`Found ${contacts.length} contacts with selected categories`);
       
       // First get all existing partners from the database to check for duplicates
       const { data: existingPartners } = await supabase
@@ -1126,8 +1126,8 @@ function AdminReferrers() {
       });
       
       setVaultreContacts(contactsWithStatus);
-    } catch (error) {
-      console.error('Error fetching contacts from CRM:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       setSyncError('Failed to fetch contacts from your CRM');
     } finally {
       setLoadingVaultreContacts(false);
@@ -1217,8 +1217,8 @@ function AdminReferrers() {
         
         toast.success('Partner imported successfully');
       }
-    } catch (error) {
-      console.error('Error importing partner:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Failed to import partner');
     }
   };
@@ -1249,7 +1249,7 @@ function AdminReferrers() {
         // Skip contact if it has no name or contact info
         if ((!contact.firstName && !contact.lastName && !contact.fullName) || 
             (!contact.email && !contact.mobilePhone && !contact.workPhone && !contact.homePhone)) {
-          console.log(`Skipping contact with insufficient data: ${contact.id}`);
+          toast.error("${contact.id}`");
           skippedCount++;
           continue;
         }
@@ -1261,7 +1261,7 @@ function AdminReferrers() {
         );
         
         if (isDuplicate) {
-          console.log(`Skipping duplicate contact: ${contact.fullName || contact.email || contact.id}`);
+          toast.error("${contact.fullName || contact.email || contact.id}`");
           skippedCount++;
           continue;
         }
@@ -1288,13 +1288,13 @@ function AdminReferrers() {
               .insert(partnerData);
             
             if (error) {
-              console.warn('Error importing partner:', error);
+              toast.error("An error occurred");
               skippedCount++;
             } else {
               successCount++;
             }
-          } catch (error) {
-            console.warn('Error importing partner:', error);
+          } catch (_error) {
+            toast.error("An error occurred");
             skippedCount++;
           }
         }
@@ -1319,8 +1319,8 @@ function AdminReferrers() {
         toast.info(`${skippedCount} contacts skipped (duplicates or invalid data)`);
       }
       
-    } catch (error) {
-      console.error('Error batch importing partners:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Failed to import some partners');
     }
   };
@@ -1341,7 +1341,7 @@ function AdminReferrers() {
   const searchContactsByTerms = async (_searchTerm: string) => {
     setLoadingVaultreContacts(true);
     try {
-      console.log("Fetching recently modified contacts from VaultRE...");
+      toast.error("Fetching recently modified contacts from VaultRE...");
       
       // Get the 50 most recently modified contacts
       const contacts = await getContacts({
@@ -1350,7 +1350,7 @@ function AdminReferrers() {
         sortOrder: 'desc'     // Sort in descending order to get most recent first
       });
       
-      console.log(`Found ${contacts.length} recently modified contacts from API`);
+      toast.error(`Found ${contacts.length} recently modified contacts from API`);
       
       // Get existing partners to check for duplicates
       const { data: existingPartners } = await supabase
@@ -1378,8 +1378,8 @@ function AdminReferrers() {
       } else {
         toast.info('No contacts found');
       }
-    } catch (error) {
-      console.error('Error fetching recent contacts:', error);
+    } catch (_error) {
+      toast.error("An error occurred");
       toast.error('Error loading contacts');
     } finally {
       setLoadingVaultreContacts(false);

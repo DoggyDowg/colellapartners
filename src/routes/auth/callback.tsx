@@ -18,33 +18,110 @@ export const Route = createFileRoute('/auth/callback')({
 function AuthCallback() {
   const navigate = useNavigate();
   const search = useSearch({ from: '/auth/callback' }) as CallbackSearchParams;
-  const redirectPath = search.redirect || '/';
+  // If a specific redirect path is provided, use it
+  // Otherwise, we'll determine based on the user's role
+  const redirectParam = search.redirect;
   const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
-    const handleAuthCallback = async () => {
-      try {
-        // Get and handle the auth callback from Supabase
-        const { error } = await supabase.auth.getSession();
-        
-        if (error) {
-          throw error;
+    // Let Supabase handle the session
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        // Determine where to redirect based on user role
+        try {
+          // If a specific redirect is provided in the URL, use that instead
+          if (redirectParam && redirectParam !== '/') {
+            navigate({ to: redirectParam });
+            return;
+          }
+          
+          // Check if the user is an admin
+          const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
+          
+          if (adminError) {
+            // Set error state instead of console.error
+            setError(`Admin check failed: ${adminError.message}`);
+            // Default to partner dashboard if we can't determine admin status
+            navigate({ to: '/' });
+            return;
+          }
+          
+          // Redirect based on user role
+          if (isAdmin) {
+            navigate({ to: '/admin' });
+          } else {
+            navigate({ to: '/' });
+          }
+        } catch (_error) {
+          // Set error state instead of console.error
+          setError('Error during role check');
+          // Default to partner dashboard on error
+          navigate({ to: '/' });
         }
+      }
+    });
+    
+    // Check if we already have a session
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
         
-        // Redirect to the intended destination
-        navigate({ to: redirectPath });
-      } catch (err: any) {
-        console.error('Error during auth callback:', err);
-        setError(err.message || 'An error occurred during authentication');
-        // Redirect to login on error
+        if (error) throw error;
+        
+        if (data.session) {
+          // Determine where to redirect based on user role
+          try {
+            // If a specific redirect is provided in the URL, use that instead
+            if (redirectParam && redirectParam !== '/') {
+              navigate({ to: redirectParam });
+              return;
+            }
+            
+            // Check if the user is an admin
+            const { data: isAdmin, error: adminError } = await supabase.rpc('is_admin');
+            
+            if (adminError) {
+              // Set error state instead of console.error
+              setError(`Admin check failed: ${adminError.message}`);
+              // Default to partner dashboard if we can't determine admin status
+              navigate({ to: '/' });
+              return;
+            }
+            
+            // Redirect based on user role
+            if (isAdmin) {
+              navigate({ to: '/admin' });
+            } else {
+              navigate({ to: '/' });
+            }
+          } catch (_error) {
+            // Set error state instead of console.error
+            setError('Error during role check');
+            // Default to partner dashboard on error
+            navigate({ to: '/' });
+          }
+        } else {
+          // If no session after 3 seconds, navigate to auth
+          setTimeout(() => {
+            navigate({ to: '/auth' });
+          }, 3000);
+        }
+      } catch (err: unknown) {
+        // Set error state instead of console.error
+        const errorMessage = err instanceof Error ? err.message : 'An error occurred during authentication';
+        setError(errorMessage);
         setTimeout(() => {
-          navigate({ to: '/auth/login' });
+          navigate({ to: '/auth' });
         }, 3000);
       }
     };
     
-    handleAuthCallback();
-  }, [navigate, redirectPath]);
+    checkSession();
+    
+    return () => {
+      authListener?.subscription.unsubscribe();
+    };
+  }, [navigate, redirectParam]);
   
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">

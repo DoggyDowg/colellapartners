@@ -8,17 +8,19 @@ import { Label } from '../../components/ui/label';
 import { useTheme } from '../../context/theme-context';
 import { FcGoogle } from 'react-icons/fc';
 
+interface AuthError {
+  message: string;
+  status?: number;
+  [key: string]: unknown;
+}
+
 export default function Login() {
-  const { theme } = useTheme();
+  const { theme: _theme } = useTheme();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  console.log("Login component rendered");
-  console.log("Theme:", theme);
-  console.log("Supabase client:", supabase);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +35,9 @@ export default function Login() {
 
       if (error) throw error;
       navigate({ to: '/' });
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during sign in');
+    } catch (err: unknown) {
+      const authError = err as AuthError;
+      setError(authError.message || 'An error occurred during sign in');
     } finally {
       setLoading(false);
     }
@@ -53,8 +56,9 @@ export default function Login() {
       });
 
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during Google sign in');
+    } catch (err: unknown) {
+      const authError = err as AuthError;
+      setError(authError.message || 'An error occurred during Google sign in');
       setLoading(false);
     }
   };

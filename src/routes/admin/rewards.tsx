@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -31,6 +31,15 @@ interface Referral {
   referee_type: string;
 }
 
+// Define interface for gift card details
+interface GiftCardDetails {
+  provider: string;
+  code?: string;
+  expiry_date?: string;
+  notes?: string;
+  [key: string]: string | number | undefined; // Add index signature to match RewardDetailsDialog
+}
+
 interface Reward {
   id: string;
   referral_id: string;
@@ -38,13 +47,20 @@ interface Reward {
   amount: number;
   status: 'pending' | 'approved' | 'paid';
   reward_type: 'cash' | 'gift_card';
-  gift_card_details?: any;
+  gift_card_details?: GiftCardDetails;
   payment_date?: string;
   created_at: string;
   updated_at: string;
   referrers?: Referrer;
   referrals?: Referral;
 }
+
+// Utility function for error handling
+const logError = (message: string, error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  toast.error(`${message} ${errorMessage}`);
+};
 
 export const Route = createFileRoute('/admin/rewards')({
   component: AdminRewards,
@@ -69,11 +85,7 @@ function AdminRewards() {
     'paid'
   ];
 
-  useEffect(() => {
-    fetchRewards();
-  }, [statusFilter, typeFilter]);
-
-  const fetchRewards = async () => {
+  const fetchRewards = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -108,7 +120,7 @@ function AdminRewards() {
       const { data, error } = await query;
       
       if (error) {
-        console.error('Supabase error:', error);
+        logError('Supabase error:', error);
         setError(`Error fetching rewards: ${error.message}`);
         return;
       }
@@ -130,12 +142,16 @@ function AdminRewards() {
         setRewards(filteredData);
       }
     } catch (error) {
-      console.error('Error fetching rewards:', error);
+      logError('Error fetching rewards:', error);
       setError('An unexpected error occurred when fetching rewards.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, typeFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchRewards();
+  }, [fetchRewards]);
 
   const openRewardDetails = (reward: Reward) => {
     setSelectedReward(reward);
@@ -146,13 +162,15 @@ function AdminRewards() {
     try {
       // Validate the status is one of our expected values
       if (!['pending', 'approved', 'paid'].includes(newStatus)) {
-        console.error('Invalid status:', newStatus);
+        logError('Invalid status:', newStatus);
         toast.error('Invalid status value');
         return;
       }
       
       const validStatus = newStatus as 'pending' | 'approved' | 'paid';
-      let updateData: any = { status: validStatus };
+      const updateData: { status: 'pending' | 'approved' | 'paid'; payment_date?: string } = { 
+        status: validStatus 
+      };
       
       // If status is changed to 'paid', update payment date
       if (validStatus === 'paid') {
@@ -165,7 +183,7 @@ function AdminRewards() {
         .eq('id', rewardId);
       
       if (error) {
-        console.error('Error updating reward status:', error);
+        logError('Error updating reward status:', error);
         return;
       }
       
@@ -193,7 +211,7 @@ function AdminRewards() {
       }
       
     } catch (error) {
-      console.error('Error updating reward status:', error);
+      logError('Error updating reward status:', error);
     }
   };
 

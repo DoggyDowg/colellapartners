@@ -33,14 +33,13 @@ function PropertyDetailPage() {
         const data = await getPropertyById(id);
         setProperty(data);
         
-        // Set first image as active if available
-        if (data.images && data.images.length > 0) {
+        // Set first image as active if available and data is not null
+        if (data?.images && data.images.length > 0) {
           setActiveImage(data.images[0].url);
         }
         
         setError(null);
-      } catch (err) {
-        console.error(`Failed to fetch property ${id}:`, err);
+      } catch (_err) {
         setError('Failed to load property details. Please try again later.');
       } finally {
         setLoading(false);

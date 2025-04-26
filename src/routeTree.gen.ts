@@ -31,8 +31,11 @@ import { Route as AdminReferralsImport } from './routes/admin/referrals'
 import { Route as AdminRafflesImport } from './routes/admin/raffles'
 import { Route as AdminPropertiesImport } from './routes/admin/properties'
 import { Route as AdminEventsImport } from './routes/admin/events'
+import { Route as AuthenticatedLatestNewsImport } from './routes/_authenticated/latest-news'
+import { Route as AuthenticatedInstagramDebugImport } from './routes/_authenticated/instagram-debug'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
+import { Route as authAuthImport } from './routes/(auth)/auth'
 import { Route as auth500Import } from './routes/(auth)/500'
 import { Route as AuthenticatedRewardsIndexImport } from './routes/_authenticated/rewards/index'
 import { Route as AuthenticatedReferralsIndexImport } from './routes/_authenticated/referrals/index'
@@ -291,6 +294,19 @@ const AdminEventsRoute = AdminEventsImport.update({
   getParentRoute: () => AdminRoute,
 } as any)
 
+const AuthenticatedLatestNewsRoute = AuthenticatedLatestNewsImport.update({
+  id: '/latest-news',
+  path: '/latest-news',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+
+const AuthenticatedInstagramDebugRoute =
+  AuthenticatedInstagramDebugImport.update({
+    id: '/instagram-debug',
+    path: '/instagram-debug',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+
 const authSignInRoute = authSignInImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
@@ -300,6 +316,12 @@ const authSignInRoute = authSignInImport.update({
 const authOtpRoute = authOtpImport.update({
   id: '/(auth)/otp',
   path: '/otp',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const authAuthRoute = authAuthImport.update({
+  id: '/(auth)/auth',
+  path: '/auth',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -511,6 +533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof auth500Import
       parentRoute: typeof rootRoute
     }
+    '/(auth)/auth': {
+      id: '/(auth)/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof authAuthImport
+      parentRoute: typeof rootRoute
+    }
     '/(auth)/otp': {
       id: '/(auth)/otp'
       path: '/otp'
@@ -524,6 +553,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in'
       preLoaderRoute: typeof authSignInImport
       parentRoute: typeof rootRoute
+    }
+    '/_authenticated/instagram-debug': {
+      id: '/_authenticated/instagram-debug'
+      path: '/instagram-debug'
+      fullPath: '/instagram-debug'
+      preLoaderRoute: typeof AuthenticatedInstagramDebugImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/latest-news': {
+      id: '/_authenticated/latest-news'
+      path: '/latest-news'
+      fullPath: '/latest-news'
+      preLoaderRoute: typeof AuthenticatedLatestNewsImport
+      parentRoute: typeof AuthenticatedRouteImport
     }
     '/admin/events': {
       id: '/admin/events'
@@ -806,6 +849,8 @@ const AuthenticatedSettingsRouteLazyRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedInstagramDebugRoute: typeof AuthenticatedInstagramDebugRoute
+  AuthenticatedLatestNewsRoute: typeof AuthenticatedLatestNewsRoute
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyIdLazyRoute: typeof AuthenticatedPropertyIdLazyRoute
@@ -820,6 +865,8 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedInstagramDebugRoute: AuthenticatedInstagramDebugRoute,
+  AuthenticatedLatestNewsRoute: AuthenticatedLatestNewsRoute,
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
@@ -880,7 +927,7 @@ const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 export interface FileRoutesByFullPath {
   '': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
-  '/auth': typeof AuthRouteWithChildren
+  '/auth': typeof authAuthRoute
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/login': typeof LoginLazyRoute
@@ -888,6 +935,8 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/instagram-debug': typeof AuthenticatedInstagramDebugRoute
+  '/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -926,7 +975,7 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '': typeof IndexRoute
-  '/auth': typeof AuthRouteWithChildren
+  '/auth': typeof authAuthRoute
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/login': typeof LoginLazyRoute
@@ -934,6 +983,8 @@ export interface FileRoutesByTo {
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
+  '/instagram-debug': typeof AuthenticatedInstagramDebugRoute
+  '/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -980,8 +1031,11 @@ export interface FileRoutesById {
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/(auth)/500': typeof auth500Route
+  '/(auth)/auth': typeof authAuthRoute
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
+  '/_authenticated/instagram-debug': typeof AuthenticatedInstagramDebugRoute
+  '/_authenticated/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -1033,6 +1087,8 @@ export interface FileRouteTypes {
     | '/500'
     | '/otp'
     | '/sign-in'
+    | '/instagram-debug'
+    | '/latest-news'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1078,6 +1134,8 @@ export interface FileRouteTypes {
     | '/500'
     | '/otp'
     | '/sign-in'
+    | '/instagram-debug'
+    | '/latest-news'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1122,8 +1180,11 @@ export interface FileRouteTypes {
     | '/login'
     | '/register'
     | '/(auth)/500'
+    | '/(auth)/auth'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
+    | '/_authenticated/instagram-debug'
+    | '/_authenticated/latest-news'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1173,6 +1234,7 @@ export interface RootRouteChildren {
   LoginLazyRoute: typeof LoginLazyRoute
   RegisterLazyRoute: typeof RegisterLazyRoute
   auth500Route: typeof auth500Route
+  authAuthRoute: typeof authAuthRoute
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
   PropertyIdRoute: typeof PropertyIdRoute
@@ -1196,6 +1258,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginLazyRoute: LoginLazyRoute,
   RegisterLazyRoute: RegisterLazyRoute,
   auth500Route: auth500Route,
+  authAuthRoute: authAuthRoute,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
   PropertyIdRoute: PropertyIdRoute,
@@ -1228,6 +1291,7 @@ export const routeTree = rootRoute
         "/login",
         "/register",
         "/(auth)/500",
+        "/(auth)/auth",
         "/(auth)/otp",
         "/(auth)/sign-in",
         "/property/$id",
@@ -1244,6 +1308,8 @@ export const routeTree = rootRoute
     "/_authenticated": {
       "filePath": "_authenticated/route.tsx",
       "children": [
+        "/_authenticated/instagram-debug",
+        "/_authenticated/latest-news",
         "/_authenticated/settings",
         "/_authenticated/",
         "/_authenticated/property/$id",
@@ -1297,11 +1363,22 @@ export const routeTree = rootRoute
     "/(auth)/500": {
       "filePath": "(auth)/500.tsx"
     },
+    "/(auth)/auth": {
+      "filePath": "(auth)/auth.tsx"
+    },
     "/(auth)/otp": {
       "filePath": "(auth)/otp.tsx"
     },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"
+    },
+    "/_authenticated/instagram-debug": {
+      "filePath": "_authenticated/instagram-debug.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/latest-news": {
+      "filePath": "_authenticated/latest-news.tsx",
+      "parent": "/_authenticated"
     },
     "/admin/events": {
       "filePath": "admin/events.tsx",

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,7 +12,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!loading && !user) {
-      navigate({ to: '/auth/login' });
+      navigate({ to: '/auth' });
     }
   }, [user, loading, navigate]);
 

@@ -10,7 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useUserProfile } from '@/hooks/use-user-profile'
 import { BadgeCheck, Bell, LogOut } from 'lucide-react'
 
@@ -39,7 +39,7 @@ export function ProfileDropdown() {
 
   const handleLogout = async () => {
     await signOut()
-    navigate({ to: '/auth/login' })
+    navigate({ to: '/auth' })
   }
 
   return (

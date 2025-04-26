@@ -63,7 +63,6 @@ export function AppearanceForm() {
           .single()
         
         if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows found"
-          console.error('Error fetching theme preference:', error)
           setInitialLoad(false);
           return;
         }
@@ -79,8 +78,7 @@ export function AppearanceForm() {
         }
         
         setInitialLoad(false);
-      } catch (error) {
-        console.error('Error loading theme preference:', error)
+      } catch (_error) {
         setInitialLoad(false);
       }
     }
@@ -113,7 +111,6 @@ export function AppearanceForm() {
         .single()
         
       if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error fetching existing profile:', fetchError)
         throw fetchError
       }
 
@@ -126,15 +123,12 @@ export function AppearanceForm() {
         updated_at: new Date().toISOString(),
       }
       
-      console.log('Updating profile with data:', updateData)
-      
       // Save the theme preference to the database
       const { error } = await supabase
         .from('user_profiles')
         .upsert(updateData, { onConflict: 'id' })
         
       if (error) {
-        console.error('Upsert error:', error)
         throw error
       }
       
@@ -142,8 +136,7 @@ export function AppearanceForm() {
         title: 'Appearance preferences updated',
         description: 'Your appearance settings have been saved.',
       })
-    } catch (error) {
-      console.error('Error updating theme preference:', error)
+    } catch (_error) {
       toast({
         title: 'Update failed',
         description: 'Failed to save appearance preferences.',

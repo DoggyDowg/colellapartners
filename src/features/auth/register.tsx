@@ -6,6 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
 
+interface AuthError {
+  message: string;
+  status?: number;
+  [key: string]: unknown;
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -36,8 +42,9 @@ export default function Register() {
       // Success message
       alert("Registration successful! Please check your email for verification.");
       navigate({ to: '/login' });
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during registration');
+    } catch (err: unknown) {
+      const authError = err as AuthError;
+      setError(authError.message || 'An error occurred during registration');
     } finally {
       setLoading(false);
     }

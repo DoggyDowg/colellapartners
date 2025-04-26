@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { Button } from '../ui/button';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export function SignOutButton() {
   const { signOut } = useAuth();
@@ -8,7 +8,7 @@ export function SignOutButton() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate({ to: '/auth/login' });
+    navigate({ to: '/auth' });
   };
 
   return (

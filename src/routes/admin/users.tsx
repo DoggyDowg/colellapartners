@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -45,6 +45,14 @@ interface UserProfile {
   created_at: string;
 }
 
+// Utility function for error handling
+const logError = (message: string, error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  // For now, we'll just show the error to the user via an alert
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  alert(`${message} ${errorMessage}`);
+};
+
 export const Route = createFileRoute('/admin/users')({
   component: AdminUsers,
 });
@@ -68,11 +76,7 @@ function AdminUsers() {
     'user'
   ];
 
-  useEffect(() => {
-    fetchUsers();
-  }, [roleFilter, statusFilter]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -117,11 +121,15 @@ function AdminUsers() {
         setUsers(filteredData);
       }
     } catch (error) {
-      console.error('Error fetching users:', error);
+      logError('Error fetching users:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [roleFilter, statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
 
   const handleUpdateUserRole = async (userId: string, newRole: string) => {
     try {
@@ -147,7 +155,7 @@ function AdminUsers() {
       }
       
     } catch (error) {
-      console.error('Error updating user role:', error);
+      logError('Error updating user role:', error);
       alert('Failed to update user role. Please try again.');
     }
   };
@@ -176,7 +184,7 @@ function AdminUsers() {
       }
       
     } catch (error) {
-      console.error('Error updating user status:', error);
+      logError('Error updating user status:', error);
       alert('Failed to update user status. Please try again.');
     }
   };
@@ -198,7 +206,7 @@ function AdminUsers() {
       alert(`Password reset email sent to ${email}`);
       
     } catch (error) {
-      console.error('Error sending password reset:', error);
+      logError('Error sending password reset:', error);
       alert('Failed to send password reset email. Please try again.');
     }
   };
@@ -240,7 +248,7 @@ function AdminUsers() {
       alert(`User ${email} has been deleted successfully`);
       
     } catch (error) {
-      console.error('Error deleting user:', error);
+      logError('Error deleting user:', error);
       alert('Failed to delete user. Please try again.');
     }
   };

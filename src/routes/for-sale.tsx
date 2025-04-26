@@ -21,8 +21,6 @@ import {
   SheetClose
 } from '@/components/ui/sheet';
 import { Header } from '@/components/layout/header';
-import { ThemeSwitch } from '@/components/theme-switch';
-import { ProfileDropdown } from '@/components/profile-dropdown';
 
 export const Route = createFileRoute('/for-sale')({
   component: ForSalePage,
@@ -64,7 +62,6 @@ export default function ForSalePage() {
       
       setProperties(filteredProperties);
     } catch (error) {
-      console.error("Error fetching properties:", error);
       setError(typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Unable to retrieve property listings at this time.'));
       setProperties([]);
     } finally {
@@ -74,7 +71,7 @@ export default function ForSalePage() {
 
   useEffect(() => {
     fetchProperties(filters);
-  }, []);
+  }, [filters]);
 
   const handleSearch = () => {
     const params: PropertyListParams = {
@@ -139,12 +136,7 @@ export default function ForSalePage() {
 
   return (
     <>
-      <Header title="Properties For Sale">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="Properties For Sale" />
       <div className="container mx-auto py-6">
         <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 mb-6">
           <h1 className="text-3xl font-bold">Properties For Sale</h1>
@@ -483,7 +475,7 @@ function PropertyCard({ property }: { property: Property }) {
       </a>
     ) 
     : (
-      <Link to={`/property/${property.id}`} className="block h-full">
+      <Link to={`/property/$id`} params={{ id: property.id }} className="block h-full">
         <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
           <div className="aspect-video w-full overflow-hidden relative">
             {property.images && property.images.length > 0 ? (

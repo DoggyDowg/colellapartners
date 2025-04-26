@@ -26,8 +26,7 @@ export default function PropertyDetail() {
       try {
         const propertyData = await getPropertyById(id);
         setProperty(propertyData);
-      } catch (err) {
-        console.error('Error fetching property details:', err);
+      } catch (_err) {
         setError('Unable to load property details. Please try again later.');
       } finally {
         setLoading(false);

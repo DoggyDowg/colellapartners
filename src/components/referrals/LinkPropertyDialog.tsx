@@ -7,6 +7,7 @@ import { Loader2, Search } from 'lucide-react';
 import { getLinkableProperties, Property } from '@/lib/vault-re-api'; // Assuming this function fetches properties and Property type
 import { supabase } from '@/lib/supabase'; // Assuming supabase client setup
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { handleError } from '@/utils/error-handler';
 
 // Define the props interface
 interface LinkPropertyDialogProps {
@@ -86,8 +87,11 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
         const props = await getLinkableProperties();
         setProperties(props);
       } catch (error) {
-        console.error("Error fetching properties for linking:", error);
-        toast.error("Failed to load properties from VaultRE");
+        handleError(error, {
+          context: 'LinkPropertyDialog.fetchProps',
+          toastMessage: "Failed to load properties from VaultRE",
+          showToast: true
+        });
       } finally {
         setLoading(false);
       }
@@ -140,7 +144,11 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
         .upsert(propertyDataForTable, { onConflict: 'vault_property_id' });
 
       if (upsertError) {
-        console.error("Error upserting property:", upsertError);
+        handleError(upsertError, {
+          context: 'LinkPropertyDialog.upsertProperty',
+          toastMessage: "Failed to save property details.",
+          showToast: false
+        });
         throw new Error("Failed to save property details.");
       }
 
@@ -151,7 +159,11 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
         .eq('id', referralId);
 
       if (referralUpdateError) {
-        console.error("Error updating referral link:", referralUpdateError);
+        handleError(referralUpdateError, {
+          context: 'LinkPropertyDialog.updateReferral',
+          toastMessage: "Failed to link property to referral.",
+          showToast: false
+        });
         throw new Error("Failed to link property to referral.");
       }
 
@@ -163,8 +175,11 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
       }); 
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error linking property:", error);
-      toast.error(error.message || "Failed to link property.");
+      handleError(error, {
+        context: 'LinkPropertyDialog.handleLinkProperty',
+        toastMessage: error.message || "Failed to link property.",
+        showToast: true
+      });
     } finally {
       setIsProcessing(false);
     }

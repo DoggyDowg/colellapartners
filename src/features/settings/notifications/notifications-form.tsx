@@ -14,7 +14,7 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { useState } from 'react'
 import supabase from '@/lib/supabase'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 
 const notificationsFormSchema = z.object({
   communication_emails: z.boolean().default(true),
@@ -73,7 +73,7 @@ export function NotificationsForm() {
           description: 'Your notification preferences have been saved',
         })
       }
-    } catch (error) {
+    } catch (_error) {
       toast({
         title: 'An unexpected error occurred',
         description: 'Please try again later',

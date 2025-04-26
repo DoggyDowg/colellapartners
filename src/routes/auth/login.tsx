@@ -33,8 +33,8 @@ function Login() {
       });
 
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during sign in');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during sign in');
     } finally {
       setLoading(false);
     }
@@ -53,8 +53,8 @@ function Login() {
       });
 
       if (error) throw error;
-    } catch (err: any) {
-      setError(err.message || 'An error occurred during Google sign in');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred during Google sign in');
       setLoading(false);
     }
   };

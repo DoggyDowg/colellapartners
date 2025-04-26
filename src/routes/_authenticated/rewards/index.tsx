@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '../../../hooks/useAuth';
 import supabase from '../../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { 
@@ -13,8 +13,6 @@ import {
 } from '../../../components/ui/table';
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
-import { ThemeSwitch } from '../../../components/theme-switch';
-import { ProfileDropdown } from '../../../components/profile-dropdown';
 import RewardDetailsDialog from '../../../components/rewards/RewardDetailsDialog';
 import { toast } from 'sonner';
 import { Input } from '../../../components/ui/input';
@@ -28,6 +26,16 @@ interface Referral {
   referrer_id: string;
 }
 
+// Define gift card details interface to match RewardDetailsDialog
+interface GiftCardDetails {
+  provider?: string;
+  code?: string;
+  amount?: number;
+  expiry_date?: string;
+  notes?: string;
+  [key: string]: string | number | undefined; // Allow for additional properties
+}
+
 interface Reward {
   id: string;
   referral_id: string;
@@ -35,7 +43,7 @@ interface Reward {
   amount: number;
   status: 'pending' | 'approved' | 'paid';
   reward_type: 'cash' | 'gift_card';
-  gift_card_details?: any;
+  gift_card_details?: GiftCardDetails;
   payment_date?: string;
   created_at: string;
   updated_at: string;
@@ -99,7 +107,6 @@ function UserRewards() {
         .order('created_at', { ascending: false });
       
       if (error) {
-        console.error('Error fetching rewards:', error);
         setError(`Error fetching rewards: ${error.message}`);
         return;
       }
@@ -128,9 +135,9 @@ function UserRewards() {
         setRewards([]);
         setFilteredRewards([]);
       }
-    } catch (error: any) {
-      console.error('Error fetching rewards:', error);
-      setError('An unexpected error occurred when fetching rewards.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`An unexpected error occurred when fetching rewards: ${errorMessage}`);
       toast.error('Failed to load your rewards');
     } finally {
       setLoading(false);
@@ -153,12 +160,7 @@ function UserRewards() {
   if (error) {
     return (
       <>
-        <Header title="My Rewards">
-          <div className='ml-auto flex items-center space-x-4'>
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </Header>
+        <Header title="My Rewards" />
         <div className="container py-6">
           <h1 className="text-3xl font-bold mb-6">My Rewards</h1>
           <Card className="p-6">
@@ -182,12 +184,7 @@ function UserRewards() {
 
   return (
     <>
-      <Header title="My Rewards">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="My Rewards" />
       <div className="container py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">My Rewards</h1>

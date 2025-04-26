@@ -57,7 +57,6 @@ export default function PropertiesPage() {
       
       setProperties(filteredProperties);
     } catch (error) {
-      console.error("Error fetching properties:", error);
       setError(typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Unable to retrieve property listings at this time.'));
       setProperties([]);
     } finally {
@@ -67,7 +66,7 @@ export default function PropertiesPage() {
 
   useEffect(() => {
     fetchProperties(filters);
-  }, []);
+  }, [filters]);
 
   const handleSearch = () => {
     const params: PropertyListParams = {
@@ -399,7 +398,7 @@ function PropertyCard({ property }: { property: Property }) {
     : null;
   
   return (
-    <Link to={`/admin/property/${property.id}`} className="block h-full">
+    <Link to={`/admin/property/$id`} params={{ id: property.id }} className="block h-full">
       <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
         <div className="aspect-video w-full overflow-hidden relative">
           {property.images && property.images.length > 0 ? (

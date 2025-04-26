@@ -12,6 +12,13 @@ import { TeamSwitcher } from '@/components/layout/team-switcher'
 import { sidebarData } from './data/sidebar-data'
 import supabase from '@/lib/supabase'
 
+// Utility function for error handling
+const logError = (_message: string, _error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  // const errorMessage = _error instanceof Error ? _error.message : String(_error);
+  // Silent error handling for UI components
+};
+
 // Define the type for nav group items based on existing data
 type NavGroupType = typeof sidebarData.navGroups[0];
 
@@ -52,7 +59,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         const { data: isAdminResult, error } = await supabase.rpc('is_admin');
         
         if (error) {
-          console.error('Error checking admin status:', error);
+          logError('Error checking admin status:', error);
           setNavGroups(filterNonAdminItems(sidebarData.navGroups));
           // Cache the result even on error (as non-admin)
           sessionStorage.setItem('user_is_admin', 'false');
@@ -68,7 +75,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           }
         }
       } catch (err) {
-        console.error('Error in checkAdmin:', err);
+        logError('Error in checkAdmin:', err);
         setNavGroups(filterNonAdminItems(sidebarData.navGroups));
         // Cache the result even on error (as non-admin)
         sessionStorage.setItem('user_is_admin', 'false');

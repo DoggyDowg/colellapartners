@@ -65,3 +65,26 @@ Crafted with 🤍 by [@satnaing](https://github.com/satnaing)
 ## License
 
 Licensed under the [MIT License](https://choosealicense.com/licenses/mit/)
+
+## Admin User Setup
+
+### Automatic Admin Assignment
+
+The application supports automatic admin role assignment based on email domains. Users who sign up with email addresses from specified domains will automatically be assigned the admin role.
+
+To configure the admin domains:
+
+1. Edit the `.env.development` (for development) and `.env.production` (for production) files
+2. Add or modify the `VITE_ADMIN_EMAIL_DOMAINS` variable with a comma-separated list of domains:
+   ```
+   VITE_ADMIN_EMAIL_DOMAINS=example.com,admin-domain.com
+   ```
+
+3. Run the migration in `migrations/04_create_admin_functions.sql` in your Supabase project to set up the necessary database functions and triggers.
+
+This migration:
+- Creates a `users` table with a `role` column to track user roles
+- Creates an `is_admin()` function that the application uses to check admin status
+- Sets up a trigger to automatically assign the admin role when a user signs up with an email from the specified domains
+
+After applying the migration, new users who sign up with an email address from one of the specified domains will automatically receive admin privileges.

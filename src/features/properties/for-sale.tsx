@@ -21,8 +21,6 @@ import {
   SheetClose
 } from '@/components/ui/sheet';
 import { Header } from '@/components/layout/header';
-import { ThemeSwitch } from '@/components/theme-switch';
-import { ProfileDropdown } from '@/components/profile-dropdown';
 import { SearchProvider } from '@/context/search-context';
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -49,25 +47,18 @@ export default function ForSalePageContent() {
         sortOrder: 'desc',
       };
       
-      console.log("Fetching properties with params:", apiParams);
-      
       // Call the API to get properties
       const fetchedProperties = await getProperties(apiParams);
       
       // Add verbose debugging for property data
       if (!fetchedProperties || !Array.isArray(fetchedProperties)) {
-        console.error("Invalid properties response: not an array", fetchedProperties);
         setProperties([]);
         setError("Unable to retrieve property listings. Received invalid data format.");
         return;
       }
       
-      console.log("Fetched properties:", fetchedProperties.length);
-      
       if (fetchedProperties.length > 0) {
         // Log an example property for debugging
-        console.log("Example property structure:", 
-          JSON.stringify(fetchedProperties[0]).substring(0, 500) + "...");
       }
       
       // Filter properties locally based on user preferences
@@ -85,10 +76,8 @@ export default function ForSalePageContent() {
         return hasValidTitle && hasImages;
       });
       
-      console.log("Filtered properties:", filteredProperties.length);
       setProperties(filteredProperties);
     } catch (error) {
-      console.error("Error fetching properties:", error);
       setError(typeof error === 'string' ? error : (error instanceof Error ? error.message : 'Unable to retrieve property listings at this time.'));
       setProperties([]);
     } finally {
@@ -98,7 +87,7 @@ export default function ForSalePageContent() {
 
   useEffect(() => {
     fetchProperties(filters);
-  }, []);
+  }, [filters]);
 
   const handleSearch = () => {
     const params: PropertyListParams = {
@@ -174,12 +163,7 @@ export default function ForSalePageContent() {
 
   const mainContent = (
     <>
-      <Header title="Properties For Sale">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="Properties For Sale" />
       
       <div className="container py-6">
         <div className="flex flex-col space-y-4 md:flex-row md:items-center md:justify-between md:space-y-0 mb-6">
@@ -607,7 +591,7 @@ function PropertyCard({ property }: { property: Property }) {
         </a>
       ) 
       : (
-        <Link to={`/property/${property.id}`} className="block h-full">
+        <Link to={`/property/$id`} params={{ id: property.id }} className="block h-full">
           <Card className="overflow-hidden h-full flex flex-col hover:shadow-md transition-shadow">
             <div className="aspect-video w-full overflow-hidden relative">
               {imageUrl ? (

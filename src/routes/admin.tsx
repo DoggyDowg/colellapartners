@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 import Cookies from 'js-cookie';
 import supabase from '../lib/supabase';
 import SkipToMain from '../components/skip-to-main';
+import { handleError } from '../utils/error-handler';
 
 // A more robust session check that uses localStorage as a fallback
 const getSessionAndCheckAdmin = async () => {
@@ -19,7 +20,6 @@ const getSessionAndCheckAdmin = async () => {
     if (!session) {
       const storedSession = localStorage.getItem('supabase_auth_session');
       if (!storedSession) {
-        console.log('No stored session found');
         return { isAuthenticated: false, isAdmin: false, session: null };
       }
       
@@ -30,8 +30,8 @@ const getSessionAndCheckAdmin = async () => {
           access_token: parsedSession.access_token,
           refresh_token: parsedSession.refresh_token,
         });
-      } catch (err) {
-        console.error('Error refreshing stored session:', err);
+      } catch (_err) {
+        // Handle the error by removing the stored session
         localStorage.removeItem('supabase_auth_session');
         return { isAuthenticated: false, isAdmin: false, session: null };
       }
@@ -40,13 +40,11 @@ const getSessionAndCheckAdmin = async () => {
       const { data: { session: refreshedSession } } = await supabase.auth.getSession();
       if (!refreshedSession) {
         localStorage.removeItem('supabase_auth_session');
-        console.log('No refreshed session found');
         return { isAuthenticated: false, isAdmin: false, session: null };
       }
       
       // Check if user is admin with refreshed session
-      const { data: isAdmin, error } = await supabase.rpc('is_admin');
-      console.log('Admin check with refreshed session:', isAdmin, error);
+      const { data: isAdmin } = await supabase.rpc('is_admin');
       return { 
         isAuthenticated: true, 
         isAdmin: !!isAdmin, 
@@ -55,15 +53,18 @@ const getSessionAndCheckAdmin = async () => {
     }
     
     // If we have a session directly from Supabase, check if user is admin
-    const { data: isAdmin, error } = await supabase.rpc('is_admin');
-    console.log('Admin check with direct session:', isAdmin, error);
+    const { data: isAdmin } = await supabase.rpc('is_admin');
     return { 
       isAuthenticated: true, 
       isAdmin: !!isAdmin, 
       session 
     };
   } catch (error) {
-    console.error('Error checking admin session:', error);
+    handleError(error, {
+      context: 'AdminRoute.getSessionAndCheckAdmin',
+      showToast: false,
+      silent: true // Don't show error in console as this is expected to fail for unauthenticated users
+    });
     return { isAuthenticated: false, isAdmin: false, session: null };
   }
 };
@@ -77,12 +78,9 @@ export const Route = createFileRoute('/admin')({
   component: AdminLayout,
   // Use loader to check admin status with robust session checking
   loader: async ({ location }) => {
-    console.log('Running admin loader, isAuthenticated:', isAuthenticated, 'isAdmin:', isAdminUser);
-    
     try {
       // Skip authentication check if already verified and not on initial load
       if ((isAuthenticated && isAdminUser) && location.pathname !== '/admin') {
-        console.log('Already verified as admin, skipping check');
         return {};
       }
       
@@ -92,35 +90,26 @@ export const Route = createFileRoute('/admin')({
       isAuthenticated = hasAuth;
       isAdminUser = isAdmin;
       
-      console.log('Auth check results:', { hasAuth, isAdmin });
-      
       if (!hasAuth) {
-        console.log('User is not authenticated, redirecting to login');
-        throw redirect({ to: '/auth/login' });
+        throw redirect({ to: '/auth' });
       }
       
       if (!isAdmin) {
-        console.log('User is authenticated but not admin, redirecting to dashboard');
         throw redirect({ to: '/' });
       }
       
-      console.log('Admin authentication successful');
       return {};
-    } catch (error: any) {
-      console.error('Admin auth error:', error);
-      
+    } catch (_error: unknown) {
       // If we have an explicit redirect, use it
-      if (error.toString().includes('redirect')) {
-        throw error;
+      if (_error instanceof Error && _error.toString().includes('redirect')) {
+        throw _error;
       }
       
       // For unexpected errors, decide based on authentication state
       if (isAuthenticated) {
-        console.log('Error during admin check but user is authenticated, redirecting to dashboard');
         throw redirect({ to: '/' });
       } else {
-        console.log('Error during admin check and user is not authenticated, redirecting to login');
-        throw redirect({ to: '/auth/login' });
+        throw redirect({ to: '/auth' });
       }
     }
   },

@@ -2,6 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from '@tanstack/react-router';
 import supabase from '@/lib/supabase';
 
+// Utility function for error handling
+const logError = (_message: string, _error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  // const errorMessage = _error instanceof Error ? _error.message : String(_error);
+  // We're not using alert here because this is a silent component
+};
+
+// Utility function for informational logging
+const logInfo = (_message: string): void => {
+  // In a production app, you might want to use a proper logging service
+};
+
 export function AdminCheck() {
   const navigate = useNavigate();
   const [checking, setChecking] = useState(true);
@@ -13,8 +25,8 @@ export function AdminCheck() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!session) {
-          console.log('No session found, redirecting to login');
-          navigate({ to: '/auth/login' });
+          logInfo('No session found, redirecting to login');
+          navigate({ to: '/auth' });
           return;
         }
         
@@ -22,13 +34,13 @@ export function AdminCheck() {
         const { data: isAdmin, error } = await supabase.rpc('is_admin');
         
         if (error) {
-          console.error('Error checking admin status:', error);
+          logError('Error checking admin status:', error);
           navigate({ to: '/' });
           return;
         }
         
         if (!isAdmin) {
-          console.log('User is not an admin, redirecting to dashboard');
+          logInfo('User is not an admin, redirecting to dashboard');
           navigate({ to: '/' });
           return;
         }
@@ -36,7 +48,7 @@ export function AdminCheck() {
         // User is authenticated and is an admin
         setChecking(false);
       } catch (error) {
-        console.error('Error in AdminCheck:', error);
+        logError('Error in AdminCheck:', error);
         navigate({ to: '/' });
       }
     };

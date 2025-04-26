@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useNavigate } from '@tanstack/react-router';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from './useAuth';
 
 export function useRedirectAfterAuth(redirectTo: string = '/') {
   const { user, loading } = useAuth();

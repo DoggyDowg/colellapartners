@@ -23,6 +23,16 @@ export interface Referral {
   referee_type: string;
 }
 
+// Define gift card details interface
+export interface GiftCardDetails {
+  provider?: string;
+  code?: string;
+  amount?: number;
+  expiry_date?: string;
+  notes?: string;
+  [key: string]: string | number | undefined; // Allow for additional properties
+}
+
 export interface Reward {
   id: string;
   referral_id: string;
@@ -30,7 +40,7 @@ export interface Reward {
   amount: number;
   status: 'pending' | 'approved' | 'paid';
   reward_type: 'cash' | 'gift_card';
-  gift_card_details?: any;
+  gift_card_details?: GiftCardDetails;
   payment_date?: string;
   created_at: string;
   updated_at?: string;

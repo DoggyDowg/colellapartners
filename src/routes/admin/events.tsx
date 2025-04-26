@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -64,6 +64,7 @@ function AdminEvents() {
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isNewEventDialogOpen, setIsNewEventDialogOpen] = useState(false);
+  const [_error, setError] = useState<string | null>(null);
   
   // Form state for new event
   const [newEvent, setNewEvent] = useState({
@@ -89,11 +90,7 @@ function AdminEvents() {
     'other'
   ];
 
-  useEffect(() => {
-    fetchEvents();
-  }, [typeFilter]);
-
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -106,10 +103,10 @@ function AdminEvents() {
         query = query.eq('event_type', typeFilter);
       }
 
-      const { data, error } = await query;
+      const { data, error: _error } = await query;
       
-      if (error) {
-        throw error;
+      if (_error) {
+        throw _error;
       }
       
       if (data) {
@@ -128,16 +125,20 @@ function AdminEvents() {
         
         setEvents(filteredData);
       }
-    } catch (error) {
-      console.error('Error fetching events:', error);
+    } catch (_error) {
+      setError('Error fetching events');
     } finally {
       setLoading(false);
     }
-  };
+  }, [typeFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchEvents();
+  }, [fetchEvents]);
 
   const fetchEventAttendees = async (eventId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error: _error } = await supabase
         .from('event_attendees')
         .select(`
           *,
@@ -151,13 +152,13 @@ function AdminEvents() {
         .eq('event_id', eventId)
         .order('created_at', { ascending: false });
       
-      if (error) {
-        throw error;
+      if (_error) {
+        throw _error;
       }
       
       setAttendees(data as unknown as EventAttendee[]);
-    } catch (error) {
-      console.error('Error fetching event attendees:', error);
+    } catch (_error) {
+      setError('Error fetching event attendees');
       setAttendees([]);
     }
   };
@@ -170,7 +171,7 @@ function AdminEvents() {
 
   const handleCreateEvent = async () => {
     try {
-      const { error } = await supabase
+      const { error: _error } = await supabase
         .from('events')
         .insert([
           {
@@ -184,8 +185,8 @@ function AdminEvents() {
         ])
         .select();
       
-      if (error) {
-        throw error;
+      if (_error) {
+        throw _error;
       }
       
       // Close the dialog and reset form
@@ -202,8 +203,8 @@ function AdminEvents() {
       // Refresh events list
       fetchEvents();
       
-    } catch (error) {
-      console.error('Error creating event:', error);
+    } catch (_error) {
+      setError('Error creating event');
       alert('Failed to create event. Please try again.');
     }
   };
@@ -215,23 +216,23 @@ function AdminEvents() {
     
     try {
       // First delete all attendees
-      const { error: attendeesError } = await supabase
+      const { error: _attendeesError } = await supabase
         .from('event_attendees')
         .delete()
         .eq('event_id', eventId);
       
-      if (attendeesError) {
-        throw attendeesError;
+      if (_attendeesError) {
+        throw _attendeesError;
       }
       
       // Then delete the event
-      const { error } = await supabase
+      const { error: _error } = await supabase
         .from('events')
         .delete()
         .eq('id', eventId);
       
-      if (error) {
-        throw error;
+      if (_error) {
+        throw _error;
       }
       
       // Close dialog if open
@@ -242,8 +243,8 @@ function AdminEvents() {
       // Refresh events list
       fetchEvents();
       
-    } catch (error) {
-      console.error('Error deleting event:', error);
+    } catch (_error) {
+      setError('Error deleting event');
       alert('Failed to delete event. Please try again.');
     }
   };

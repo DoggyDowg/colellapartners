@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -78,6 +78,176 @@ const defaultValues: Partial<ProfileFormValues> = {
 // Maximum file size allowed (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+// Custom DatePicker component to fix React hooks rules violations
+function DatePicker({ value, onChange }: { value?: Date, onChange: (date: Date) => void }) {
+  const [month, setMonth] = useState(value?.getMonth() || new Date().getMonth());
+  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  
+  // Add a click outside handler
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false);
+        setShowMonthDropdown(false);
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  // Array of all months
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  
+  // Get days in month (accounting for leap years)
+  const getDaysInMonth = (month: number) => {
+    // Use current year or default to non-leap year
+    const year = new Date().getFullYear();
+    return new Date(year, month + 1, 0).getDate();
+  };
+  
+  // Create array of days for the selected month
+  const daysInMonth = getDaysInMonth(month);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  
+  // Handle day selection
+  const handleDaySelect = (day: number) => {
+    const date = new Date();
+    date.setMonth(month);
+    date.setDate(day);
+    // Keep the year as current year
+    onChange(date);
+  };
+  
+  // Handle month change
+  const handleMonthChange = (newMonth: number) => {
+    setMonth(newMonth);
+    setShowMonthDropdown(false);
+    
+    // Update the date if already selected
+    if (value) {
+      const newDate = new Date(value);
+      newDate.setMonth(newMonth);
+      // Adjust the day if needed (e.g., March 31 → Feb 28/29)
+      if (newDate.getDate() > getDaysInMonth(newMonth)) {
+        newDate.setDate(getDaysInMonth(newMonth));
+      }
+      onChange(newDate);
+    }
+  };
+  
+  // Check if a day is selected
+  const isDaySelected = (day: number) => {
+    if (!value) return false;
+    return value.getMonth() === month && value.getDate() === day;
+  };
+  
+  return (
+    <div className="relative" ref={calendarRef}>
+      <Button
+        type="button"
+        variant={'outline'}
+        className={cn(
+          'w-[240px] pl-3 text-left font-normal',
+          !value && 'text-muted-foreground'
+        )}
+        onClick={() => setShowCalendar(!showCalendar)}
+      >
+        {value ? (
+          format(value, 'MMM d')
+        ) : (
+          <span>Select your birthday</span>
+        )}
+        <CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
+      </Button>
+      
+      {showCalendar && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none animate-in fade-in-80">
+          <div className="flex items-center justify-between p-2 border-b">
+            <button 
+              className="p-1 rounded-sm hover:bg-muted" 
+              onClick={(e) => {
+                e.preventDefault();
+                setMonth(prev => (prev - 1 + 12) % 12);
+              }}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            
+            <div className="relative">
+              <button 
+                className="flex items-center gap-1 text-base font-medium hover:underline"
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowMonthDropdown(!showMonthDropdown);
+                }}
+              >
+                {months[month]} <ChevronDown className="h-4 w-4" />
+              </button>
+              
+              {showMonthDropdown && (
+                <div className="absolute top-full left-0 z-50 mt-1 w-32 rounded-md border bg-popover p-2 text-popover-foreground shadow-md max-h-52 overflow-y-auto">
+                  {months.map((monthName, idx) => (
+                    <button
+                      key={idx}
+                      className={cn(
+                        "w-full text-left px-2 py-1 rounded-sm text-sm",
+                        month === idx ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      )}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleMonthChange(idx);
+                      }}
+                    >
+                      {monthName}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <button 
+              className="p-1 rounded-sm hover:bg-muted" 
+              onClick={(e) => {
+                e.preventDefault();
+                setMonth(prev => (prev + 1) % 12);
+              }}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+          
+          <div className="p-3 grid grid-cols-7 gap-2 text-center">
+            {days.map((day) => (
+              <button
+                key={day}
+                className={cn(
+                  "h-8 w-8 rounded-md text-sm flex items-center justify-center",
+                  isDaySelected(day) ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                )}
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleDaySelect(day);
+                  setShowCalendar(false); // Close the calendar after selection
+                }}
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfileForm() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
@@ -122,33 +292,26 @@ export default function ProfileForm() {
         }
         
         setUserId(user.id)
-        console.log('User ID:', user.id)
-        console.log('User metadata:', user.user_metadata)
         
         // Test direct query without any table existence check
-        console.log('Directly trying to fetch profile')
         try {
-          const { data: profile, error: directError } = await supabase
+          const { data: _profile, error: directError } = await supabase
             .from('user_profiles')
             .select('id, name, email')
             .eq('id', user.id)
             .maybeSingle()
           
           if (directError) {
-            console.error('Direct query error:', directError)
             setDbDiagnostics(`Direct query error: ${directError.message}. Code: ${directError.code}`)
             
             // Continue with insert attempt anyway
-          } else {
-            console.log('Direct query result:', profile)
           }
-        } catch (directErr) {
-          console.error('Direct query exception:', directErr)
+        } catch (_directErr) {
+          // Remove console.error statement
         }
         
         // Just try to insert first if table exists
         try {
-          console.log('Attempting to create user profile')
           const { error: insertError } = await supabase
             .from('user_profiles')
             .upsert({
@@ -160,17 +323,13 @@ export default function ProfileForm() {
             }, { onConflict: 'id', ignoreDuplicates: true })
           
           if (insertError) {
-            console.error('Profile insert error:', insertError)
             setDbDiagnostics(`Error inserting profile: ${insertError.message}. Code: ${insertError.code}`)
-          } else {
-            console.log('Profile created or already exists')
           }
-        } catch (insertErr) {
-          console.error('Insert try/catch error:', insertErr)
+        } catch (_insertErr) {
+          // Remove console.error statement
         }
         
         // Now try to get the profile with a different approach
-        console.log('Fetching profile data')
         try {
           const { data: profile, error: fetchError } = await supabase
             .from('user_profiles')
@@ -179,7 +338,6 @@ export default function ProfileForm() {
             .single()
           
           if (fetchError) {
-            console.error('Profile fetch error:', fetchError)
             setDbDiagnostics(`Error fetching profile: ${fetchError.message}. Code: ${fetchError.code}.
             
 This usually indicates a permissions issue with Row Level Security (RLS).
@@ -193,8 +351,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
             })
             return
           }
-          
-          console.log('Profile data received:', profile)
           
           // If profile exists, use it
           if (profile) {
@@ -215,13 +371,11 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
               email: user.email || '',
             })
           }
-        } catch (fetchErr) {
-          console.error('Fetch try/catch error:', fetchErr)
-          setDbDiagnostics(`Exception fetching profile: ${String(fetchErr)}`)
+        } catch (_fetchErr) {
+          setDbDiagnostics(`Exception fetching profile: ${String(_fetchErr)}`)
         }
-      } catch (error) {
-        console.error('Error loading user data:', error)
-        setDbDiagnostics(`General error: ${String(error)}`)
+      } catch (_error) {
+        setDbDiagnostics(`General error: ${String(_error)}`)
         toast({
           title: 'Error',
           description: 'Failed to load profile data.',
@@ -233,7 +387,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     }
     
     getUserData()
-  }, [])
+  }, [form])
 
   // Function to optimize the image
   const optimizeImage = async (file: File): Promise<Blob> => {
@@ -273,7 +427,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           ctx.drawImage(img, 0, 0, width, height);
           
           // Convert to blob with quality adjustment
-          let quality = 0.85; // Start with good quality
+          const quality = 0.85; // Start with good quality
           canvas.toBlob((blob) => {
             if (blob) {
               resolve(blob);
@@ -338,7 +492,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
   };
 
   // Update canvas with current crop, zoom, and position
-  const updateCanvas = () => {
+  const updateCanvas = useCallback(() => {
     if (!canvasRef.current || !originalImage) return;
     
     const canvas = canvasRef.current;
@@ -374,7 +528,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     // Draw the image centered
     ctx.drawImage(originalImage, drawX, drawY, originalImage.width, originalImage.height);
     ctx.restore();
-  };
+  }, [canvasRef, originalImage, zoom, position]);
 
   // Apply the cropped image
   const applyCrop = async () => {
@@ -485,7 +639,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     return () => {
       resizeObserver.disconnect();
     };
-  }, [imageContainerRef.current, originalImage]);
+  }, [updateCanvas]);
 
   // Update canvas when relevant state changes
   useEffect(() => {
@@ -493,7 +647,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
       // Use RAF to ensure smooth updates
       requestAnimationFrame(updateCanvas);
     }
-  }, [imageEditorOpen, zoom, position, originalImage]);
+  }, [imageEditorOpen, originalImage, updateCanvas]);
 
   // Mouse and touch event handlers
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -528,29 +682,23 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     
     try {
       // Try to upload the file directly to the profiles bucket
-      console.log('Uploading file to', filePath)
-      const { error: uploadError, data: uploadData } = await supabase.storage
+      const { error: uploadError, data: _uploadData } = await supabase.storage
         .from('profiles')
         .upload(filePath, file, { upsert: true })
         
       if (uploadError) {
-        console.error('Avatar upload error:', uploadError)
         throw uploadError
       }
-      
-      console.log('Upload successful:', uploadData)
       
       const { data: urlData } = await supabase.storage
         .from('profiles')
         .getPublicUrl(filePath)
       
-      console.log('Public URL:', urlData.publicUrl)  
       return urlData.publicUrl
-    } catch (error) {
-      console.error('Error uploading avatar:', error)
+    } catch (_error) {
       toast({
         title: 'Upload failed',
-        description: 'Error uploading profile picture. Please try again.',
+        description: 'Failed to upload avatar. Please try again.',
         variant: 'destructive',
       })
       return null
@@ -588,8 +736,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
             // Construct the storage path using the same pattern as in uploadAvatar
             const filePath = `${userId}/avatar.${fileExt}`
             
-            console.log('Attempting to delete file from storage:', filePath)
-            
             // Call our custom RPC function to delete the file
             const { data: rpcResult, error: rpcError } = await supabase.rpc(
               'delete_storage_object',
@@ -599,36 +745,25 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
               }
             )
             
-            console.log('RPC delete result:', { result: rpcResult, error: rpcError })
-            
             // If our RPC function didn't work, try the standard method
             if (rpcError || rpcResult === false) {
-              console.log('RPC delete failed, trying standard method')
-              
               // Try standard delete method
               const { error: deleteError, data: deleteData } = await supabase.storage
                 .from('profiles')
                 .remove([filePath])
               
-              console.log('Standard delete result:', { error: deleteError, data: deleteData })
-              
               // If standard method didn't work, try listing files in the folder
               if (!deleteError && (!deleteData || deleteData.length === 0)) {
                 // List all files in the user's folder to get exact paths
-                console.log(`Standard delete returned empty result, listing files in ${userId} folder`)
-                
                 const { data: folderData, error: folderError } = await supabase.storage
                   .from('profiles')
                   .list(userId)
-                
-                console.log('Folder listing result:', { error: folderError, data: folderData })
                 
                 if (!folderError && folderData && folderData.length > 0) {
                   // Try to delete each file found
                   for (const file of folderData) {
                     if (file.name.includes('avatar') || file.name.endsWith('.jpg') || file.name.endsWith('.png')) {
                       const exactPath = `${userId}/${file.name}`
-                      console.log(`Attempting to delete found file: ${exactPath}`)
                       
                       // Try RPC delete first for this file
                       const { data: fileRpcResult } = await supabase.rpc(
@@ -640,36 +775,30 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
                       )
                       
                       if (fileRpcResult === true) {
-                        console.log(`Successfully deleted ${exactPath} via RPC`)
+                        // Successfully deleted
                       } else {
                         // Fall back to standard method
-                        const { error: exactDeleteError } = await supabase.storage
+                        const { error: _exactDeleteError } = await supabase.storage
                           .from('profiles')
                           .remove([exactPath])
                         
-                        if (exactDeleteError) {
-                          console.error(`Error deleting ${exactPath}:`, exactDeleteError)
-                        } else {
-                          console.log(`Successfully deleted ${exactPath}`)
-                        }
+                        // Handle the result silently
                       }
                     }
                   }
                 }
               }
               
-              // Final attempt: Try with various extensions
-              console.log('Trying with different file extensions as last resort')
+              // Final attempt: Try with different extensions
               const extensions = ['jpg', 'jpeg', 'png', 'gif', 'webp']
               
               for (const ext of extensions) {
                 if (ext === fileExt) continue // Skip the one we already tried
                 
                 const altFilePath = `${userId}/avatar.${ext}`
-                console.log(`Trying deletion with alternate extension: ${altFilePath}`)
                 
                 // Try RPC delete first
-                const { data: altRpcResult } = await supabase.rpc(
+                const { error: _rpcAltError, data: _rpcAltResult } = await supabase.rpc(
                   'delete_storage_object',
                   {
                     bucket_name: 'profiles',
@@ -677,26 +806,17 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
                   }
                 )
                 
-                if (altRpcResult === true) {
-                  console.log(`Successfully deleted with extension ${ext} via RPC`)
-                } else {
-                  // Fall back to standard method
-                  const { error: altError } = await supabase.storage
-                    .from('profiles')
-                    .remove([altFilePath])
-                  
-                  if (!altError) {
-                    console.log(`Successfully deleted with extension ${ext}`)
-                  }
-                }
+                // Also try standard method
+                const { error: _altError } = await supabase.storage
+                  .from('profiles')
+                  .remove([altFilePath])
               }
             }
-          } catch (pathErr) {
-            console.error('Error during file deletion:', pathErr)
+          } catch (_pathErr) {
+            // Continue with operation
           }
         }
-      } catch (storageErr) {
-        console.error('Error during storage deletion:', storageErr)
+      } catch (_storageErr) {
         // Continue to update the database anyway
       }
       
@@ -710,7 +830,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         .eq('id', userId)
       
       if (updateError) {
-        console.error('Error updating profile after avatar deletion:', updateError)
         throw updateError
       }
       
@@ -723,8 +842,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         description: 'Your profile picture has been removed.',
       })
       
-    } catch (error) {
-      console.error('Error deleting profile picture:', error)
+    } catch (_error) {
       toast({
         title: 'Deletion failed',
         description: 'Failed to delete profile picture. Please try again.',
@@ -759,7 +877,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
       }
       
       // Prepare data for upsert
-      const profileData: any = {
+      const profileData: Record<string, unknown> = {
         id: userId,
         name: data.name,
         email: data.email,
@@ -775,25 +893,20 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         profileData.avatar_url = avatarUrl
       }
       
-      console.log('Updating profile with data:', profileData)
-      
       // Upsert the profile data
       const { error } = await supabase
         .from('user_profiles')
         .upsert(profileData, { onConflict: 'id' })
         
       if (error) {
-        console.error('Profile update error:', error)
         throw error
       }
       
-      console.log('Profile updated successfully')
       toast({
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',
       })
-    } catch (error) {
-      console.error('Error updating profile:', error)
+    } catch (_error) {
       toast({
         title: 'Update failed',
         description: 'Failed to update profile. Please try again.',
@@ -912,184 +1025,21 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         <FormField
           control={form.control}
           name='dob'
-          render={({ field }) => {
-            // Custom calendar implementation with proper month dropdown
-            const [month, setMonth] = useState(field.value?.getMonth() || new Date().getMonth());
-            const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-            const [showCalendar, setShowCalendar] = useState(false);
-            const calendarRef = useRef<HTMLDivElement>(null);
-            
-            // Add a click outside handler
-            useEffect(() => {
-              function handleClickOutside(event: MouseEvent) {
-                if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-                  setShowCalendar(false);
-                  setShowMonthDropdown(false);
-                }
-              }
-              
-              document.addEventListener('mousedown', handleClickOutside);
-              return () => {
-                document.removeEventListener('mousedown', handleClickOutside);
-              };
-            }, []);
-            
-            // Array of all months
-            const months = [
-              "January", "February", "March", "April", "May", "June",
-              "July", "August", "September", "October", "November", "December"
-            ];
-            
-            // Get days in month (accounting for leap years)
-            const getDaysInMonth = (month: number) => {
-              // Use current year or default to non-leap year
-              const year = new Date().getFullYear();
-              return new Date(year, month + 1, 0).getDate();
-            };
-            
-            // Create array of days for the selected month
-            const daysInMonth = getDaysInMonth(month);
-            const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-            
-            // Handle day selection
-            const handleDaySelect = (day: number) => {
-              const date = new Date();
-              date.setMonth(month);
-              date.setDate(day);
-              // Keep the year as current year
-              field.onChange(date);
-            };
-            
-            // Handle month change
-            const handleMonthChange = (newMonth: number) => {
-              setMonth(newMonth);
-              setShowMonthDropdown(false);
-              
-              // Update the date if already selected
-              if (field.value) {
-                const newDate = new Date(field.value);
-                newDate.setMonth(newMonth);
-                // Adjust the day if needed (e.g., March 31 → Feb 28/29)
-                if (newDate.getDate() > getDaysInMonth(newMonth)) {
-                  newDate.setDate(getDaysInMonth(newMonth));
-                }
-                field.onChange(newDate);
-              }
-            };
-            
-            // Check if a day is selected
-            const isDaySelected = (day: number) => {
-              if (!field.value) return false;
-              return field.value.getMonth() === month && field.value.getDate() === day;
-            };
-            
-            return (
-              <FormItem className='flex flex-col'>
-                <FormLabel>Birthday</FormLabel>
+          render={({ field }) => (
+            <FormItem className='flex flex-col'>
+              <FormLabel>Birthday</FormLabel>
               <FormControl>
-                  <div className="relative" ref={calendarRef}>
-                    <Button
-                      type="button"
-                      variant={'outline'}
-                      className={cn(
-                        'w-[240px] pl-3 text-left font-normal',
-                        !field.value && 'text-muted-foreground'
-                      )}
-                      onClick={() => setShowCalendar(!showCalendar)}
-                    >
-                      {field.value ? (
-                        format(field.value, 'MMM d')
-                      ) : (
-                        <span>Select your birthday</span>
-                      )}
-                      <CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
-                    </Button>
-                    
-                    {showCalendar && (
-                      <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none animate-in fade-in-80">
-                        <div className="flex items-center justify-between p-2 border-b">
-                          <button 
-                            className="p-1 rounded-sm hover:bg-muted" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setMonth(prev => (prev - 1 + 12) % 12);
-                            }}
-                          >
-                            <ChevronLeft className="h-4 w-4" />
-                          </button>
-                          
-                          <div className="relative">
-                            <button 
-                              className="flex items-center gap-1 text-base font-medium hover:underline"
-                              onClick={(e) => {
-                                e.preventDefault();
-                                setShowMonthDropdown(!showMonthDropdown);
-                              }}
-                            >
-                              {months[month]} <ChevronDown className="h-4 w-4" />
-                            </button>
-                            
-                            {showMonthDropdown && (
-                              <div className="absolute top-full left-0 z-50 mt-1 w-32 rounded-md border bg-popover p-2 text-popover-foreground shadow-md max-h-52 overflow-y-auto">
-                                {months.map((monthName, idx) => (
-                                  <button
-                                    key={idx}
-                                    className={cn(
-                                      "w-full text-left px-2 py-1 rounded-sm text-sm",
-                                      month === idx ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                                    )}
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handleMonthChange(idx);
-                                    }}
-                                  >
-                                    {monthName}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <button 
-                            className="p-1 rounded-sm hover:bg-muted" 
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setMonth(prev => (prev + 1) % 12);
-                            }}
-                          >
-                            <ChevronRight className="h-4 w-4" />
-                          </button>
-                        </div>
-                        
-                        <div className="p-3 grid grid-cols-7 gap-2 text-center">
-                          {days.map((day) => (
-                            <button
-                              key={day}
-                              className={cn(
-                                "h-8 w-8 rounded-md text-sm flex items-center justify-center",
-                                isDaySelected(day) ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                              )}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                handleDaySelect(day);
-                                setShowCalendar(false); // Close the calendar after selection
-                              }}
-                            >
-                              {day}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                <DatePicker 
+                  value={field.value} 
+                  onChange={field.onChange} 
+                />
               </FormControl>
               <FormDescription>
-                  Add your birthday to receive additional benefits on your special day.
+                Add your birthday to receive additional benefits on your special day.
               </FormDescription>
               <FormMessage />
             </FormItem>
-            );
-          }}
+          )}
         />
 
         <Button type='submit' disabled={loading} className="w-full md:w-auto">

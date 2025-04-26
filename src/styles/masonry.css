@@ -1,0 +1,45 @@
+/* Masonry container styles */
+.my-masonry-grid {
+  display: flex;
+  width: auto;
+  margin-left: -16px; /* Adjust the negative margin to match your desired gap */
+}
+
+/* Masonry column styles */
+.my-masonry-grid-column {
+  padding-left: 16px; /* Adjust this to match your desired gap */
+  background-clip: padding-box;
+}
+
+/* Style for each masonry item */
+.masonry-item {
+  margin-bottom: 16px; /* Space between items vertically */
+  break-inside: avoid; /* Prevent items from breaking across columns */
+}
+
+/* Responsive adjustments */
+@media (max-width: 900px) {
+  .my-masonry-grid {
+    margin-left: -14px; /* Slightly smaller gap on medium screens */
+  }
+  .my-masonry-grid-column {
+    padding-left: 14px; /* Slightly smaller gap on medium screens */
+  }
+}
+
+@media (max-width: 600px) {
+  .my-masonry-grid {
+    margin-left: -12px; /* Smaller gap on mobile */
+  }
+  .my-masonry-grid-column {
+    padding-left: 12px; /* Smaller gap on mobile */
+  }
+}
+
+/* Ensure images maintain aspect ratio */
+.masonry-item img,
+.masonry-item video {
+  max-width: 100%;
+  display: block;
+  height: auto;
+} 

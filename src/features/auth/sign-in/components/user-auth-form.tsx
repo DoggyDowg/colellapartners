@@ -2,8 +2,8 @@ import { HTMLAttributes, useState } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Link } from '@tanstack/react-router'
-import { IconBrandFacebook, IconBrandGithub } from '@tabler/icons-react'
+import { useNavigate } from '@tanstack/react-router'
+import { FcGoogle } from 'react-icons/fc'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +16,8 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
+import supabase from '@/lib/supabase'
+import { Link } from '@tanstack/react-router'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -36,6 +38,8 @@ const formSchema = z.object({
 
 export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const navigate = useNavigate()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -45,14 +49,62 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
     },
   })
 
-  function onSubmit(data: z.infer<typeof formSchema>) {
+  async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
-    // eslint-disable-next-line no-console
-    console.log(data)
+    setError(null)
+    
+    try {
+      // Sign in with password
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
 
-    setTimeout(() => {
+      if (signInError) throw signInError
+      
+      // Check if the user is an admin
+      const { data: isAdmin, error: adminCheckError } = await supabase.rpc('is_admin')
+      
+      if (adminCheckError) {
+        // If we can't determine admin status, redirect to the regular dashboard
+        navigate({ to: '/' })
+        return
+      }
+      
+      // Redirect based on user role
+      if (isAdmin) {
+        // Redirect admin users to admin dashboard
+        navigate({ to: '/admin' })
+      } else {
+        // Redirect regular users to partner dashboard
+        navigate({ to: '/' })
+      }
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign in';
+      setError(errorMessage)
+    } finally {
       setIsLoading(false)
-    }, 3000)
+    }
+  }
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=/`,
+        },
+      })
+
+      if (error) throw error
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred during Google sign in';
+      setError(errorMessage)
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -60,6 +112,12 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <div className='grid gap-2'>
+            {error && (
+              <div className="rounded-md bg-destructive/15 p-3 text-sm text-destructive mb-2">
+                {error}
+              </div>
+            )}
+            
             <FormField
               control={form.control}
               name='email'
@@ -95,7 +153,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               )}
             />
             <Button className='mt-2' disabled={isLoading}>
-              Login
+              {isLoading ? 'Signing in...' : 'Login'}
             </Button>
 
             <div className='relative my-2'>
@@ -104,29 +162,21 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
               </div>
               <div className='relative flex justify-center text-xs uppercase'>
                 <span className='bg-background px-2 text-muted-foreground'>
-                  Or continue with
+                  Or continue with Google
                 </span>
               </div>
             </div>
 
-            <div className='flex items-center gap-2'>
-              <Button
-                variant='outline'
-                className='w-full'
-                type='button'
-                disabled={isLoading}
-              >
-                <IconBrandGithub className='h-4 w-4' /> GitHub
-              </Button>
-              <Button
-                variant='outline'
-                className='w-full'
-                type='button'
-                disabled={isLoading}
-              >
-                <IconBrandFacebook className='h-4 w-4' /> Facebook
-              </Button>
-            </div>
+            <Button
+              variant='outline'
+              className='w-full flex items-center justify-center gap-2'
+              type='button'
+              disabled={isLoading}
+              onClick={handleGoogleSignIn}
+            >
+              <FcGoogle className='h-5 w-5' />
+              <span>Continue with Google</span>
+            </Button>
           </div>
         </form>
       </Form>

@@ -1,10 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
-import { ThemeSwitch } from '../../../components/theme-switch';
-import { ProfileDropdown } from '../../../components/profile-dropdown';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../components/ui/badge';
@@ -39,46 +37,6 @@ function UserAchievements() {
     progressPercentage: 0,
     nextMilestone: ''
   });
-
-  useEffect(() => {
-    fetchAchievements();
-  }, []);
-
-  const fetchAchievements = async () => {
-    setLoading(true);
-    setError(null);
-    
-    try {
-      // Since this is a demo, let's create mock achievements
-      // In a real app, we'd fetch these from the database
-      const mockAchievements = generateMockAchievements();
-      setAchievements(mockAchievements);
-      
-      // Calculate stats
-      const total = mockAchievements.length;
-      const completed = mockAchievements.filter(a => a.completed).length;
-      const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
-      
-      // Find next milestone
-      const nextMilestone = mockAchievements
-        .filter(a => !a.completed)
-        .sort((a, b) => (b.progress / b.target) - (a.progress / a.target))[0]?.title || 'All achievements completed!';
-      
-      setStats({
-        totalAchievements: total,
-        completedAchievements: completed,
-        progressPercentage: progressPct,
-        nextMilestone: nextMilestone
-      });
-      
-    } catch (error: any) {
-      console.error('Error handling achievements:', error);
-      setError('An unexpected error occurred when fetching achievements.');
-      toast.error('Failed to load your achievements');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const generateMockAchievements = (): Achievement[] => {
     // In a real app, these would come from the database
@@ -163,6 +121,46 @@ function UserAchievements() {
     return mockData;
   };
 
+  const fetchAchievements = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Since this is a demo, let's create mock achievements
+      // In a real app, we'd fetch these from the database
+      const mockAchievements = generateMockAchievements();
+      setAchievements(mockAchievements);
+      
+      // Calculate stats
+      const total = mockAchievements.length;
+      const completed = mockAchievements.filter(a => a.completed).length;
+      const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
+      
+      // Find next milestone
+      const nextMilestone = mockAchievements
+        .filter(a => !a.completed)
+        .sort((a, b) => (b.progress / b.target) - (a.progress / a.target))[0]?.title || 'All achievements completed!';
+      
+      setStats({
+        totalAchievements: total,
+        completedAchievements: completed,
+        progressPercentage: progressPct,
+        nextMilestone: nextMilestone
+      });
+      
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`An unexpected error occurred when fetching achievements: ${errorMessage}`);
+      toast.error('Failed to load your achievements');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
+
   const getIconForAchievement = (icon: string) => {
     switch (icon) {
       case 'user':
@@ -185,12 +183,7 @@ function UserAchievements() {
   if (error) {
     return (
       <>
-        <Header title="Achievements">
-          <div className='ml-auto flex items-center space-x-4'>
-            <ThemeSwitch />
-            <ProfileDropdown />
-          </div>
-        </Header>
+        <Header title="Achievements" />
         <div className="container py-6">
           <h1 className="text-3xl font-bold mb-6">Achievements</h1>
           <Card className="p-6">
@@ -214,12 +207,7 @@ function UserAchievements() {
 
   return (
     <>
-      <Header title="Achievements">
-        <div className='ml-auto flex items-center space-x-4'>
-          <ThemeSwitch />
-          <ProfileDropdown />
-        </div>
-      </Header>
+      <Header title="Achievements" />
       <div className="container py-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-3xl font-bold">Achievements</h1>

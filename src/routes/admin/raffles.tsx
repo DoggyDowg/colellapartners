@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import supabase from '../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Input } from '../../components/ui/input';
@@ -55,6 +55,14 @@ interface RaffleTicket {
   };
 }
 
+// Utility function for error handling
+const logError = (message: string, error: unknown): void => {
+  // In a production app, you might want to use a proper logging service
+  // For now, we'll just show the error to the user via an alert
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  alert(`${message} ${errorMessage}`);
+};
+
 export const Route = createFileRoute('/admin/raffles')({
   component: AdminRaffles,
 });
@@ -87,11 +95,7 @@ function AdminRaffles() {
     'canceled'
   ];
 
-  useEffect(() => {
-    fetchRaffles();
-  }, [statusFilter]);
-
-  const fetchRaffles = async () => {
+  const fetchRaffles = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
@@ -127,11 +131,15 @@ function AdminRaffles() {
         setRaffles(filteredData);
       }
     } catch (error) {
-      console.error('Error fetching raffles:', error);
+      logError('Error fetching raffles:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter, searchQuery]);
+
+  useEffect(() => {
+    fetchRaffles();
+  }, [fetchRaffles]);
 
   const fetchRaffleTickets = async (raffleId: string) => {
     try {
@@ -159,7 +167,7 @@ function AdminRaffles() {
       
       setTickets(data as unknown as RaffleTicket[]);
     } catch (error) {
-      console.error('Error fetching raffle tickets:', error);
+      logError('Error fetching raffle tickets:', error);
       setTickets([]);
     }
   };
@@ -203,7 +211,7 @@ function AdminRaffles() {
       fetchRaffles();
       
     } catch (error) {
-      console.error('Error creating raffle:', error);
+      logError('Error creating raffle:', error);
       alert('Failed to create raffle. Please try again.');
     }
   };
@@ -232,7 +240,7 @@ function AdminRaffles() {
       }
       
     } catch (error) {
-      console.error('Error updating raffle status:', error);
+      logError('Error updating raffle status:', error);
       alert('Failed to update raffle status. Please try again.');
     }
   };
@@ -261,7 +269,7 @@ function AdminRaffles() {
       alert('Winner has been selected successfully!');
       
     } catch (error) {
-      console.error('Error drawing winner:', error);
+      logError('Error drawing winner:', error);
       alert('Failed to draw winner. Please try again.');
     }
   };
@@ -301,7 +309,7 @@ function AdminRaffles() {
       fetchRaffles();
       
     } catch (error) {
-      console.error('Error deleting raffle:', error);
+      logError('Error deleting raffle:', error);
       alert('Failed to delete raffle. Please try again.');
     }
   };

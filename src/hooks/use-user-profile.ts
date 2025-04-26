@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/context/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 
 interface UserProfile {
@@ -34,14 +34,12 @@ export function useUserProfile() {
           .single()
           
         if (error) {
-          console.error('Error fetching user profile:', error)
           setError(error)
           return
         }
         
         setProfile(data)
       } catch (err) {
-        console.error('Exception fetching user profile:', err)
         setError(err instanceof Error ? err : new Error(String(err)))
       } finally {
         setLoading(false)

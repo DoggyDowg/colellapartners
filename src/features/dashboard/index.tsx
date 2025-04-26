@@ -1,6 +1,6 @@
 import { ProtectedRoute } from '../../components/auth/ProtectedRoute';
 import { SignOutButton } from '../../components/auth/SignOutButton';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { Header } from '../../components/layout/header';
 import { Search } from '../../components/search';
 import { ThemeSwitch } from '../../components/theme-switch';

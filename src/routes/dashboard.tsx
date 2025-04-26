@@ -1,7 +1,7 @@
 import { createFileRoute, Navigate } from '@tanstack/react-router';
 import { ProtectedRoute } from '../components/auth/ProtectedRoute';
 import { SignOutButton } from '../components/auth/SignOutButton';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 export const Route = createFileRoute('/dashboard')({
   component: DashboardRedirect,

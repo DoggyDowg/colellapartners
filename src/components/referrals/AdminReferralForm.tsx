@@ -39,6 +39,7 @@ import { PlusCircle, Loader2 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
+import { handleError } from '@/utils/error-handler'
 
 // Define the form schema based on the database structure
 const adminReferralFormSchema = z.object({
@@ -179,7 +180,11 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
       // Otherwise, it should not exist in the database
       return data.length === 0;
     } catch (error) {
-      console.error('Error checking partner code:', error);
+      handleError(error, {
+        context: 'AdminReferralForm.checkPartnerCodeUnique',
+        toastMessage: 'Error checking partner code',
+        showToast: false
+      });
       return false;
     } finally {
       setPartnerCodeChecking(false);
@@ -192,7 +197,7 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
   };
 
   // Force uppercase and handle input restrictions for partner code
-  const handlePartnerCodeChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (...event: any[]) => void) => {
+  const handlePartnerCodeChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
     const value = e.target.value.toUpperCase();
     
     // Check for invalid characters
@@ -288,11 +293,10 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
         setReferrerFieldsDisabled(true);
       }
     } catch (error) {
-      console.error('Error checking referrer:', error);
-      toast({
-        title: "Lookup error",
-        description: "There was a problem checking this email. Please try again.",
-        variant: "destructive"
+      handleError(error, {
+        context: 'AdminReferralForm.lookupReferrer',
+        toastMessage: "There was a problem checking this email. Please try again.",
+        showToast: true
       });
     } finally {
       setEmailChecking(false);
@@ -394,7 +398,11 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
           .single();
         
         if (insertError) {
-          console.error('Error creating referrer:', insertError);
+          handleError(insertError, {
+            context: 'AdminReferralForm.onSubmit.createReferrer',
+            toastMessage: 'Failed to create partner profile. Please contact support.',
+            showToast: false
+          });
           throw new Error('Failed to create partner profile. Please contact support.');
         }
         
@@ -462,12 +470,11 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
-    } catch (error: any) {
-      console.error('Error submitting referral:', error);
-      toast({
-        title: "Submission failed",
-        description: error.message || "There was a problem submitting the referral. Please try again.",
-        variant: "destructive"
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'AdminReferralForm.onSubmit',
+        toastMessage: error instanceof Error ? error.message : "There was a problem submitting the referral. Please try again.",
+        showToast: true
       });
     } finally {
       setSubmitting(false);
@@ -478,18 +485,17 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
   const handleFormSubmit = form.handleSubmit(
     onSubmit,
     (errors) => {
-      console.error('Form validation errors:', errors);
+      handleError(errors, {
+        context: 'AdminReferralForm.formValidation',
+        toastMessage: "Please fix the form errors before submitting",
+        showToast: true
+      });
+      
       const errorMessages = Object.entries(errors)
         .map(([field, error]) => `${field}: ${error.message}`)
         .filter(Boolean);
       
       setFormErrors(errorMessages);
-      
-      toast({
-        title: "Validation Error",
-        description: "Please fix the form errors before submitting",
-        variant: "destructive"
-      });
     }
   );
 

@@ -30,6 +30,7 @@ import { Loader2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Separator } from '@/components/ui/separator'
+import { handleError } from '@/utils/error-handler'
 
 // Define the form schema for partner information
 const adminPartnerFormSchema = z.object({
@@ -134,8 +135,6 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
 
   // Helper to check if a partner code is unique
   const checkPartnerCodeUnique = async (code: string): Promise<boolean> => {
-    if (!code || code.length < 3) return false;
-    
     setPartnerCodeChecking(true);
     try {
       const { data, error } = await supabase
@@ -153,7 +152,11 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
       // Otherwise, it should not exist in the database
       return data.length === 0;
     } catch (error) {
-      console.error('Error checking partner code:', error);
+      handleError(error, {
+        context: 'AdminPartnerForm.checkPartnerCodeUnique',
+        toastMessage: 'Error checking partner code',
+        showToast: false
+      });
       return false;
     } finally {
       setPartnerCodeChecking(false);
@@ -166,7 +169,7 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
   };
 
   // Force uppercase and handle input restrictions for partner code
-  const handlePartnerCodeChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (...event: any[]) => void) => {
+  const handlePartnerCodeChange = (e: React.ChangeEvent<HTMLInputElement>, onChange: (value: string) => void) => {
     const value = e.target.value.toUpperCase();
     
     // Check for invalid characters
@@ -258,8 +261,11 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
         setPartnerFieldsDisabled(true);
       }
     } catch (error) {
-      console.error('Error checking partner:', error);
-      toast.error("There was a problem checking this email. Please try again.");
+      handleError(error, {
+        context: 'AdminPartnerForm.lookupPartner',
+        toastMessage: "There was a problem checking this email. Please try again.",
+        showToast: true
+      });
     } finally {
       setEmailChecking(false);
     }
@@ -339,8 +345,8 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
           toast.info("No changes made to existing partner");
         }
       } else {
-        // Create a new partner
-        const { error: insertError } = await supabase
+        // Create new partner record
+        const { data: _newPartner, error: insertError } = await supabase
           .from('referrers')
           .insert({
             full_name: data.full_name,
@@ -356,7 +362,11 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
           .select();
         
         if (insertError) {
-          console.error('Error creating partner:', insertError);
+          handleError(insertError, {
+            context: 'AdminPartnerForm.onSubmit.createPartner',
+            toastMessage: 'Failed to create partner. Please contact support.',
+            showToast: false
+          });
           throw new Error('Failed to create partner. Please contact support.');
         }
         
@@ -385,9 +395,12 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
-    } catch (error: any) {
-      console.error('Error submitting partner:', error);
-      toast.error(error.message || "There was a problem saving the partner. Please try again.");
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'AdminPartnerForm.onSubmit',
+        toastMessage: error instanceof Error ? error.message : "There was a problem saving the partner. Please try again.",
+        showToast: true
+      });
     } finally {
       setSubmitting(false);
     }
@@ -397,14 +410,17 @@ export function AdminPartnerForm({ onSubmitSuccess, triggerButton, onViewPartner
   const handleFormSubmit = form.handleSubmit(
     onSubmit,
     (errors) => {
-      console.error('Form validation errors:', errors);
+      handleError(errors, {
+        context: 'AdminPartnerForm.formValidation',
+        toastMessage: "Please fix the form errors before submitting",
+        showToast: true
+      });
+      
       const errorMessages = Object.entries(errors)
         .map(([field, error]) => `${field}: ${error.message}`)
         .filter(Boolean);
       
       setFormErrors(errorMessages);
-      
-      toast.error("Please fix the form errors before submitting");
     }
   );
 

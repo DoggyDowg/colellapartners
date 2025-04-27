@@ -23,13 +23,15 @@ import { Loader2 } from 'lucide-react';
 import { RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { getPropertyById } from '../../lib/vault-re-api'; // Import the VaultRE API client
-import { differenceInDays, parseISO, format } from 'date-fns';
+import { differenceInDays, parseISO } from 'date-fns';
 import { SettlementDialog } from './SettlementDialog';
-import { LinkPropertyDialog, extractPropertyAddressData } from './LinkPropertyDialog'; // Import the new dialog and helper
-import { LinkReferrerDialog } from './LinkReferrerDialog'; // Import the new dialog
+import { LinkPropertyDialog } from './LinkPropertyDialog'; // Remove the imports that were moved
+import { LinkReferrerDialog } from './LinkReferrerDialog';
 import { cn } from '../../lib/utils';
 import supabase from "../../lib/supabase";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { handleError } from '@/utils/error-handler';
+import { PropertyDetails, extractPropertyAddressData } from '../../utils/property-utils'; // Import from the new location
 
 // Define interfaces for types
 export interface Partner {
@@ -80,6 +82,53 @@ export interface Note {
   date: string;
 }
 
+// Extend PropertyDetails to create ExtendedPropertyDetails
+export interface ExtendedPropertyDetails extends PropertyDetails {
+  status?: string;
+  property_type?: string;
+  price_text?: string;
+  address_obj?: {
+    display_address?: string;
+  };
+}
+
+// Define a generic type for property data from the API
+interface VaultPropertyData {
+  id?: unknown;
+  address?: unknown;
+  status?: string;
+  type?: unknown;
+  propertyType?: unknown;
+  agency?: unknown;
+  priceText?: string;
+  displayPrice?: string;
+  [key: string]: unknown;
+}
+
+// Define interfaces for property data structures
+interface AddressData {
+  display_address?: string;
+  suburb?: {
+    name?: string;
+  };
+  state?: string;
+  postcode?: string;
+}
+
+interface PropertyAddress {
+  suburb?: string | { name?: string };
+  state?: string;
+  postcode?: string;
+}
+
+interface VaultPropertyType {
+  name?: string;
+}
+
+interface VaultPropertyAgency {
+  name?: string;
+}
+
 interface ReferralDetailsDialogProps {
   referral: Referral | null;
   open: boolean;
@@ -100,7 +149,7 @@ interface ReferralDetailsDialogProps {
   partnerName?: string;
   partnerEmail?: string;
   partnerPhone?: string;
-  linkedProperty?: any | null;
+  linkedProperty?: ExtendedPropertyDetails | null;
   loadingProperty?: boolean;
   onSyncComplete?: (updatedReferral: Partial<Referral>) => void;
 }
@@ -116,7 +165,7 @@ const calculateDaysAway = (dateStr: string) => {
     if (days === 0) return '(today)';
     if (days === 1) return '(tomorrow)';
     return `(${days} days away)`;
-  } catch (error) {
+  } catch (_error) {
     return '';
   }
 };
@@ -150,7 +199,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   const [pendingStatusChange, setPendingStatusChange] = useState<{referralId: string, status: string} | null>(null);
   const [referral, setReferral] = useState<Referral | null>(initialReferral);
   const [isLinkPropertyDialogOpen, setIsLinkPropertyDialogOpen] = useState(false);
-  const [linkedProperty, setLinkedProperty] = useState<any | null>(initialLinkedProperty);
+  const [linkedProperty, setLinkedProperty] = useState<ExtendedPropertyDetails | null>(initialLinkedProperty || null);
   const [loadingProperty, setLoadingProperty] = useState(initialLoadingProperty);
   const [isLinkReferrerDialogOpen, setIsLinkReferrerDialogOpen] = useState(false); // State for link referrer dialog
   const [partnerDetails, setPartnerDetails] = useState<Partner | null>(initialReferral?.referrers || null); // Local state for partner details
@@ -165,11 +214,15 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
     
     // Debug logging to understand the data structure
     if (process.env.NODE_ENV === 'development') {
-      console.log('Referral state updated:', { 
+      handleError({message: 'Referral state updated', data: { 
         hasReferrerId: !!initialReferral?.referrer_id,
         referrerId: initialReferral?.referrer_id,
         hasReferrers: !!initialReferral?.referrers,
         referrers: initialReferral?.referrers
+      }}, {
+        context: 'ReferralDetailsDialog.useEffect',
+        silent: true,
+        showToast: false
       });
     }
   }, [initialReferral]);
@@ -192,7 +245,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
 
   // Update local linked property state when prop changes
   React.useEffect(() => {
-    setLinkedProperty(initialLinkedProperty);
+    setLinkedProperty(initialLinkedProperty || null);
   }, [initialLinkedProperty]);
   
   React.useEffect(() => {
@@ -212,6 +265,45 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
     'appraisal': 'Appraised',
   };
 
+  // Helper to adapt VaultRE Property to PropertyDetails type
+  const adaptPropertyToPropertyDetails = (property: VaultPropertyData): ExtendedPropertyDetails => {
+    // Extract address details
+    // Pass the property as unknown first to avoid type errors
+    const addressData = extractPropertyAddressData(property as unknown as PropertyDetails);
+    
+    // Handle different address formats safely
+    let displayAddress = '';
+    if (typeof addressData === 'string') {
+      displayAddress = addressData;
+    } else if (addressData && typeof addressData === 'object') {
+      displayAddress = (addressData as AddressData).display_address || '';
+    }
+      
+    return {
+      id: String(property.id || ''),
+      address: displayAddress,
+      city: typeof property.address === 'object' && property.address 
+        ? String(((property.address as PropertyAddress)?.suburb as { name?: string })?.name || (property.address as PropertyAddress)?.suburb || '')
+        : '',
+      state: typeof property.address === 'object' && property.address 
+        ? String((property.address as PropertyAddress)?.state || '')
+        : '',
+      zip: typeof property.address === 'object' && property.address 
+        ? String((property.address as PropertyAddress)?.postcode || '')
+        : '',
+      county: typeof property.agency === 'object' && property.agency 
+        ? String((property.agency as VaultPropertyAgency)?.name || '')
+        : '',
+      parcel_id: String(property.id || ''), // Use property ID as fallback if no parcel ID
+      status: typeof property.status === 'string' ? property.status.toLowerCase() : undefined,
+      property_type: typeof property.type === 'object' && property.type 
+        ? String((property.type as VaultPropertyType)?.name || property.propertyType || '')
+        : typeof property.propertyType === 'string' ? property.propertyType : undefined,
+      price_text: typeof property.priceText === 'string' ? property.priceText 
+        : typeof property.displayPrice === 'string' ? property.displayPrice : undefined,
+    };
+  };
+
   const handleSyncStatus = async () => {
     if (!referral?.id || !referral.vault_property_id) return;
 
@@ -221,25 +313,10 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
       const property = await getPropertyById(referral.vault_property_id);
       
       if (property) {
-          // Prepare property data for consistency if needed (or use fetched directly)
-          const propertyDataForTable = {
-            vault_property_id: property.id,
-            referral_id: referral.id,
-            address: extractPropertyAddressData(property), // Use the shared helper
-            status: property.status,
-            property_type: property.type?.name || property.propertyType,
-            bedrooms: property.bedrooms,
-            bathrooms: property.bathrooms,
-            car_spaces: property.carSpaces,
-            price_text: property.priceText || property.displayPrice,
-            listed_date: property.listedDate,
-            agent_name: property.agent?.name,
-            agent_email: property.agent?.email,
-            agent_phone: property.agent?.phone,
-            vault_last_modified: property.dateModified || null,
-            updated_at: new Date().toISOString()
-          };
-          setLinkedProperty(propertyDataForTable); // Update local linked property state
+          // Adapt property data to match our PropertyData interface
+          // First cast to unknown, then to our expected type to avoid TypeScript errors
+          const propertyData = adaptPropertyToPropertyDetails(property as unknown as VaultPropertyData);
+          setLinkedProperty(propertyData); // Update local property state
       }
 
       if (!property || !property.status) {
@@ -294,9 +371,13 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         // Pass back only status and ID as linkedProperty is handled locally
         onSyncComplete({ id: referral.id, status: newStatus }); 
       }
-    } catch (error: any) {
-      console.error("Sync error:", error);
-      toast.error(error.message || 'Failed to sync referral status');
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'ReferralDetailsDialog.handleSyncStatus',
+        toastMessage: 'Failed to sync referral status',
+        showToast: true
+      });
+      toast.error(error instanceof Error ? error.message : 'Failed to sync referral status');
     } finally {
       setIsSyncing(false);
       setLoadingProperty(false); // Finish loading
@@ -339,7 +420,11 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         .eq('id', pendingStatusChange.referralId);
         
       if (error) {
-        console.error('Error saving settlement details:', error);
+        handleError(error, {
+          context: 'ReferralDetailsDialog.handleSettlementConfirm',
+          toastMessage: 'Failed to save settlement details',
+          showToast: true
+        });
         
         // Show a more user-friendly message
         if (error.message?.includes("Could not find the 'settlement_date' column")) {
@@ -384,8 +469,12 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
       setPendingStatusChange(null);
       
       toast.success('Referral marked as Sold with settlement details');
-    } catch (error) {
-      console.error('Error saving settlement details:', error);
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'ReferralDetailsDialog.handleSettlementConfirm',
+        toastMessage: 'Failed to save settlement details',
+        showToast: true
+      });
       toast.error('Failed to save settlement details. Please try again later.');
       
       // Close dialog despite the error
@@ -401,7 +490,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   };
 
   // Callback for when property linking is complete
-  const handleLinkPropertyComplete = (update: { vault_property_id: string, propertyDetails: any }) => {
+  const handleLinkPropertyComplete = (update: { vault_property_id: string, propertyDetails: ExtendedPropertyDetails }) => {
     if (referral) {
       // Update local referral state with the new vault_property_id
       const updatedReferral = { ...referral, vault_property_id: update.vault_property_id };
@@ -430,7 +519,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   };
 
   // Callback for when partner linking is complete
-  const handleLinkPartnerComplete = async (update: { referrer_id: string, partnerDetails: Partner }) => {
+  const handleLinkPartnerComplete = async (update: { referrer_partner_id: string, partnerDetails: Partner }) => {
     if (referral) {
       try {
         // Immediately update local state for good UX
@@ -439,7 +528,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         // Update local referral state with the new referrer_id
         const updatedReferral = { 
           ...referral, 
-          referrer_id: update.referrer_id,
+          referrer_id: update.referrer_partner_id,
         };
         setReferral(updatedReferral);
         
@@ -450,11 +539,15 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         const { data: freshPartnerData, error } = await supabase
           .from('referrers')
           .select('id, full_name, email, phone')
-          .eq('id', update.referrer_id)
+          .eq('id', update.referrer_partner_id)
           .single();
           
         if (error) {
-          console.error("Error fetching partner details:", error);
+          handleError(error, {
+            context: 'ReferralDetailsDialog.handleLinkPartnerComplete',
+            toastMessage: 'Error fetching partner details',
+            showToast: false
+          });
           // Continue with the local data we already have
         } else if (freshPartnerData) {
           // Update with the fresh data from database
@@ -465,11 +558,15 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         if (onSyncComplete) {
           onSyncComplete({
             id: referral.id,
-            referrer_id: update.referrer_id
+            referrer_id: update.referrer_partner_id
           });
         }
-      } catch (error) {
-        console.error("Error in partner linking process:", error);
+      } catch (error: unknown) {
+        handleError(error, {
+          context: 'ReferralDetailsDialog.handleLinkPartnerComplete',
+          toastMessage: 'Error in partner linking process',
+          showToast: true
+        });
         toast.error("There was an issue updating partner details. Please try refreshing.");
       }
     }
@@ -496,11 +593,22 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           vault_property_id: undefined,
         });
       }
-      
-      toast.success("Property unlinked from this referral");
-    } catch (error) {
-      console.error("Error unlinking property:", error);
-      toast.error("Failed to unlink property. Please try again.");
+
+      // Notify the parent component
+      if (onSyncComplete) {
+        onSyncComplete({
+          id: referral.id,
+          vault_property_id: undefined,
+        });
+      }
+
+      toast.success("Property unlinked successfully");
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'ReferralDetailsDialog.handleUnlinkProperty',
+        toastMessage: 'Error unlinking property',
+        showToast: true
+      });
     } finally {
       setIsSaving(false);
     }
@@ -513,7 +621,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
       // Update the database
       const { error } = await supabase
         .from("referrals")
-        .update({ referrer_id: null })
+        .update({ referrer_partner_id: null })
         .eq("id", referral.id);
 
       if (error) throw error;
@@ -524,14 +632,25 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         setReferral({
           ...referral,
           referrer_id: undefined,
-          referrers: undefined,
+          referrers: undefined
         });
       }
-      
-      toast.success("Partner unlinked from this referral");
-    } catch (error) {
-      console.error("Error unlinking partner:", error);
-      toast.error("Failed to unlink partner. Please try again.");
+
+      // Notify the parent component
+      if (onSyncComplete) {
+        onSyncComplete({
+          id: referral.id,
+          referrer_id: undefined,
+        });
+      }
+
+      toast.success("Partner unlinked successfully");
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'ReferralDetailsDialog.handleUnlinkPartner',
+        toastMessage: 'Error unlinking partner',
+        showToast: true
+      });
     } finally {
       setIsSaving(false);
     }
@@ -547,6 +666,49 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   const handlePropertyWarningCancel = () => {
     setIsPropertyWarningOpen(false);
     setPendingStatusChange(null);
+  };
+
+  React.useEffect(() => {
+    if (pendingStatusChange === null) {
+      setIsPropertyWarningOpen(false);
+    }
+  }, [pendingStatusChange]);
+  
+  // Render the settlement date if available
+  const renderSettlementDate = () => {
+    if (!referral?.settlement_date) return null;
+    
+    try {
+      // Parse the date but don't store in variable if not using it
+      parseISO(referral.settlement_date);
+      const formattedDate = formatDate(referral.settlement_date);
+      const daysAway = calculateDaysAway(referral.settlement_date);
+      
+      return (
+        <div className="flex flex-col space-y-1">
+          <span className="text-sm font-medium">Settlement Date:</span>
+          <span className="text-sm">
+            {formattedDate} <span className="text-muted-foreground">{daysAway}</span>
+          </span>
+        </div>
+      );
+    } catch (error) {
+      handleError(error, {
+        context: 'ReferralDetailsDialog.renderSettlementDate',
+        toastMessage: 'Error formatting settlement date',
+        showToast: false,
+        silent: true
+      });
+      return null;
+    }
+  };
+
+  // Fix the display logic
+  const renderPropertyAddress = (property: ExtendedPropertyDetails) => {
+    if (property.address_obj && property.address_obj.display_address) {
+      return property.address_obj.display_address;
+    }
+    return property.address || 'N/A';
   };
 
   if (!referral) return null;
@@ -650,13 +812,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
                           {referral.status || 'New'}
                         </Badge>
                       </p>
-                      {referral.status === 'Sold' && referral.settlement_date && (
-                        <p>
-                          <span className="font-medium text-foreground">Settlement Date:</span>{' '}
-                          {format(parseISO(referral.settlement_date), 'dd MMM, yyyy')}{' '}
-                          {calculateDaysAway(referral.settlement_date)}
-                        </p>
-                      )}
+                      {renderSettlementDate()}
                     </div>
                   </div>
                   
@@ -706,7 +862,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
                       </div>
                     ) : linkedProperty ? (
                       <div className="space-y-1 text-sm text-muted-foreground">
-                        <p><span className="font-medium text-foreground">Address:</span> {linkedProperty.address?.display_address || 'N/A'}</p>
+                        <p><span className="font-medium text-foreground">Address:</span> {renderPropertyAddress(linkedProperty)}</p>
                         <p><span className="font-medium text-foreground">Status:</span> {linkedProperty.status || 'N/A'}</p>
                         <p><span className="font-medium text-foreground">Type:</span> {linkedProperty.property_type || 'N/A'}</p>
                         <p><span className="font-medium text-foreground">Price:</span> {linkedProperty.price_text || 'N/A'}</p>
@@ -920,7 +1076,22 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           referralId={referral.id}
           open={isLinkPropertyDialogOpen}
           onOpenChange={setIsLinkPropertyDialogOpen}
-          onLinkComplete={handleLinkPropertyComplete}
+          onLinkComplete={({ vault_property_id, propertyDetails }) => {
+            // Convert PropertyDetails to ExtendedPropertyDetails
+            const extendedDetails: ExtendedPropertyDetails = {
+              ...propertyDetails,
+              status: undefined,
+              property_type: undefined,
+              price_text: undefined,
+              address_obj: {
+                display_address: propertyDetails.address
+              }
+            };
+            handleLinkPropertyComplete({
+              vault_property_id,
+              propertyDetails: extendedDetails
+            });
+          }}
         />
       )}
       
@@ -930,7 +1101,31 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           referralId={referral.id}
           open={isLinkReferrerDialogOpen}
           onOpenChange={setIsLinkReferrerDialogOpen}
-          onLinkComplete={handleLinkPartnerComplete}
+          onLinkComplete={
+            // Define an interface for the expected structure
+            (update: { 
+              referrer_partner_id: string; 
+              partnerDetails: { 
+                id: string;
+                name: string;
+                company_name?: string | null;
+                email: string | null;
+                phone: string | null;
+              }
+            }) => {
+              // Ensure the Partner type matches the expected format
+              const compatibleUpdate = {
+                referrer_partner_id: update.referrer_partner_id,
+                partnerDetails: {
+                  id: update.partnerDetails.id,
+                  full_name: update.partnerDetails.name || '',
+                  email: update.partnerDetails.email || '',
+                  phone: update.partnerDetails.phone || ''
+                }
+              };
+              handleLinkPartnerComplete(compatibleUpdate);
+            }
+          }
         />
       )}
     </Dialog>

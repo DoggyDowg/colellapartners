@@ -6,14 +6,22 @@ import { toast } from 'sonner';
 import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Partner } from './ReferralDetailsDialog'; // Import Partner type instead of Referrer
+import { handleError } from '@/utils/error-handler';
 
-// Props for the dialog
+// Define interfaces for types
+interface Partner {
+  id: string;
+  name: string;
+  company_name: string | null;
+  email: string | null;
+  phone: string | null;
+}
+
 interface LinkReferrerDialogProps {
   referralId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLinkComplete: (update: { referrer_id: string, partnerDetails: Partner }) => void;
+  onLinkComplete: (updatedReferral: { referrer_partner_id: string, partnerDetails: Partner }) => void;
 }
 
 export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkComplete }: LinkReferrerDialogProps) {
@@ -23,7 +31,7 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch partners (referrers) when dialog opens
+  // Fetch partners when dialog opens
   useEffect(() => {
     const fetchPartners = async () => {
       if (!open) return;
@@ -32,15 +40,18 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
       setSearchTerm('');
       try {
         const { data, error } = await supabase
-          .from('referrers')
-          .select('id, full_name, email, phone')
-          .order('full_name');
+          .from('partners')
+          .select('id, name, company_name, email, phone')
+          .order('name');
           
         if (error) throw error;
         setPartners(data || []);
       } catch (error) {
-        console.error("Error fetching partners:", error);
-        toast.error("Failed to load partners");
+        handleError(error, {
+          context: 'LinkReferrerDialog.fetchPartners',
+          toastMessage: "Failed to load partners",
+          showToast: true
+        });
       } finally {
         setLoading(false);
       }
@@ -51,7 +62,8 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
   // Filter partners based on search term
   const filteredPartners = partners.filter(partner =>
     !searchTerm ||
-    (partner.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (partner.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (partner.company_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (partner.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (partner.phone?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -68,27 +80,34 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
 
     setIsProcessing(true);
     try {
-      // Update the referral table with the selected referrer_id
+      // Update the referral table with the selected partner_id
       const { error: referralUpdateError } = await supabase
         .from('referrals')
-        .update({ referrer_id: selectedPartnerId })
+        .update({ referrer_partner_id: selectedPartnerId })
         .eq('id', referralId);
 
       if (referralUpdateError) {
-        console.error("Error updating referral link:", referralUpdateError);
-        throw new Error("Failed to link partner to referral.");
+        handleError(referralUpdateError, {
+          context: 'LinkReferrerDialog.updateReferral',
+          toastMessage: "Failed to link partner to referral",
+          showToast: false
+        });
+        throw new Error("Failed to link partner to referral");
       }
 
       toast.success("Partner linked successfully!");
       // Pass back the selected partner ID and details
       onLinkComplete({
-          referrer_id: selectedPartnerId,
+          referrer_partner_id: selectedPartnerId,
           partnerDetails: selectedPartner 
       }); 
       onOpenChange(false);
-    } catch (error: any) {
-      console.error("Error linking partner:", error);
-      toast.error(error.message || "Failed to link partner.");
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'LinkReferrerDialog.handleLinkPartner',
+        toastMessage: "Failed to link partner",
+        showToast: true
+      });
     } finally {
       setIsProcessing(false);
     }
@@ -98,9 +117,9 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Link Partner</DialogTitle>
+          <DialogTitle>Link Referrer</DialogTitle>
           <DialogDescription>
-            Select an existing partner from the database to link to this referral.
+            Select an existing partner as the referrer for this referral.
           </DialogDescription>
         </DialogHeader>
 
@@ -109,7 +128,7 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search partners by name, email, or phone..."
+              placeholder="Search partners by name, company, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -129,8 +148,13 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
                     className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPartnerId === partner.id ? 'bg-accent border-primary' : 'hover:bg-accent/50'}`}
                     onClick={() => setSelectedPartnerId(partner.id)}
                   >
-                    <p className="font-medium text-sm">{partner.full_name || 'No Name'}</p>
-                    <p className="text-xs text-muted-foreground">{partner.email || '-'} | {partner.phone || '-'}</p>
+                    <p className="font-medium text-sm">{partner.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {partner.company_name ? `${partner.company_name} • ` : ''}
+                      {partner.email || partner.phone ? 
+                        `${partner.email || ''}${partner.email && partner.phone ? ' • ' : ''}${partner.phone || ''}` : 
+                        'No contact info'}
+                    </p>
                   </div>
                 ))
               ) : (

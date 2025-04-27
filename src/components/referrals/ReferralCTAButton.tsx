@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import supabase from '@/lib/supabase'
 import { PartnerReferralForm } from './PartnerReferralForm'
 import { AdminReferralForm } from './AdminReferralForm'
+import { handleError } from '@/utils/error-handler'
 
 export function ReferralCTAButton() {
   const { user } = useAuth()
@@ -23,13 +24,21 @@ export function ReferralCTAButton() {
         const { data, error } = await supabase.rpc('is_admin')
         
         if (error) {
-          console.error('Error checking admin status:', error)
+          handleError(error, {
+            context: 'ReferralCTAButton.checkAdminStatus',
+            toastMessage: 'Error checking admin status',
+            showToast: false
+          })
           setIsAdmin(false)
         } else {
           setIsAdmin(!!data)
         }
-      } catch (error) {
-        console.error('Error in admin check:', error)
+      } catch (error: unknown) {
+        handleError(error, {
+          context: 'ReferralCTAButton.checkAdminStatus',
+          toastMessage: 'Error in admin check',
+          showToast: false
+        })
         setIsAdmin(false)
       } finally {
         setLoading(false)

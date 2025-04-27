@@ -1,5 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import supabase from '../../lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
@@ -8,9 +8,10 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '../../components/ui/badge'
 import { IconTrophy, IconUserCircle, IconGift, IconArrowRight, IconUserPlus, IconChartBar, IconCalendarStats } from '@tabler/icons-react'
 import { Link } from '@tanstack/react-router'
-import { PropertyOverview } from '../../components/dashboard/PropertyOverview'
 import { QuickActions } from '../../components/dashboard/QuickActions'
 import { RewardsActivity } from '../../components/dashboard/RewardsActivity'
+import { useAuth } from '../../hooks/useAuth'
+import { PartnerReferralForm } from '../../components/referrals/PartnerReferralForm'
 
 // Define interfaces for our data
 interface Referral {
@@ -42,6 +43,7 @@ export const Route = createFileRoute('/_authenticated/')({
 export { PartnerDashboard };
 
 function PartnerDashboard() {
+  const { user } = useAuth()
   const [stats, setStats] = useState({
     totalReferrals: 0,
     pendingReferrals: 0,
@@ -49,27 +51,27 @@ function PartnerDashboard() {
     conversionRate: 0,
   })
   const [latestReferral, setLatestReferral] = useState<Referral | null>(null)
-  const [nextAchievement, setNextAchievement] = useState<Achievement | null>(null)
+  const [nextAchievement, ] = useState<Achievement | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hasReferrals, setHasReferrals] = useState(false)
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
-  const fetchDashboardData = async () => {
+  // Define fetchDashboardData before using it in useEffect
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return
+    
     setLoading(true)
     setError(null)
     
     try {
-      // Hardcoded user ID for demo - replace with actual user auth in production
-      const hardcodedId = '7e4b6261-8037-4136-8119-2944dc9453ff'
+      // Use authenticated user's ID instead of hardcoded ID
+      const userId = user.id
       
       // Fetch referrals
       const { data: referralsData, error: referralsError } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', hardcodedId)
+        .eq('referrer_id', userId)
         .order('created_at', { ascending: false })
       
       if (referralsError) {
@@ -78,6 +80,7 @@ function PartnerDashboard() {
       
       if (referralsData && referralsData.length > 0) {
         const referrals = referralsData as unknown as Referral[]
+        setHasReferrals(true)
         
         // Set latest referral
         setLatestReferral(referrals[0])
@@ -95,18 +98,35 @@ function PartnerDashboard() {
           completedReferrals: completed,
           conversionRate: conversionRate
         })
+      } else {
+        // No referrals found
+        setHasReferrals(false)
+        setLatestReferral(null)
+        setStats({
+          totalReferrals: 0,
+          pendingReferrals: 0,
+          completedReferrals: 0,
+          conversionRate: 0
+        })
       }
       
-      // For demo purposes, create a mock next achievement
-      // In production, this would be fetched from the database
-      setNextAchievement({
-        id: '2',
-        title: 'Referral Master',
-        description: 'Submit 5 referrals',
-        target: 5,
-        progress: 3,
-        icon: 'user'
-      })
+      // Fetch next achievement 
+      // In a real app, we would fetch this from the database
+      // This is a placeholder that would be replaced with actual data
+      /*
+      const { data: achievementsData, error: achievementsError } = await supabase
+        .from('achievements') // This table name caused the error
+        .select('*')
+        .eq('user_id', userId)
+        .order('progress', { ascending: false })
+        .limit(1)
+      
+      if (achievementsError) {
+        setError(`Error fetching achievements: ${achievementsError.message}`)
+      } else if (achievementsData && achievementsData.length > 0) {
+        setNextAchievement(achievementsData[0] as unknown as Achievement)
+      }
+      */
       
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
@@ -114,7 +134,14 @@ function PartnerDashboard() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
+
+  // Now use it in useEffect
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user, fetchDashboardData])
 
   const getStatusBadgeClass = (status: string) => {
     const statusLower = status?.toLowerCase() || ''
@@ -149,6 +176,24 @@ function PartnerDashboard() {
     }
   }
 
+  const EmptyDashboardState = () => (
+    <Card className="col-span-3">
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+        <img 
+          src="/images/empty-folder.png" 
+          alt="Empty folder" 
+          className="mb-4 opacity-70 w-16 h-16"
+        />
+        <h3 className="text-xl font-semibold mb-2">No referrals yet</h3>
+        <p className="text-muted-foreground mb-6 max-w-md text-sm">
+          When you make a referral, you'll be able to track everything here, 
+          including statistics, rewards, and progress toward achievements.
+        </p>
+        <PartnerReferralForm />
+      </CardContent>
+    </Card>
+  );
+
   if (error) {
     return (
       <>
@@ -176,170 +221,183 @@ function PartnerDashboard() {
           <QuickActions />
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-          {/* Total Referrals */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Total Referrals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <IconUserPlus className="mr-2 h-8 w-8 text-muted-foreground" />
-                <div>
-                  <div className="text-2xl font-bold">{loading ? '...' : stats.totalReferrals}</div>
-                  <p className="text-xs text-muted-foreground">All time referrals</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Completed Referrals */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Completed Referrals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <IconChartBar className="mr-2 h-8 w-8 text-muted-foreground" />
-                <div>
-                  <div className="text-2xl font-bold">{loading ? '...' : stats.completedReferrals}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {loading ? '' : `${stats.conversionRate}% conversion rate`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Pending Referrals */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium">Pending Referrals</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center">
-                <IconCalendarStats className="mr-2 h-8 w-8 text-muted-foreground" />
-                <div>
-                  <div className="text-2xl font-bold">{loading ? '...' : stats.pendingReferrals}</div>
-                  <p className="text-xs text-muted-foreground">Awaiting completion</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {/* Latest Referral */}
-          <Card className="col-span-2 md:col-span-1 lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Latest Referral</CardTitle>
-              <CardDescription>Your most recent client referral</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="h-36 flex items-center justify-center">
-                  <p>Loading latest referral...</p>
-                </div>
-              ) : latestReferral ? (
-                <div>
-                  <div className="mb-4 flex items-center justify-between">
-                    <div>
-                      <h3 className="font-semibold text-lg">{latestReferral.referee_name}</h3>
-                      <p className="text-sm text-muted-foreground">{latestReferral.referee_email}</p>
-                    </div>
-                    <Badge className={getStatusBadgeClass(latestReferral.status)}>
-                      {latestReferral.status}
-                    </Badge>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-medium">Type</p>
-                      <p className="text-sm text-muted-foreground">{latestReferral.referee_type}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Date Submitted</p>
-                      <p className="text-sm text-muted-foreground">{formatDate(latestReferral.created_at)}</p>
-                    </div>
-                    {latestReferral.situation_description && (
-                      <div className="col-span-2 mt-2">
-                        <p className="text-sm font-medium">Description</p>
-                        <p className="text-sm text-muted-foreground">{latestReferral.situation_description}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="h-36 flex items-center justify-center">
-                  <p className="text-muted-foreground">No referrals found. Make your first referral today!</p>
-                </div>
-              )}
-            </CardContent>
-            {latestReferral && (
-              <CardFooter>
-                <Button asChild variant="outline" className="w-full">
-                  <Link to="/referrals">
-                    View All Referrals
-                    <IconArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardFooter>
-            )}
-          </Card>
-
-          {/* Rewards Activity */}
-          <div className="col-span-2 md:col-span-1 lg:col-span-1">
-            <RewardsActivity />
+        {loading ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Loading...</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-12"></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Loading...</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-12"></div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base font-medium">Loading...</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-12"></div>
+              </CardContent>
+            </Card>
           </div>
-          
-          {/* Next Achievement */}
-          <Card className="col-span-2 md:col-span-1 lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Next Achievement</CardTitle>
-              <CardDescription>Your progress towards the next milestone</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="h-36 flex items-center justify-center">
-                  <p>Loading achievement...</p>
-                </div>
-              ) : nextAchievement ? (
-                <div className="flex flex-col items-center">
-                  <div className="mb-4 p-3 bg-primary/10 rounded-full">
-                    {getIconForAchievement(nextAchievement.icon)}
+        ) : hasReferrals ? (
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+              {/* Total Referrals */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Total Referrals</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center">
+                    <IconUserPlus className="mr-2 h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.totalReferrals}</div>
+                      <p className="text-xs text-muted-foreground">All time referrals</p>
+                    </div>
                   </div>
-                  <h3 className="font-semibold text-center text-lg mb-1">{nextAchievement.title}</h3>
-                  <p className="text-sm text-center text-muted-foreground mb-4">{nextAchievement.description}</p>
-                  <div className="w-full mb-2">
-                    <Progress 
-                      value={(nextAchievement.progress / nextAchievement.target) * 100} 
-                      className="h-2" 
-                    />
+                </CardContent>
+              </Card>
+              
+              {/* Completed Referrals */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Completed Referrals</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center">
+                    <IconChartBar className="mr-2 h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.completedReferrals}</div>
+                      <p className="text-xs text-muted-foreground">
+                        {`${stats.conversionRate}% conversion rate`}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm font-medium">
-                    {nextAchievement.progress} of {nextAchievement.target} completed
-                  </p>
-                </div>
-              ) : (
-                <div className="h-36 flex items-center justify-center text-center">
-                  <p className="text-muted-foreground">Great job! You've completed all achievements!</p>
-                </div>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button asChild variant="outline" className="w-full">
-                <Link to="/achievements">
-                  View All Achievements
-                  <IconArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
+                </CardContent>
+              </Card>
+              
+              {/* Pending Referrals */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Pending Referrals</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center">
+                    <IconCalendarStats className="mr-2 h-8 w-8 text-muted-foreground" />
+                    <div>
+                      <div className="text-2xl font-bold">{stats.pendingReferrals}</div>
+                      <p className="text-xs text-muted-foreground">Awaiting completion</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
 
-          {/* Featured Properties */}
-          <Card className="col-span-2 md:col-span-2 lg:col-span-1">
-            <PropertyOverview />
-          </Card>
-        </div>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {/* Latest Referral */}
+              <Card className="col-span-2 md:col-span-1 lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>Latest Referral</CardTitle>
+                  <CardDescription>Your most recent client referral</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {latestReferral ? (
+                    <div>
+                      <div className="mb-4 flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-lg">{latestReferral.referee_name}</h3>
+                          <p className="text-sm text-muted-foreground">{latestReferral.referee_email}</p>
+                        </div>
+                        <Badge className={getStatusBadgeClass(latestReferral.status)}>
+                          {latestReferral.status}
+                        </Badge>
+                      </div>
+                      {latestReferral.situation_description && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-medium mb-1">Situation</h4>
+                          <p className="text-sm text-muted-foreground">{latestReferral.situation_description}</p>
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">
+                        Referred on {formatDate(latestReferral.created_at)}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-36 flex items-center justify-center">
+                      <p>No referrals found</p>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/referrals">
+                      View All Referrals
+                      <IconArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+              
+              {/* Rewards Activity */}
+              <Card className="col-span-2 md:col-span-1 lg:col-span-1">
+                <RewardsActivity userId={user?.id} />
+              </Card>
+              
+              {/* Next Achievement */}
+              <Card className="col-span-2 md:col-span-2 lg:col-span-1">
+                <CardHeader>
+                  <CardTitle>Next Achievement</CardTitle>
+                  <CardDescription>Your progress towards the next milestone</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {nextAchievement ? (
+                    <div>
+                      <div className="flex items-center gap-3 mb-4">
+                        {getIconForAchievement(nextAchievement.icon)}
+                        <div>
+                          <h3 className="font-semibold">{nextAchievement.title}</h3>
+                          <p className="text-sm text-muted-foreground">{nextAchievement.description}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>Progress</span>
+                          <span>{nextAchievement.progress} / {nextAchievement.target}</span>
+                        </div>
+                        <Progress value={(nextAchievement.progress / nextAchievement.target) * 100} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="h-[104px] flex items-center justify-center">
+                      <p>No achievements found</p>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link to="/achievements">
+                      View All Achievements
+                      <IconArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </>
+        ) : (
+          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+            <EmptyDashboardState />
+          </div>
+        )}
       </div>
     </>
   )

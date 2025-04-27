@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { useAuth } from '@/hooks/useAuth'
 import supabase from '@/lib/supabase'
+import { handleError } from '@/utils/error-handler'
 import { 
   Dialog,
   DialogContent,
@@ -129,7 +130,11 @@ export function PartnerReferralForm({ onSubmitSuccess }: PartnerReferralFormProp
           .eq('id', existingReferrerByEmail.id);
           
         if (updateError) {
-          console.error('Error updating referrer user_id:', updateError);
+          handleError(updateError, {
+            context: 'PartnerReferralForm.updateReferrer',
+            toastMessage: 'Failed to update partner profile',
+            showToast: false
+          });
           throw new Error('Failed to update partner profile. Please contact support.');
         }
         
@@ -164,7 +169,11 @@ export function PartnerReferralForm({ onSubmitSuccess }: PartnerReferralFormProp
           .single();
         
         if (insertError) {
-          console.error('Error creating referrer:', insertError);
+          handleError(insertError, {
+            context: 'PartnerReferralForm.createReferrer',
+            toastMessage: 'Failed to create partner profile',
+            showToast: false
+          });
           throw new Error('Failed to create partner profile. Please contact support.');
         }
         
@@ -214,11 +223,15 @@ export function PartnerReferralForm({ onSubmitSuccess }: PartnerReferralFormProp
       if (onSubmitSuccess) {
         onSubmitSuccess();
       }
-    } catch (error: any) {
-      console.error('Error submitting partner referral:', error);
+    } catch (error: unknown) {
+      handleError(error, {
+        context: 'PartnerReferralForm.onSubmit',
+        toastMessage: "Submission failed",
+        showToast: true
+      });
       toast({
         title: "Submission failed",
-        description: error.message || "There was a problem submitting your referral. Please try again.",
+        description: error instanceof Error ? error.message : "There was a problem submitting your referral. Please try again.",
         variant: "destructive"
       });
     } finally {

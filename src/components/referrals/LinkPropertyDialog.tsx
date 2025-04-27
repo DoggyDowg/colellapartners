@@ -4,73 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 import { Loader2, Search } from 'lucide-react';
-import { getLinkableProperties, Property } from '@/lib/vault-re-api'; // Assuming this function fetches properties and Property type
-import { supabase } from '@/lib/supabase'; // Assuming supabase client setup
+import { supabase } from '@/lib/supabase';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { handleError } from '@/utils/error-handler';
+import { PropertyDetails, extractPropertyAddressData } from '../../utils/property-utils';
 
-// Define the props interface
+// Define interfaces for types
 interface LinkPropertyDialogProps {
-  referralId: string | null; // The ID of the referral to link
+  referralId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLinkComplete: (updatedReferral: { vault_property_id: string, propertyDetails: any }) => void; // Callback after linking is done, passing back necessary details
+  onLinkComplete: (updatedReferral: { vault_property_id: string, propertyDetails: PropertyDetails }) => void;
 }
 
-// Helper function to extract address data from VaultRE Property object
-export const extractPropertyAddressData = (property: Property) => {
-  if (!property || !property.address) return null;
-
-  const addr = property.address;
-
-  // Construct address components
-  let streetAddress = addr.street || '';
-  if (addr.streetNumber) {
-    streetAddress = `${addr.streetNumber} ${streetAddress}`;
-  }
-  if (addr.unitNumber) {
-    streetAddress = `Unit ${addr.unitNumber}, ${streetAddress}`;
-  }
-
-  // Handle potentially nested suburb object or simple string
-  let suburbName = '';
-  let postcode = addr.postcode || '';
-  let stateAbbr = addr.state || '';
-
-  if (typeof addr.suburb === 'object' && addr.suburb !== null) {
-    suburbName = addr.suburb.name || '';
-    postcode = addr.suburb.postcode || postcode;
-    stateAbbr = addr.suburb.state?.abbreviation || stateAbbr;
-  } else if (typeof addr.suburb === 'string') {
-    suburbName = addr.suburb;
-  }
-
-  // Create formatted addresses
-  const postalAddressString = [
-    streetAddress,
-    suburbName,
-    stateAbbr,
-    postcode
-  ].filter(Boolean).join(', ');
-
-  const displayAddress = addr.displayAddress || [
-    streetAddress,
-    suburbName
-  ].filter(Boolean).join(' ');
-
-  return {
-    street_address: streetAddress.trim() || null,
-    suburb: suburbName || null,
-    state: stateAbbr || null,
-    post_code: postcode || null,
-    postal_address: postalAddressString || null,
-    display_address: displayAddress || null
-  };
-};
-
-
 export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkComplete }: LinkPropertyDialogProps) {
-  const [properties, setProperties] = useState<Property[]>([]);
+  const [properties, setProperties] = useState<PropertyDetails[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -78,40 +26,48 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
 
   // Fetch properties when dialog opens
   useEffect(() => {
-    const fetchProps = async () => {
+    const fetchProperties = async () => {
       if (!open) return;
       setLoading(true);
-      setSelectedPropertyId(null); // Reset selection
-      setSearchTerm(''); // Reset search
+      setSelectedPropertyId(null);
+      setSearchTerm('');
       try {
-        const props = await getLinkableProperties();
-        setProperties(props);
+        const { data, error } = await supabase
+          .from('vault_properties')
+          .select('id, address, city, state, zip, county, parcel_id')
+          .order('address');
+          
+        if (error) throw error;
+        setProperties(data || []);
       } catch (error) {
         handleError(error, {
-          context: 'LinkPropertyDialog.fetchProps',
-          toastMessage: "Failed to load properties from VaultRE",
+          context: 'LinkPropertyDialog.fetchProperties',
+          toastMessage: "Failed to load properties",
           showToast: true
         });
       } finally {
         setLoading(false);
       }
     };
-    fetchProps();
+    fetchProperties();
   }, [open]);
 
   // Filter properties based on search term
-  const filteredProperties = properties.filter(prop =>
+  const filteredProperties = properties.filter(property =>
     !searchTerm ||
-    (prop.address?.fullAddress?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (prop.displayAddress && prop.displayAddress.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (prop.id?.toLowerCase().includes(searchTerm.toLowerCase()))
+    (property.address?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (property.city?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (property.state?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (property.zip?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (property.county?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (property.parcel_id?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   // Handle linking the property
   const handleLinkProperty = async () => {
     if (!referralId || !selectedPropertyId) return;
 
-    const selectedProperty = properties.find(prop => prop.id === selectedPropertyId);
+    const selectedProperty = properties.find(property => property.id === selectedPropertyId);
     if (!selectedProperty) {
       toast.error("Selected property not found. Please try again.");
       return;
@@ -119,40 +75,7 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
 
     setIsProcessing(true);
     try {
-      // 1. Prepare property data for our table
-      const propertyDataForTable = {
-        vault_property_id: selectedProperty.id,
-        referral_id: referralId,
-        address: extractPropertyAddressData(selectedProperty),
-        status: selectedProperty.status,
-        property_type: selectedProperty.type?.name || selectedProperty.propertyType,
-        bedrooms: selectedProperty.bedrooms,
-        bathrooms: selectedProperty.bathrooms,
-        car_spaces: selectedProperty.carSpaces,
-        price_text: selectedProperty.priceText || selectedProperty.displayPrice,
-        listed_date: selectedProperty.listedDate,
-        agent_name: selectedProperty.agent?.name,
-        agent_email: selectedProperty.agent?.email,
-        agent_phone: selectedProperty.agent?.phone,
-        vault_last_modified: selectedProperty.dateModified || null,
-        updated_at: new Date().toISOString()
-      };
-
-      // 2. Upsert into the properties table
-      const { error: upsertError } = await supabase
-        .from('properties')
-        .upsert(propertyDataForTable, { onConflict: 'vault_property_id' });
-
-      if (upsertError) {
-        handleError(upsertError, {
-          context: 'LinkPropertyDialog.upsertProperty',
-          toastMessage: "Failed to save property details.",
-          showToast: false
-        });
-        throw new Error("Failed to save property details.");
-      }
-
-      // 3. Update the referral table with the vault_property_id
+      // Update the referral table with the selected property_id
       const { error: referralUpdateError } = await supabase
         .from('referrals')
         .update({ vault_property_id: selectedPropertyId })
@@ -161,23 +84,23 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
       if (referralUpdateError) {
         handleError(referralUpdateError, {
           context: 'LinkPropertyDialog.updateReferral',
-          toastMessage: "Failed to link property to referral.",
+          toastMessage: "Failed to link property to referral",
           showToast: false
         });
-        throw new Error("Failed to link property to referral.");
+        throw new Error("Failed to link property to referral");
       }
 
       toast.success("Property linked successfully!");
-      // Pass back the linked property ID and the full details we just upserted
+      // Pass back the selected property ID and details
       onLinkComplete({
           vault_property_id: selectedPropertyId,
-          propertyDetails: propertyDataForTable 
+          propertyDetails: selectedProperty 
       }); 
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error) {
       handleError(error, {
         context: 'LinkPropertyDialog.handleLinkProperty',
-        toastMessage: error.message || "Failed to link property.",
+        toastMessage: "Failed to link property",
         showToast: true
       });
     } finally {
@@ -187,11 +110,11 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Link Property to Referral</DialogTitle>
+          <DialogTitle>Link Property</DialogTitle>
           <DialogDescription>
-            Select a property from VaultRE to link to this referral for tracking.
+            Select an existing property from the database to link to this referral.
           </DialogDescription>
         </DialogHeader>
 
@@ -200,7 +123,7 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search properties by address or ID..."
+              placeholder="Search properties by address, city, state, zip..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -214,19 +137,21 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredProperties.length > 0 ? (
-                filteredProperties.map((prop) => (
+                filteredProperties.map((property) => (
                   <div
-                    key={prop.id}
-                    className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPropertyId === prop.id ? 'bg-accent border-primary' : 'hover:bg-accent/50'}`}
-                    onClick={() => setSelectedPropertyId(prop.id)}
+                    key={property.id}
+                    className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPropertyId === property.id ? 'bg-accent border-primary' : 'hover:bg-accent/50'}`}
+                    onClick={() => setSelectedPropertyId(property.id)}
                   >
-                    <p className="font-medium text-sm">{prop.displayAddress || prop.address?.fullAddress || 'No Address'}</p>
-                    <p className="text-xs text-muted-foreground">ID: {prop.id} | Status: {prop.status || 'N/A'}</p>
+                    <p className="font-medium text-sm">{extractPropertyAddressData(property)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      County: {property.county || '-'} | Parcel ID: {property.parcel_id || '-'}
+                    </p>
                   </div>
                 ))
               ) : (
                 <p className="text-center text-sm text-muted-foreground py-4">
-                  {searchTerm ? 'No matching properties found.' : 'No properties available to link.'}
+                  {searchTerm ? 'No matching properties found.' : (loading ? '' : 'No properties found in the database.')}
                 </p>
               )}
             </div>

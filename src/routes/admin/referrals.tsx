@@ -45,8 +45,9 @@ import {
   getContacts,
   Contact,
   Property,
-  getLinkableProperties
+  getLinkableProperties,
 } from '../../lib/vault-re-api';
+import { PropertyDetails } from '../../utils/property-utils';
 
 // Only import Tooltip components since they're used in the file
 import { 
@@ -142,6 +143,16 @@ interface LinkPropertyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onLinkComplete: () => void; // Callback after linking is done
+}
+
+// Define the ExtendedPropertyDetails interface
+interface ExtendedPropertyDetails extends PropertyDetails {
+  status?: string;
+  property_type?: string;
+  price_text?: string;
+  address_obj?: {
+    display_address?: string;
+  };
 }
 
 export const Route = createFileRoute('/admin/referrals')({
@@ -1978,6 +1989,33 @@ function AdminReferrals() {
     );
   }
 
+  // Keep the property mapper function
+  const mapPropertyToExtendedPropertyDetails = (property: Property | null): ExtendedPropertyDetails | null => {
+    if (!property) return null;
+    
+    // Get display address
+    const displayAddress = property.displayAddress || property.address?.fullAddress || '';
+    
+    return {
+      // Include all required properties from PropertyDetails
+      id: property.id,
+      address: displayAddress,
+      city: (typeof property.address?.suburb === 'object' ? property.address?.suburb?.name : property.address?.suburb) || '',
+      state: property.address?.state || '',
+      zip: property.address?.postcode || '',
+      county: '', // Not directly available in Property type
+      parcel_id: property.id, // Use property ID as parcel ID if not available
+      
+      // Add ExtendedPropertyDetails properties
+      status: property.status?.toLowerCase(),
+      property_type: property.type?.name || property.propertyType,
+      price_text: property.priceText || property.displayPrice,
+      address_obj: {
+        display_address: displayAddress
+      }
+    };
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8">
       <AdminCheck />
@@ -2209,7 +2247,7 @@ function AdminReferrals() {
               parseNotes={parseNotes}
               getInitials={getInitials}
               // Pass property data and loading state
-              linkedProperty={linkedPropertyDetails}
+              linkedProperty={mapPropertyToExtendedPropertyDetails(linkedPropertyDetails)}
               loadingProperty={loadingPropertyDetails}
               // Pass the sync complete handler
               onSyncComplete={handleSyncComplete}

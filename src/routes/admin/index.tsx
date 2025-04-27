@@ -34,7 +34,7 @@ export const Route = createFileRoute('/admin/')({
 type TimePeriod = '7d' | '30d' | '90d' | '6m' | '1y' | 'all'
 
 // Set this to false to ensure we're using real data
-const useMockData = false;
+const useMockData = true;
 
 // Referral types for filtering
 type ReferralType = 'all' | 'seller' | 'landlord'
@@ -503,6 +503,8 @@ function AdminDashboard() {
           setRewardsTrend([]);
         }
       }
+      // Add this line to set loading to false after all data operations
+      setLoading(false);
     } catch (_error: unknown) {
       setError('Error fetching dashboard data');
       setLoading(false);

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { IconGift, IconArrowRight, IconCoin } from '@tabler/icons-react';
+import { IconGift, IconArrowRight, IconCoin, IconMoodEmpty } from '@tabler/icons-react';
 import { Link } from '@tanstack/react-router';
+import supabase from '../../lib/supabase';
 
 interface RewardActivity {
   id: string;
@@ -11,62 +12,71 @@ interface RewardActivity {
   amount: number;
   description: string;
   date: string;
+  user_id: string;
 }
 
-export function RewardsActivity() {
+interface RewardsActivityProps {
+  userId?: string;
+}
+
+export function RewardsActivity({ userId }: RewardsActivityProps) {
   const [activities, setActivities] = useState<RewardActivity[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [hasRewards, setHasRewards] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchRewardActivities = useCallback(async () => {
+    if (!userId) return;
+    
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Fetch reward activities from database
+      const { data, error } = await supabase
+        .from('reward_activities')
+        .select('*')
+        .eq('user_id', userId)
+        .order('date', { ascending: false })
+        .limit(3);
+        
+      if (error) {
+        throw new Error(`Error fetching reward activities: ${error.message}`);
+      }
+      
+      if (data && data.length > 0) {
+        setActivities(data as RewardActivity[]);
+        setHasRewards(true);
+        
+        // Calculate total points
+        const total = data.reduce((sum, activity) => {
+          if (activity.type === 'earned') {
+            return sum + activity.amount;
+          } else {
+            return sum - activity.amount;
+          }
+        }, 0);
+        
+        setTotalPoints(total);
+      } else {
+        setActivities([]);
+        setHasRewards(false);
+        setTotalPoints(0);
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setError(`Error loading rewards: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
 
   useEffect(() => {
-    // In a real app, fetch from the backend
-    // For now, we'll use mock data
-    fetchMockActivities();
-  }, []);
-
-  const fetchMockActivities = () => {
-    setLoading(true);
-    // Simulate API delay
-    setTimeout(() => {
-      const mockData: RewardActivity[] = [
-        {
-          id: '1',
-          type: 'earned',
-          amount: 1000,
-          description: 'Referral: John Smith',
-          date: '2023-12-15T10:30:00Z',
-        },
-        {
-          id: '2',
-          type: 'redeemed',
-          amount: 500,
-          description: '$50 Gift Card',
-          date: '2023-12-10T14:45:00Z',
-        },
-        {
-          id: '3',
-          type: 'earned',
-          amount: 250,
-          description: 'Quarterly Bonus',
-          date: '2023-11-01T09:15:00Z',
-        },
-      ];
-
-      setActivities(mockData);
-      
-      // Calculate total points
-      const total = mockData.reduce((sum, activity) => {
-        if (activity.type === 'earned') {
-          return sum + activity.amount;
-        } else {
-          return sum - activity.amount;
-        }
-      }, 0);
-      
-      setTotalPoints(total);
-      setLoading(false);
-    }, 1000);
-  };
+    if (userId) {
+      fetchRewardActivities();
+    }
+  }, [userId, fetchRewardActivities]);
 
   const formatDate = (dateString: string) => {
     const options: Intl.DateTimeFormatOptions = { 
@@ -76,6 +86,15 @@ export function RewardsActivity() {
     };
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
+
+  const EmptyRewardsState = () => (
+    <div className="flex flex-col items-center justify-center py-6 text-center h-[180px]">
+      <IconMoodEmpty className="h-10 w-10 text-muted-foreground mb-3" />
+      <p className="text-sm text-muted-foreground">
+        No reward activity yet. Start referring to earn points!
+      </p>
+    </div>
+  );
 
   return (
     <Card>
@@ -96,7 +115,11 @@ export function RewardsActivity() {
           <div className="h-[148px] flex items-center justify-center">
             <p>Loading rewards activity...</p>
           </div>
-        ) : activities.length > 0 ? (
+        ) : error ? (
+          <div className="h-[148px] flex items-center justify-center text-center">
+            <p className="text-muted-foreground">{error}</p>
+          </div>
+        ) : hasRewards ? (
           <div className="space-y-4">
             {activities.map((activity) => (
               <div key={activity.id} className="flex items-center justify-between">
@@ -124,9 +147,7 @@ export function RewardsActivity() {
             ))}
           </div>
         ) : (
-          <div className="h-[148px] flex items-center justify-center text-center">
-            <p className="text-muted-foreground">No reward activity yet. Start referring to earn points!</p>
-          </div>
+          <EmptyRewardsState />
         )}
       </CardContent>
       <CardFooter>

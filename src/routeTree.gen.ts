@@ -32,7 +32,6 @@ import { Route as AdminRafflesImport } from './routes/admin/raffles'
 import { Route as AdminPropertiesImport } from './routes/admin/properties'
 import { Route as AdminEventsImport } from './routes/admin/events'
 import { Route as AuthenticatedLatestNewsImport } from './routes/_authenticated/latest-news'
-import { Route as AuthenticatedInstagramDebugImport } from './routes/_authenticated/instagram-debug'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
 import { Route as authAuthImport } from './routes/(auth)/auth'
@@ -300,13 +299,6 @@ const AuthenticatedLatestNewsRoute = AuthenticatedLatestNewsImport.update({
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
-const AuthenticatedInstagramDebugRoute =
-  AuthenticatedInstagramDebugImport.update({
-    id: '/instagram-debug',
-    path: '/instagram-debug',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-
 const authSignInRoute = authSignInImport.update({
   id: '/(auth)/sign-in',
   path: '/sign-in',
@@ -553,13 +545,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/sign-in'
       preLoaderRoute: typeof authSignInImport
       parentRoute: typeof rootRoute
-    }
-    '/_authenticated/instagram-debug': {
-      id: '/_authenticated/instagram-debug'
-      path: '/instagram-debug'
-      fullPath: '/instagram-debug'
-      preLoaderRoute: typeof AuthenticatedInstagramDebugImport
-      parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/latest-news': {
       id: '/_authenticated/latest-news'
@@ -849,7 +834,6 @@ const AuthenticatedSettingsRouteLazyRouteWithChildren =
   )
 
 interface AuthenticatedRouteRouteChildren {
-  AuthenticatedInstagramDebugRoute: typeof AuthenticatedInstagramDebugRoute
   AuthenticatedLatestNewsRoute: typeof AuthenticatedLatestNewsRoute
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
@@ -865,7 +849,6 @@ interface AuthenticatedRouteRouteChildren {
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
-  AuthenticatedInstagramDebugRoute: AuthenticatedInstagramDebugRoute,
   AuthenticatedLatestNewsRoute: AuthenticatedLatestNewsRoute,
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
@@ -935,7 +918,6 @@ export interface FileRoutesByFullPath {
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
-  '/instagram-debug': typeof AuthenticatedInstagramDebugRoute
   '/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
@@ -983,7 +965,6 @@ export interface FileRoutesByTo {
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
-  '/instagram-debug': typeof AuthenticatedInstagramDebugRoute
   '/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
@@ -1034,7 +1015,6 @@ export interface FileRoutesById {
   '/(auth)/auth': typeof authAuthRoute
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
-  '/_authenticated/instagram-debug': typeof AuthenticatedInstagramDebugRoute
   '/_authenticated/latest-news': typeof AuthenticatedLatestNewsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
@@ -1087,7 +1067,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/otp'
     | '/sign-in'
-    | '/instagram-debug'
     | '/latest-news'
     | '/admin/events'
     | '/admin/properties'
@@ -1134,7 +1113,6 @@ export interface FileRouteTypes {
     | '/500'
     | '/otp'
     | '/sign-in'
-    | '/instagram-debug'
     | '/latest-news'
     | '/admin/events'
     | '/admin/properties'
@@ -1183,7 +1161,6 @@ export interface FileRouteTypes {
     | '/(auth)/auth'
     | '/(auth)/otp'
     | '/(auth)/sign-in'
-    | '/_authenticated/instagram-debug'
     | '/_authenticated/latest-news'
     | '/admin/events'
     | '/admin/properties'
@@ -1308,7 +1285,6 @@ export const routeTree = rootRoute
     "/_authenticated": {
       "filePath": "_authenticated/route.tsx",
       "children": [
-        "/_authenticated/instagram-debug",
         "/_authenticated/latest-news",
         "/_authenticated/settings",
         "/_authenticated/",
@@ -1371,10 +1347,6 @@ export const routeTree = rootRoute
     },
     "/(auth)/sign-in": {
       "filePath": "(auth)/sign-in.tsx"
-    },
-    "/_authenticated/instagram-debug": {
-      "filePath": "_authenticated/instagram-debug.tsx",
-      "parent": "/_authenticated"
     },
     "/_authenticated/latest-news": {
       "filePath": "_authenticated/latest-news.tsx",

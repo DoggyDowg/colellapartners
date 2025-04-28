@@ -120,295 +120,113 @@ async function enrichPostWithMedia(post, accessToken, accountId) {
 
 // Instagram Feed API route (Handler logic now inline)
 app.all('/api/instagram-feed', async (req, res) => {
+  console.log("[IG API - Inline] Request received for Instagram feed (Refactored: Feed + Filter)");
+
+  // We only support GET now
+  if (req.method !== 'GET') {
+    console.log(`[IG API - Inline] Method Not Allowed: ${req.method}`);
+    res.setHeader('Allow', ['GET']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
   // Read Credentials
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  
+  // Use the standard backend environment variable name
+  const filterTag = process.env.INSTAGRAM_FILTER_HASHTAG || '#ColellaPartners';
+  // Make sure we don't have leading or trailing whitespace
+  const cleanFilterTag = filterTag.trim();
+  // Updated log to reflect the source (env or default)
+  console.log(`[IG API - Inline] Using filter tag: "${cleanFilterTag}" (from ${process.env.INSTAGRAM_FILTER_HASHTAG ? 'environment' : 'default'})`);
 
   if (!accessToken || !accountId) {
-    console.error('Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID environment variables.');
-    return res.status(500).json({ error: 'Server configuration error.' });
+    console.error('[IG API - Inline] Missing INSTAGRAM_ACCESS_TOKEN or INSTAGRAM_BUSINESS_ACCOUNT_ID environment variables.');
+    return res.status(500).json({ error: 'Server configuration error: Missing Instagram credentials' });
   }
 
-  // Determine Request Type
-  const { type, tag } = req.query;
+  console.log(`[IG API - Inline] Using Account ID: ${accountId ? 'Provided' : 'MISSING'}, Filter Tag: "${cleanFilterTag}"`);
 
   try {
     let posts = [];
-    const baseUrl = 'https://graph.facebook.com/v22.0'; // Update to v22.0 to match token
+    const baseUrl = 'https://graph.facebook.com/v22.0'; // Use a recent API version
+    const fetchLimit = 50; // How many recent posts to fetch initially
 
-    if (type === 'hashtag') {
-      if (!tag) {
-        return res.status(400).json({ error: 'Missing \'tag\' query parameter for hashtag search.' });
-      }
-      console.log(`[IG API - Inline] Hashtag search requested for: #${tag}`);
+    // --- Fetch Account Feed Directly ---
+    console.log(`[IG API - Inline] Fetching account feed (limit: ${fetchLimit})`);
+    const url = `${baseUrl}/${accountId}/media?fields=${igMediaFields}&limit=${fetchLimit}&access_token=${accessToken}`;
+    console.log(`[IG API - Inline] Fetch URL: ${baseUrl}/${accountId}/media?fields=...&limit=${fetchLimit}&access_token=...`);
+
+    const response = await fetch(url);
+    const data = await handleIGApiResponse(response); // Throws on error
+    const fetchedPosts = data.data || [];
+    console.log(`[IG API - Inline] Fetched ${fetchedPosts.length} posts directly from account feed.`);
+
+    // --> ADD THIS LOGGING <--
+    console.log('[IG API - Inline] Captions from initial fetch (first 50):');
+    fetchedPosts.forEach((post, index) => {
+        // Log caption safely, checking if it exists
+        const captionText = post.caption ? `Caption -> "${post.caption}"` : "Caption -> null/undefined";
+        console.log(`  Inline Post ${index + 1} (${post.id}, Type: ${post.media_type}): ${captionText}`);
+    });
+    // --> END LOGGING <--
+
+    // --- Filter Posts by Hashtag in Caption ---
+    // Log the actual filter tag being used
+    console.log(`[IG API - Inline] Filtering posts by caption containing: "${cleanFilterTag}"`);
+    
+    // Use a case-insensitive filter to improve matching
+    const filteredPosts = fetchedPosts.filter(post => {
+      if (!post.caption) return false;
       
-      // 1. Get Hashtag ID (add business_id parameter which is sometimes needed in newer API versions)
-      const searchUrl = `${baseUrl}/ig_hashtag_search?user_id=${accountId}&business_id=${accountId}&q=${encodeURIComponent(tag)}&access_token=${accessToken}`;
-      console.log(`[IG API - Inline] Fetching hashtag ID: ${searchUrl}`);
-      const searchResponse = await fetch(searchUrl);
-      const searchData = await searchResponse.json().catch(e => ({ parseError: e.message }));
-      console.log('[IG API - Inline] Hashtag Search Response Status:', searchResponse.status);
-      console.log('[IG API - Inline] Hashtag Search Response Body:', JSON.stringify(searchData));
+      // Convert both to lowercase for case-insensitive comparison
+      const caption = post.caption.toLowerCase();
+      const tagToFind = cleanFilterTag.toLowerCase();
+      
+      return caption.includes(tagToFind);
+    });
+    
+    console.log(`[IG API - Inline] Filtered down to ${filteredPosts.length} posts.`);
 
-      if (!searchResponse.ok || !searchData.data || searchData.data.length === 0) {
-        const errorMsg = searchData?.error?.message || `Failed to find hashtag ID (Status: ${searchResponse.status})`;
-        console.error('[IG API - Inline] Hashtag ID Error:', errorMsg);
-        if (!searchResponse.ok) throw new Error(errorMsg);
-        // If response was ok but no data, return empty array
-        posts = []; 
-      } else {
-        const hashtagId = searchData.data[0].id;
-        console.log(`[IG API - Inline] Found Hashtag ID for '#${tag}': ${hashtagId}`);
-
-        // 2. Get Media for Hashtag ID
-        // IMPORTANT: For hashtag media, we can only request limited fields
-        // Instagram API restricts the fields we can request (media_url and thumbnail_url are NOT allowed)
-        // We can only use: id, caption, media_type, permalink, timestamp
-        const hashtagMediaFields = 'id,caption,media_type,permalink,timestamp,media_product_type';
-        
-        // Get ALL available media by combining both recent_media and top_media
-        let allPosts = [];
-        
-        // Try recent_media first
-        const recentMediaUrl = `${baseUrl}/${hashtagId}/recent_media?user_id=${accountId}&business_id=${accountId}&fields=${hashtagMediaFields}&access_token=${accessToken}`;
-        console.log(`[IG API - Inline] Fetching recent media for hashtag ID ${hashtagId}: ${recentMediaUrl}`);
-        let recentMediaResponse = await fetch(recentMediaUrl);
-        let recentMediaData = await recentMediaResponse.json().catch(e => ({ parseError: e.message }));
-        
-        console.log('[IG API - Inline] Recent Media Response Status:', recentMediaResponse.status);
-        if (recentMediaResponse.ok && recentMediaData.data) {
-          console.log(`[IG API - Inline] Found ${recentMediaData.data.length} recent media posts`);
-          
-          // Log media types from recent media
-          if (recentMediaData.data.length > 0) {
-            const mediaTypes = recentMediaData.data.map(post => post.media_type);
-            console.log(`[IG API - Inline] Recent media types: ${JSON.stringify(mediaTypes)}`);
-            
-            // Log if we found any videos
-            const videoCount = mediaTypes.filter(type => type === 'VIDEO').length;
-            console.log(`[IG API - Inline] Number of videos in recent media: ${videoCount}`);
-            
-            if (videoCount > 0) {
-              console.log('[IG API - Inline] Found videos in recent media:');
-              recentMediaData.data
-                .filter(post => post.media_type === 'VIDEO')
-                .forEach(video => {
-                  console.log(`  - Video ID: ${video.id}`);
-                  console.log(`    Has permalink: ${Boolean(video.permalink)}`);
-                });
-            }
-          }
-          
-          allPosts = [...recentMediaData.data];
-        } else {
-          console.log('[IG API - Inline] No recent media found or error fetching recent media');
-        }
-        
-        // Then try top_media
-        const topMediaUrl = `${baseUrl}/${hashtagId}/top_media?user_id=${accountId}&business_id=${accountId}&fields=${hashtagMediaFields}&access_token=${accessToken}`;
-        console.log(`[IG API - Inline] Fetching top media for hashtag ID ${hashtagId}: ${topMediaUrl}`);
-        let topMediaResponse = await fetch(topMediaUrl);
-        let topMediaData = await topMediaResponse.json().catch(e => ({ parseError: e.message }));
-        
-        console.log('[IG API - Inline] Top Media Response Status:', topMediaResponse.status);
-        if (topMediaResponse.ok && topMediaData.data) {
-          console.log(`[IG API - Inline] Found ${topMediaData.data.length} top media posts`);
-          
-          // Log media types from top media
-          if (topMediaData.data.length > 0) {
-            const mediaTypes = topMediaData.data.map(post => post.media_type);
-            console.log(`[IG API - Inline] Top media types: ${JSON.stringify(mediaTypes)}`);
-            
-            // Log if we found any videos
-            const videoCount = mediaTypes.filter(type => type === 'VIDEO').length;
-            console.log(`[IG API - Inline] Number of videos in top media: ${videoCount}`);
-            
-            if (videoCount > 0) {
-              console.log('[IG API - Inline] Found videos in top media:');
-              topMediaData.data
-                .filter(post => post.media_type === 'VIDEO')
-                .forEach(video => {
-                  console.log(`  - Video ID: ${video.id}`);
-                  console.log(`    Has permalink: ${Boolean(video.permalink)}`);
-                });
-            }
-          }
-          
-          // Add top media posts that aren't already in the allPosts array (avoid duplicates)
-          const existingIds = new Set(allPosts.map(post => post.id));
-          const uniqueTopPosts = topMediaData.data.filter(post => !existingIds.has(post.id));
-          allPosts = [...allPosts, ...uniqueTopPosts];
-        } else {
-          console.log('[IG API - Inline] No top media found or error fetching top media');
-        }
-        
-        // Use combined set of posts
-        posts = allPosts;
-        console.log(`[IG API - Inline] Total unique posts found for hashtag '#${tag}': ${posts.length}`);
-        
-        // Try to explicitly request videos for this hashtag using a special parameter
-        try {
-          const videoMediaUrl = `${baseUrl}/${hashtagId}/top_media?user_id=${accountId}&business_id=${accountId}&fields=${hashtagMediaFields}&media_type=VIDEO&access_token=${accessToken}`;
-          console.log(`[IG API - Inline] Explicitly fetching video media: ${videoMediaUrl}`);
-          const videoMediaResponse = await fetch(videoMediaUrl);
-          
-          if (videoMediaResponse.ok) {
-            const videoMediaData = await videoMediaResponse.json();
-            if (videoMediaData.data && videoMediaData.data.length > 0) {
-              console.log(`[IG API - Inline] Found ${videoMediaData.data.length} videos with explicit search`);
-              
-              // Add videos that aren't already in the posts array
-              const existingIds = new Set(posts.map(post => post.id));
-              const uniqueVideos = videoMediaData.data.filter(post => !existingIds.has(post.id));
-              
-              if (uniqueVideos.length > 0) {
-                console.log(`[IG API - Inline] Adding ${uniqueVideos.length} new videos to posts`);
-                posts = [...posts, ...uniqueVideos];
-              }
-            } else {
-              console.log(`[IG API - Inline] No videos found with explicit search`);
-            }
-          } else {
-            const errorText = await videoMediaResponse.text();
-            console.log(`[IG API - Inline] Video media search failed: ${videoMediaResponse.status}, ${errorText}`);
-          }
-        } catch (error) {
-          console.log(`[IG API - Inline] Error in explicit video search: ${error.message}`);
-        }
-        
-        // For hashtag searches, the Instagram API doesn't provide media_url for videos
-        // Process posts to ensure proper frontend rendering
-        posts = posts.map(post => {
-          // Make sure all posts explicitly preserve their media type
-          const originalType = post.media_type;
-          
-          if (originalType === 'VIDEO') {
-            console.log(`[IG API - Inline] Processing VIDEO post: ${post.id}`);
-            // For videos, we need to ensure they have the right format
-            return {
-              ...post,
-              media_type: 'VIDEO', // Explicitly set to ensure it's passed through correctly
-              // Don't set media_url to undefined, let enrichment add it
-            };
-          } else if (originalType === 'CAROUSEL_ALBUM') {
-            console.log(`[IG API - Inline] Processing CAROUSEL_ALBUM post: ${post.id}`);
-            // For carousels, we preserve original format
-            return {
-              ...post,
-              media_type: 'CAROUSEL_ALBUM', // Ensure type is preserved
-            };
-          } else {
-            console.log(`[IG API - Inline] Processing IMAGE post: ${post.id}`);
-            // For images, we preserve original format
-            return {
-              ...post,
-              media_type: originalType || 'IMAGE', // Default to IMAGE if type is missing
-            };
-          }
+    // --- Enrich Filtered Posts (If Necessary) ---
+    console.log(`[IG API - Inline] Starting enrichment process for ${filteredPosts.length} filtered posts.`);
+    const enrichmentPromises = filteredPosts.map(post => {
+      console.log(`[IG API - Inline] Preparing to enrich post ${post.id} (Type: ${post.media_type})`);
+      // Note: enrichPostWithMedia is defined earlier in server.js
+      return enrichPostWithMedia(post, accessToken, accountId)
+        .catch(enrichError => {
+           console.error(`[IG API - Inline Enrich] FATAL Error during enrichment for post ${post.id}:`, enrichError);
+           return post; // Return original post if enrichment promise rejects fatally
         });
-        
-        // Log media types to verify we're receiving videos
-        if (posts.length > 0) {
-          const mediaTypes = posts.map(post => post.media_type);
-          const countByType = mediaTypes.reduce((acc, type) => {
+    });
+
+    const settledPosts = await Promise.all(enrichmentPromises);
+    posts = settledPosts;
+
+    console.log(`[IG API - Inline] Enrichment complete. Total posts after enrichment: ${posts.length}`);
+
+    // --- Final Logging & Response ---
+    const finalVideoCount = posts.filter(p => p.media_type === 'VIDEO').length;
+    const finalReelCount = posts.filter(p => p.media_product_type === 'REELS').length;
+    console.log(`[IG API - Inline - Final] Total posts: ${posts.length}, Videos: ${finalVideoCount}, Reels: ${finalReelCount}`);
+
+    const mediaTypes = posts.reduce((acc, post) => {
+      const type = post.media_type + (post.media_product_type === 'REELS' ? '_REEL' : '');
             acc[type] = (acc[type] || 0) + 1;
             return acc;
           }, {});
-          const videoCount = mediaTypes.filter(type => type === 'VIDEO').length;
-          
-          console.log(`[IG API - Inline] Media types in final response: ${JSON.stringify(mediaTypes)}`);
-          console.log(`[IG API - Inline] Media types count in final response: ${JSON.stringify(countByType)}`);
-          console.log(`[IG API - Inline] Number of videos in final response: ${videoCount}`);
-          
-          // Debug first few posts if available
-          if (posts.length > 0) {
-            console.log('[IG API - Inline] First post details:');
-            const firstPost = posts[0];
-            console.log(`  ID: ${firstPost.id}`);
-            console.log(`  Type: ${firstPost.media_type}`);
-            console.log(`  Has permalink: ${Boolean(firstPost.permalink)}`);
-            console.log(`  Has media_url: ${Boolean(firstPost.media_url)}`);
-          }
-          
-          // If we have any videos, log their details
-          if (videoCount > 0) {
-            console.log('[IG API - Inline] Video posts details:');
-            posts
-              .filter(post => post.media_type === 'VIDEO')
-              .forEach((video, index) => {
-                console.log(`  Video #${index + 1}:`);
-                console.log(`    ID: ${video.id}`);
-                console.log(`    Has permalink: ${Boolean(video.permalink)}`);
-                console.log(`    Has media_url: ${Boolean(video.media_url)}`);
-              });
-          }
-        }
+    console.log(`[IG API - Inline - Final] Media types breakdown:`, JSON.stringify(mediaTypes));
 
-        // After processing posts, enrich carousel posts with media data
-        const enrichedPosts = [];
-        console.log('[IG API - Inline] Enriching posts - before enrichment:');
-        posts.forEach(post => {
-          console.log(`  - Post ID ${post.id} (${post.media_type}): Has media_url: ${Boolean(post.media_url)}`);
-        });
-        
-        for (const post of posts) {
-          // Enrich any post that doesn't have a media_url or is a VIDEO (videos need special handling)
-          if (!post.media_url || post.media_type === 'VIDEO') {
-            console.log(`[IG API - Inline] Post ${post.id} (${post.media_type}) needs enrichment, attempting to enrich`);
-            const enrichedPost = await enrichPostWithMedia(post, accessToken, accountId);
-            enrichedPosts.push(enrichedPost);
-          } else {
-            enrichedPosts.push(post);
-          }
-        }
-        
-        // Replace posts with enriched version
-        posts = enrichedPosts;
-        
-        // Log additional info about enriched posts
-        if (posts.length > 0) {
-          console.log('[IG API - Inline] Media retrieval summary (after enrichment):');
-          posts.forEach(post => {
-            console.log(`  - Post ID ${post.id} (${post.media_type}): Has media_url: ${Boolean(post.media_url)}`);
-            if (post.children?.data) {
-              console.log(`    Has ${post.children.data.length} children items`);
-            }
-          });
-          
-          // Final count of videos with actual usable data
-          const finalVideos = posts.filter(post => post.media_type === 'VIDEO');
-          console.log(`[IG API - Final] Videos in final response: ${finalVideos.length}`);
-          if (finalVideos.length > 0) {
-            console.log('[IG API - Final] Video posts in final response:');
-            finalVideos.forEach((video, index) => {
-              console.log(`  Video #${index + 1}:`);
-              console.log(`    ID: ${video.id}`);
-              console.log(`    Has permalink: ${Boolean(video.permalink)}`);
-              console.log(`    Has media_url: ${Boolean(video.media_url)}`);
-              console.log(`    Has thumbnail_url: ${Boolean(video.thumbnail_url)}`);
-            });
-          }
-        }
-      }
-    } else {
-      // Only handle hashtag for now
-      return res.status(400).json({ error: 'Invalid or missing \'type\' query parameter. Only \'hashtag\' is supported currently.' });
-    }
+    // Log details if needed for debugging
+    // posts.forEach((post, index) => {
+    //   console.log(`[IG API - Inline - Final Post ${index + 1}] ID: ${post.id}, Type: ${post.media_type}, Product: ${post.media_product_type || 'N/A'}, Has media_url: ${!!post.media_url}, Has thumbnail_url: ${!!post.thumbnail_url}`);
+    // });
 
-    // Log final payload for frontend
-    console.log(`[IG API - Final] Sending ${posts.length} posts to frontend`);
-    console.log(`[IG API - Final] Media types breakdown:`, 
-      posts.reduce((acc, post) => {
-        acc[post.media_type] = (acc[post.media_type] || 0) + 1;
-        return acc;
-      }, {})
-    );
-
-    res.status(200).json({ data: posts });
+    return res.status(200).json({ data: posts });
 
   } catch (error) {
-    console.error('[IG API - Inline] Error fetching Instagram data:', error);
-    res.status(500).json({ error: error.message || 'Failed to fetch Instagram data.' });
+    console.error('[IG API - Inline] Error fetching or processing Instagram feed:', error.message, error.stack);
+    return res.status(500).json({ error: 'Failed to fetch or process Instagram feed.' });
   }
 });
 
@@ -450,108 +268,6 @@ app.get('/api/instagram-oembed', async (req, res) => {
   } catch (error) {
     return res.status(500).json({ 
       error: 'Failed to fetch oEmbed data',
-      message: error.message 
-    });
-  }
-});
-
-// Debug endpoint to test video fetching directly by ID
-app.get('/api/instagram-debug-video', async (req, res) => {
-  try {
-    const { videoId } = req.query;
-    
-    if (!videoId) {
-      return res.status(400).json({ error: 'Missing videoId parameter' });
-    }
-    
-    const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-    const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
-    
-    if (!accessToken || !accountId) {
-      return res.status(500).json({ error: 'Missing Instagram credentials in environment variables' });
-    }
-    
-    // Try different methods to fetch video content
-    const baseUrl = 'https://graph.facebook.com/v22.0';
-    const results = {};
-    
-    // Method 1: Direct media endpoint
-    try {
-      const fields = 'id,media_type,media_url,thumbnail_url,permalink,media_product_type';
-      const mediaUrl = `${baseUrl}/${videoId}?fields=${fields}&access_token=${accessToken}`;
-      console.log(`[Debug] Trying direct media fetch: ${mediaUrl}`);
-      
-      const mediaResponse = await fetch(mediaUrl);
-      if (mediaResponse.ok) {
-        results.directMedia = await mediaResponse.json();
-        console.log(`[Debug] Direct media success:`, results.directMedia);
-      } else {
-        const errorText = await mediaResponse.text();
-        results.directMediaError = {
-          status: mediaResponse.status,
-          error: errorText
-        };
-        console.log(`[Debug] Direct media failed: ${mediaResponse.status}, ${errorText}`);
-      }
-    } catch (error) {
-      results.directMediaError = { error: error.message };
-      console.log(`[Debug] Direct media exception: ${error.message}`);
-    }
-    
-    // Method 2: Media Content endpoint
-    try {
-      const contentUrl = `${baseUrl}/${videoId}/media?access_token=${accessToken}`;
-      console.log(`[Debug] Trying media content fetch: ${contentUrl}`);
-      
-      const contentResponse = await fetch(contentUrl);
-      if (contentResponse.ok) {
-        results.mediaContent = await contentResponse.json();
-        console.log(`[Debug] Media content success:`, results.mediaContent);
-      } else {
-        const errorText = await contentResponse.text();
-        results.mediaContentError = {
-          status: contentResponse.status,
-          error: errorText
-        };
-        console.log(`[Debug] Media content failed: ${contentResponse.status}, ${errorText}`);
-      }
-    } catch (error) {
-      results.mediaContentError = { error: error.message };
-      console.log(`[Debug] Media content exception: ${error.message}`);
-    }
-    
-    // Method 3: Children endpoint (in case it's part of a carousel)
-    try {
-      const childrenUrl = `${baseUrl}/${videoId}/children?fields=id,media_type,media_url,thumbnail_url&access_token=${accessToken}`;
-      console.log(`[Debug] Trying children fetch: ${childrenUrl}`);
-      
-      const childrenResponse = await fetch(childrenUrl);
-      if (childrenResponse.ok) {
-        results.children = await childrenResponse.json();
-        console.log(`[Debug] Children success:`, results.children);
-      } else {
-        const errorText = await childrenResponse.text();
-        results.childrenError = {
-          status: childrenResponse.status,
-          error: errorText
-        };
-        console.log(`[Debug] Children failed: ${childrenResponse.status}, ${errorText}`);
-      }
-    } catch (error) {
-      results.childrenError = { error: error.message };
-      console.log(`[Debug] Children exception: ${error.message}`);
-    }
-    
-    // Return all results
-    return res.status(200).json({ 
-      videoId,
-      results 
-    });
-    
-  } catch (error) {
-    console.error('[Debug] Error:', error);
-    return res.status(500).json({ 
-      error: 'Failed to debug video',
       message: error.message 
     });
   }

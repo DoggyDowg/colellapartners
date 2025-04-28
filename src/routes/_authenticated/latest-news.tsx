@@ -56,9 +56,11 @@ function LatestNewsComponent() {
       setError(null);
       try {
         // Read hashtag from environment variable (default if not set)
-        const tag = import.meta.env.VITE_INSTAGRAM_HASHTAG || 'default_hashtag'; // Add a fallback
+        const tag = import.meta.env.VITE_INSTAGRAM_HASHTAG || 'ColellaPartners'; // Default to ColellaPartners
 
         const apiUrl = `/api/instagram-feed?type=hashtag&tag=${encodeURIComponent(tag)}`;
+        console.log(`[Instagram] Fetching posts for hashtag #${tag}`);
+        
         const response = await fetch(apiUrl);
         
         if (!response.ok) {
@@ -67,10 +69,12 @@ function LatestNewsComponent() {
         }
 
         const result: InstagramApiResponse = await response.json();
+        console.log(`[Instagram] Received ${result.data?.length || 0} posts from API`);
         
         // Process posts without logging
         setPosts(result.data || []); // Ensure data is always an array
       } catch (err) {
+        console.error('[Instagram] Error fetching posts:', err);
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
         setIsLoading(false);

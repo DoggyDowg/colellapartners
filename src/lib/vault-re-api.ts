@@ -110,70 +110,177 @@ export const statusDisplayMap: Record<string, string> = {
 // GET Properties from URL (e.g. /api/properties?page=1&pageSize=10)
 export async function getProperties(params: PropertyListParams = {}): Promise<Property[]> {
   try {
-    // Create a copy of params to modify
-    const apiParams: Record<string, unknown> = {
-      pagesize: params.pagesize || 10,
-      page: params.page || 1,
-      sort: params.sort || 'dateModified',
+    console.log("API getProperties called with params:", params);
+    
+    // Default parameters
+    const apiParams = {
+      pagesize: 50,
+      published: true,
+      sort: params.sort || 'inserted',
       sortOrder: params.sortOrder || 'desc',
-      ...params,
+      ...params
     };
     
-    // Handle the special case of categories parameter
-    if (params.categoryId && !params.categories) {
-      // Convert legacy categoryId to categories array for backward compatibility
-      apiParams.categories = [params.categoryId];
-      delete apiParams.categoryId; // Remove the old parameter
-    }
+    console.log("Actual API params being sent:", apiParams);
     
-    // Ensure categories is properly formatted if present
-    if (apiParams.categories && Array.isArray(apiParams.categories)) {
-      // The API expects a single value for categories parameter: categories=2044500
-      // For multiple values, they should be comma-separated
-      if (apiParams.categories.length === 1) {
-        // Single category - set directly
-        apiParams.categories = apiParams.categories[0];
-      } else if (apiParams.categories.length > 1) {
-        // Multiple categories - join with commas
-        apiParams.categories = apiParams.categories.join(',');
-      } else {
-        // Empty array - remove the parameter
-        delete apiParams.categories;
+    // Use the properties/sale endpoint
+    try {
+      console.log("Trying /properties/sale endpoint");
+      const response = await vaultREClient.get('/properties/sale', { params: apiParams });
+      
+      if (response.status === 200 && response.data) {
+        console.log("Properties/sale success, data structure:", Object.keys(response.data));
+        
+        // Check for different possible response formats from the API
+        if (Array.isArray(response.data)) {
+          console.log("Response is an array with length:", response.data.length);
+          return response.data;
+        }
+        
+        if (response.data.items) {
+          console.log("Response has items array with length:", response.data.items.length);
+          return response.data.items;
+        }
+        
+        if (response.data.properties) {
+          console.log("Response has properties array with length:", response.data.properties.length);
+          return response.data.properties;
+        }
+        
+        if (response.data.data) {
+          console.log("Response has data array with length:", response.data.data.length);
+          return response.data.data;
+        }
+        
+        // If we get here, log the structure to help debug
+        console.log("Unknown response structure, data sample:", 
+          JSON.stringify(response.data).substring(0, 200) + "...");
+        
+        // Try to convert numeric keys object to array if that's what we got
+        if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+          const values = Object.values(response.data);
+          if (values.length > 0) {
+            console.log("Converting object with numeric keys to array, length:", values.length);
+            return values as Property[];
+          }
+        }
+        
+        return [];
       }
-    }
-    
-    // Handle statuses parameter (similar to categories)
-    if (apiParams.statuses && Array.isArray(apiParams.statuses)) {
-      if (apiParams.statuses.length === 1) {
-        apiParams.statuses = apiParams.statuses[0];
-      } else if (apiParams.statuses.length > 1) {
-        apiParams.statuses = apiParams.statuses.join(',');
-      } else {
-        delete apiParams.statuses;
+      console.log("Properties/sale returned no data");
+      return [];
+    } catch (saleError: any) {
+      console.error("Error with /properties/sale endpoint:", saleError);
+      
+      // If 404, try the regular properties endpoint
+      if (saleError.response && saleError.response.status === 404) {
+        console.log('Properties/sale endpoint not available, falling back to properties endpoint');
+        const response = await vaultREClient.get('/properties', { params: apiParams });
+        if (response.status === 200 && response.data) {
+          console.log("Regular properties endpoint success");
+          
+          // Apply the same response format detection logic
+          if (Array.isArray(response.data)) {
+            return response.data;
+          }
+          
+          if (response.data.items) {
+            return response.data.items;
+          }
+          
+          if (response.data.properties) {
+            return response.data.properties;
+          }
+          
+          if (response.data.data) {
+            return response.data.data;
+          }
+          
+          // Try to convert numeric keys object to array
+          if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+            const values = Object.values(response.data);
+            if (values.length > 0) {
+              return values as Property[];
+            }
+          }
+          
+          return [];
+        }
       }
+      // If not a 404 or properties endpoint fails, throw the error
+      throw saleError;
     }
-    
-    // Construct URL params for logging
-    const urlParams = new URLSearchParams();
-    Object.entries(apiParams).forEach(([key, value]) => {
-      urlParams.append(key, String(value));
-    });
-    
-    const response = await vaultREClient.get('/properties', { params: apiParams });
-    
-    if (response.status === 200 && response.data) {
-      return Array.isArray(response.data) 
-        ? response.data as Property[]
-        : (response.data.items || response.data.properties || response.data.data || []) as Property[];
-    }
-    
-    return [];
   } catch (error) {
+    console.error('Error fetching properties:', error);
     if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve properties: ${error.message}`);
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
     }
-    throw new Error('Unable to retrieve properties at this time.');
+    throw new Error('Unable to retrieve property listings at this time.');
   }
+}
+
+// Helper function to determine the property status based on saleHistory
+export function determinePropertyStatus(propertyData: any): string | null {
+  const saleHistory = propertyData?.saleHistory;
+  const currentSaleLife = propertyData?.saleLife; // For fallback
+  
+  // Direct status field fallback (if any future API changes expose this)
+  if (propertyData?.status) {
+    return propertyData.status.toLowerCase();
+  }
+  
+  // Use algorithm described in documentation to determine status
+  if (!Array.isArray(saleHistory) || saleHistory.length === 0) {
+    // No history - use currentSaleLife or direct status if available
+    if (currentSaleLife?.status) {
+      return currentSaleLife.status.toLowerCase();
+    }
+    return null;
+  }
+  
+  // Define statuses considered significant for determining the active/final state
+  const significantStatuses = [
+    'listing',
+    'live',
+    'conditional',
+    'unconditional',
+    'settled',
+    'withdrawn',
+  ];
+  
+  // Filter history for significant entries
+  const significantHistory = saleHistory.filter((entry: any) =>
+    entry?.status && significantStatuses.includes(entry.status.toLowerCase())
+  );
+  
+  let statusToReturn: string | null = null;
+  
+  if (significantHistory.length > 0) {
+    // Sort significant entries by modification date, newest first
+    significantHistory.sort((a: any, b: any) => {
+      const dateA = a.modified ? new Date(a.modified).getTime() : 0;
+      const dateB = b.modified ? new Date(b.modified).getTime() : 0;
+      return dateB - dateA; // Descending
+    });
+    // The status of the most recently modified significant entry
+    statusToReturn = significantHistory[0].status.toLowerCase();
+  } else {
+    // No significant entries found (e.g., only prospect/appraisal)
+    // Fallback: Sort the *entire* history and take the latest overall status
+    saleHistory.sort((a: any, b: any) => {
+      const dateA = a.modified ? new Date(a.modified).getTime() : 0;
+      const dateB = b.modified ? new Date(b.modified).getTime() : 0;
+      return dateB - dateA; // Descending
+    });
+    statusToReturn = saleHistory[0]?.status?.toLowerCase() || null;
+  }
+  
+  return statusToReturn;
 }
 
 // GET Property by ID from URL (e.g. /api/properties/123456)
@@ -204,6 +311,17 @@ export async function getPropertyById(propertyId: string | number): Promise<Prop
         
         // Check if result has expected property data (id or propertyId)
         if (propertyData.id || propertyData.propertyId) {
+          // Get status using the saleHistory-based logic
+          if (propertyData) {
+            // Extract status using the dedicated function
+            const status = determinePropertyStatus(propertyData);
+            
+            // Append the status to the property data if found
+            if (status) {
+              propertyData.status = status;
+            }
+          }
+          
           return propertyData as unknown as Property;
         }
       }
@@ -227,7 +345,7 @@ export async function getPropertyById(propertyId: string | number): Promise<Prop
 // GET property categories
 export const getPropertyCategories = async (): Promise<PropertyCategory[]> => {
   try {
-    const response = await vaultREClient.get('/categories/property');
+    const response = await vaultREClient.get('/categories');
     
     // Handle different response formats
     if (response.data) {
@@ -256,38 +374,21 @@ export const getPropertyCategories = async (): Promise<PropertyCategory[]> => {
       }
     }
     
-    // Fallback to original logic
-    return response.data?.items || [];
+    return [];
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve property categories: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve property categories at this time.');
+    console.error('Error fetching property categories:', error);
+    throw error;
   }
 };
 
 // GET property statuses (e.g., For Sale, Sold, Under Contract)
 export const getPropertyStatuses = async (): Promise<{id: string; name: string}[]> => {
   try {
-    const response = await vaultREClient.get('/properties/statuses');
-    
-    if (response.status === 200 && response.data) {
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-      
-      if (response.data.data) {
-        return response.data.data;
-      }
-      
-      return [];
-    }
-    return [];
+    const response = await vaultREClient.get('/property-statuses');
+    return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve property statuses: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve property statuses at this time.');
+    console.error('Error fetching property statuses:', error);
+    throw error;
   }
 };
 
@@ -297,10 +398,8 @@ export const getPropertyTypes = async () => {
     const response = await vaultREClient.get('/property-types');
     return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve property types: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve property types at this time.');
+    console.error('Error fetching property types:', error);
+    throw error;
   }
 };
 
@@ -308,24 +407,10 @@ export const getPropertyTypes = async () => {
 export const getPropertyImages = async (propertyId: string): Promise<PropertyImage[]> => {
   try {
     const response = await vaultREClient.get(`/properties/${propertyId}/images`);
-    
-    if (response.status === 200 && response.data) {
-      if (Array.isArray(response.data)) {
-        return response.data;
-      }
-      
-      if (response.data.data) {
-        return response.data.data;
-      }
-      
-      return [];
-    }
-    return [];
+    return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve property images: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve property images at this time.');
+    console.error(`Error fetching images for property ${propertyId}:`, error);
+    throw error;
   }
 };
 
@@ -335,10 +420,8 @@ export const getAgents = async () => {
     const response = await vaultREClient.get('/agents');
     return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve agents: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve agents at this time.');
+    console.error('Error fetching agents:', error);
+    throw error;
   }
 };
 
@@ -350,10 +433,8 @@ export const searchProperties = async (searchTerm: string) => {
     });
     return response.data;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Error searching properties with term "${searchTerm}": ${error.message}`);
-    }
-    throw new Error(`Error searching properties with term "${searchTerm}"`);
+    console.error(`Error searching properties with term "${searchTerm}":`, error);
+    throw error;
   }
 };
 
@@ -419,12 +500,14 @@ export interface ContactListParams {
 // GET contacts with optional filters
 export async function getContacts(params: ContactListParams = {}): Promise<Contact[]> {
   try {
+    console.log("API getContacts called with params:", params);
+    
     // Create a copy of params to modify
     const apiParams: Record<string, unknown> = {
       pagesize: params.pagesize || 50,
       sort: params.sort || 'dateModified',
       sortOrder: params.sortOrder || 'desc',
-      ...params
+      ...params,
     };
     
     // Handle the special case of categories parameter
@@ -450,17 +533,22 @@ export async function getContacts(params: ContactListParams = {}): Promise<Conta
       }
     }
     
-    // Construct URL params for logging
+    console.log("Actual API params being sent:", apiParams);
+    
+    // Log the URL that would be constructed (for debugging purposes)
     const urlParams = new URLSearchParams();
     Object.entries(apiParams).forEach(([key, value]) => {
       urlParams.append(key, String(value));
     });
+    console.log("API URL that will be called:", `/contacts?${urlParams.toString()}`);
     
     const response = await vaultREClient.get('/contacts', { params: apiParams });
     
     if (response.status === 200 && response.data) {
+      console.log("Contacts endpoint success, data structure:", Object.keys(response.data));
+      
       // Convert response to array based on format
-      let contactsArray: Record<string, unknown>[] = [];
+      let contactsArray: any[] = [];
       
       if (Array.isArray(response.data)) {
         contactsArray = response.data;
@@ -478,25 +566,22 @@ export async function getContacts(params: ContactListParams = {}): Promise<Conta
       // Process contacts to extract nested email and phone values
       const processedContacts = contactsArray.map(contact => {
         // Extract email from emails array if it exists
-        let email: string | undefined = contact.email as string;
+        let email: string | undefined = contact.email;
         if (!email && contact.emails && Array.isArray(contact.emails) && contact.emails.length > 0) {
           // Get the first email in the array
-          const firstEmail = contact.emails[0];
-          email = (firstEmail as Record<string, string>).address || 
-                 (firstEmail as Record<string, string>).email || 
-                 firstEmail as string;
+          email = contact.emails[0].address || contact.emails[0].email || contact.emails[0];
         }
         
         // Extract phones from phoneNumbers array if it exists
-        let mobilePhone: string | undefined = contact.mobilePhone as string;
-        let workPhone: string | undefined = contact.workPhone as string;
-        let homePhone: string | undefined = contact.homePhone as string;
+        let mobilePhone: string | undefined = contact.mobilePhone;
+        let workPhone: string | undefined = contact.workPhone;
+        let homePhone: string | undefined = contact.homePhone;
         
         if (contact.phoneNumbers && Array.isArray(contact.phoneNumbers)) {
           // Process each phone number based on type
-          contact.phoneNumbers.forEach((phone: string | Record<string, string>) => {
-            const number = typeof phone === 'string' ? phone : phone.number || '';
-            const type = typeof phone === 'string' ? '' : phone.type || phone.typeCode || '';
+          contact.phoneNumbers.forEach((phone: any) => {
+            const number = phone.number || phone;
+            const type = phone.type || phone.typeCode || '';
             
             if (type.toLowerCase() === 'mobile' || type === 'M') {
               mobilePhone = number;
@@ -518,19 +603,31 @@ export async function getContacts(params: ContactListParams = {}): Promise<Conta
         };
       });
       
+      console.log("Processed contacts, sample email/phone:", 
+        processedContacts.length > 0 ? 
+          { email: processedContacts[0].email, phone: processedContacts[0].mobilePhone } : 
+          'No contacts');
+      
       return processedContacts as Contact[];
     }
     
+    console.log("Contacts endpoint returned no data");
     return [];
   } catch (error) {
+    console.error('Error fetching contacts:', error);
     if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve contacts: ${error.message}`);
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
     }
     throw new Error('Unable to retrieve contacts at this time.');
   }
 }
 
-// GET contact categories to find the category ID for "Colella Partner"
+// GET contact categories
 export async function getContactCategories(): Promise<Record<string, unknown>[]> {
   try {
     const response = await vaultREClient.get('/categories/contact');
@@ -557,10 +654,8 @@ export async function getContactCategories(): Promise<Record<string, unknown>[]>
     
     return [];
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve contact categories: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve contact categories at this time.');
+    console.error('Error fetching contact categories:', error);
+    throw error;
   }
 }
 
@@ -572,11 +667,20 @@ export async function getColellaPartnerContacts(categoryIds?: string[]): Promise
       ? categoryIds 
       : ["2044500"]; // Default to original hardcoded Colella Partner ID
       
+    console.log(`Starting search for partner contacts with category IDs: ${partnerCategoryIds.join(', ')}`);
+    
     // Use the categories parameter to filter by the specific categories
     // This will be formatted correctly in getContacts as categories=id1,id2,id3
     const contacts = await getContacts({ 
       categories: partnerCategoryIds 
     });
+    
+    console.log(`Retrieved ${contacts.length} contacts from API with partner category IDs`);
+    
+    // Log the first contact for debugging
+    if (contacts.length > 0) {
+      console.log("Sample contact structure:", JSON.stringify(contacts[0], null, 2));
+    }
     
     // IMPORTANT: The API already filters by category but doesn't include the categories 
     // in the response. We should NOT try to filter again client-side.
@@ -584,10 +688,8 @@ export async function getColellaPartnerContacts(categoryIds?: string[]): Promise
     
     return contacts;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve partner contacts: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve partner contacts at this time.');
+    console.error('Error fetching partner contacts:', error);
+    throw error;
   }
 }
 
@@ -602,6 +704,7 @@ export async function getLinkableProperties(): Promise<Property[]> {
   };
   
   try {
+    console.log("Fetching linkable properties with params:", params);
     const response = await vaultREClient.get('/properties/sale', { params });
     
     if (response.status === 200 && response.data) {
@@ -628,14 +731,22 @@ export async function getLinkableProperties(): Promise<Property[]> {
     }
     return []; // Return empty array if no data or wrong format
   } catch (error) {
+    console.error('Error fetching linkable properties:', error);
     if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve linkable properties: ${error.message}`);
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message
+      });
     }
-    throw new Error('Unable to retrieve linkable properties at this time.');
+    // Re-throw or return empty based on desired error handling
+    // For now, let's return empty to avoid crashing the UI
+    return []; 
   }
 }
 
-// GET contact by ID
+// GET a contact by ID
 export async function getContactById(contactId: string): Promise<Record<string, unknown> | null> {
   try {
     const response = await vaultREClient.get(`/contacts/${contactId}`);
@@ -643,12 +754,11 @@ export async function getContactById(contactId: string): Promise<Record<string, 
     if (response.status === 200 && response.data) {
       return response.data;
     }
+    
     return null;
   } catch (error) {
-    if (error instanceof AxiosError) {
-      throw new Error(`Unable to retrieve contact details: ${error.message}`);
-    }
-    throw new Error('Unable to retrieve contact details at this time.');
+    console.error(`Error fetching contact with ID ${contactId}:`, error);
+    throw error;
   }
 }
 

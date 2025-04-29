@@ -8,7 +8,6 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../components/ui/badge';
 import { 
   IconTrophy, 
-  IconUserCircle, 
   IconGift, 
   IconMedal, 
   IconAward, 
@@ -38,16 +37,6 @@ interface Achievement {
   stack?: AchievementStack;
 }
 
-interface UserAchievement {
-  id: string;
-  user_id: string;
-  achievement_id: string;
-  progress: number;
-  completed: boolean;
-  completed_date?: string;
-  achievement?: Achievement;
-}
-
 interface AchievementWithProgress extends Achievement {
   progress: number;
   completed: boolean;
@@ -67,9 +56,6 @@ export const Route = createFileRoute('/_authenticated/achievements/')({
 });
 
 function UserAchievements() {
-  const [achievementStacks, setAchievementStacks] = useState<AchievementStack[]>([]);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([]);
   const [groupedAchievements, setGroupedAchievements] = useState<GroupedAchievements>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -115,11 +101,6 @@ function UserAchievements() {
         .eq('user_id', userId);
       
       if (userAchievementsError) throw userAchievementsError;
-      
-      // Update state with fetched data
-      setAchievementStacks(stacksData || []);
-      setAchievements(achievementsData || []);
-      setUserAchievements(userAchievementsData || []);
       
       // Group achievements by stack
       const grouped: GroupedAchievements = {};

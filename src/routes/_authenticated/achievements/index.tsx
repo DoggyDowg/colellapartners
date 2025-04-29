@@ -80,6 +80,27 @@ function UserAchievements() {
       
       const userId = user.id;
       
+      // Fetch user profile data to check completion status
+      const { data: userProfile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('name, email, phone_number, birthday, communication_emails, marketing_emails')
+        .eq('id', userId)
+        .single();
+      
+      // Skip silent errors when profile doesn't exist yet
+      if (profileError && profileError.code !== 'PGRST116') {
+        // Handle error silently
+      }
+      
+      // Check if profile is complete - more robust check for each field
+      const isProfileComplete = userProfile && 
+        !!userProfile.name?.trim() && 
+        !!userProfile.email?.trim() && 
+        !!userProfile.phone_number?.trim() && 
+        !!userProfile.birthday?.trim() && 
+        userProfile.communication_emails === true && 
+        userProfile.marketing_emails === true;
+      
       // Fetch achievement stacks
       const { data: stacksData, error: stacksError } = await supabase
         .from('achievement_stacks')
@@ -94,13 +115,70 @@ function UserAchievements() {
       
       if (achievementsError) throw achievementsError;
       
+      // Find the Profile Completer achievement
+      const profileCompleterAchievement = achievementsData?.find(
+        achievement => achievement.title === "Profile Completer"
+      );
+      
+      // Let's also try with a case-insensitive search as fallback
+      let altProfileAchievement;
+      if (!profileCompleterAchievement) {
+        altProfileAchievement = achievementsData?.find(
+          achievement => achievement.title.toLowerCase().includes('profile') ||
+                        achievement.description.toLowerCase().includes('profile')
+        );
+      }
+      
+      // Use either the exact match or the alternative if found
+      const profileAchievement = profileCompleterAchievement || altProfileAchievement;
+      
       // Fetch user achievements
-      const { data: userAchievementsData, error: userAchievementsError } = await supabase
+      const { data: initialUserAchievements, error: userAchievementsError } = await supabase
         .from('user_achievements')
         .select('*')
         .eq('user_id', userId);
       
       if (userAchievementsError) throw userAchievementsError;
+      
+      // Create a mutable copy that we can update later
+      let userAchievementsData = initialUserAchievements;
+      
+      // If profile is complete and we found the achievement, update it if needed
+      if (isProfileComplete && profileAchievement) {
+        const existingUserAchievement = userAchievementsData?.find(
+          ua => ua.achievement_id === profileAchievement.id
+        );
+        
+        if (!existingUserAchievement || !existingUserAchievement.completed) {
+          // Either create a new record or update the existing one to mark it as complete
+          const { error: upsertError } = await supabase
+            .from('user_achievements')
+            .upsert({
+              id: existingUserAchievement?.id || undefined,
+              user_id: userId,
+              achievement_id: profileAchievement.id,
+              progress: 100, // For this achievement, we use 100 to represent 100%
+              completed: true,
+              completed_date: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' });
+          
+          if (upsertError) {
+            // Handle error silently - no need for a toast as this is a background operation
+          } else {
+            // Refresh user achievements data after the update
+            const { data: refreshedData, error: refreshError } = await supabase
+              .from('user_achievements')
+              .select('*')
+              .eq('user_id', userId);
+            
+            if (!refreshError && refreshedData) {
+              // Use the refreshed data instead of modifying the original
+              userAchievementsData = refreshedData;
+            }
+          }
+        }
+      }
       
       // Group achievements by stack
       const grouped: GroupedAchievements = {};

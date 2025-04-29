@@ -6,21 +6,60 @@ import { Header } from '../../../components/layout/header';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../components/ui/badge';
-import { IconTrophy, IconUserCircle, IconGift, IconMedal, IconAward } from '@tabler/icons-react';
+import { 
+  IconTrophy, 
+  IconUserCircle, 
+  IconGift, 
+  IconMedal, 
+  IconAward, 
+  IconCalendar, 
+  IconCoin,
+  IconUser,
+  IconUserCheck
+} from '@tabler/icons-react';
+import supabase from '../../../lib/supabase';
 
 // Define interfaces for our data
+interface AchievementStack {
+  id: string;
+  title: string;
+  description: string;
+  category: 'referral' | 'reward' | 'engagement' | 'milestone';
+  icon: string;
+}
+
 interface Achievement {
   id: string;
-  user_id: string;
-  achievement_type: 'referral' | 'reward' | 'engagement' | 'milestone';
+  stack_id: string;
   title: string;
   description: string;
   target: number;
+  raffle_entries: number;
+  stack?: AchievementStack;
+}
+
+interface UserAchievement {
+  id: string;
+  user_id: string;
+  achievement_id: string;
   progress: number;
   completed: boolean;
   completed_date?: string;
-  created_at: string;
-  icon: string;
+  achievement?: Achievement;
+}
+
+interface AchievementWithProgress extends Achievement {
+  progress: number;
+  completed: boolean;
+  completed_date?: string;
+  user_achievement_id?: string;
+}
+
+interface GroupedAchievements {
+  [stackId: string]: {
+    stack: AchievementStack;
+    achievements: AchievementWithProgress[];
+  }
 }
 
 export const Route = createFileRoute('/_authenticated/achievements/')({
@@ -28,7 +67,10 @@ export const Route = createFileRoute('/_authenticated/achievements/')({
 });
 
 function UserAchievements() {
+  const [achievementStacks, setAchievementStacks] = useState<AchievementStack[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [userAchievements, setUserAchievements] = useState<UserAchievement[]>([]);
+  const [groupedAchievements, setGroupedAchievements] = useState<GroupedAchievements>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState({
@@ -38,108 +80,101 @@ function UserAchievements() {
     nextMilestone: ''
   });
 
-  const generateMockAchievements = (): Achievement[] => {
-    // In a real app, these would come from the database
-    const mockData: Achievement[] = [
-      {
-        id: '1',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'referral',
-        title: 'First Referral',
-        description: 'Submit your first referral',
-        target: 1,
-        progress: 1,
-        completed: true,
-        completed_date: '2023-11-15T12:00:00Z',
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'user'
-      },
-      {
-        id: '2',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'referral',
-        title: 'Referral Master',
-        description: 'Submit 5 referrals',
-        target: 5,
-        progress: 3,
-        completed: false,
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'user'
-      },
-      {
-        id: '3',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'reward',
-        title: 'First Reward',
-        description: 'Earn your first reward',
-        target: 1,
-        progress: 1,
-        completed: true,
-        completed_date: '2023-12-10T14:30:00Z',
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'gift'
-      },
-      {
-        id: '4',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'reward',
-        title: 'Top Earner',
-        description: 'Earn $1,000 in rewards',
-        target: 1000,
-        progress: 500,
-        completed: false,
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'gift'
-      },
-      {
-        id: '5',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'engagement',
-        title: 'Profile Completer',
-        description: 'Complete your profile information',
-        target: 1,
-        progress: 1,
-        completed: true,
-        completed_date: '2023-11-05T09:15:00Z',
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'medal'
-      },
-      {
-        id: '6',
-        user_id: '7e4b6261-8037-4136-8119-2944dc9453ff',
-        achievement_type: 'milestone',
-        title: 'One Year with Us',
-        description: 'Be a member for one year',
-        target: 365,
-        progress: 180,
-        completed: false,
-        created_at: '2023-11-01T00:00:00Z',
-        icon: 'award'
-      }
-    ];
-    
-    return mockData;
-  };
-
-  const fetchAchievements = useCallback(async () => {
+  const fetchAchievementData = useCallback(async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Since this is a demo, let's create mock achievements
-      // In a real app, we'd fetch these from the database
-      const mockAchievements = generateMockAchievements();
-      setAchievements(mockAchievements);
+      // Fetch user info to get the user_id
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('Could not get user information');
+      }
+      
+      const userId = user.id;
+      
+      // Fetch achievement stacks
+      const { data: stacksData, error: stacksError } = await supabase
+        .from('achievement_stacks')
+        .select('*');
+      
+      if (stacksError) throw stacksError;
+      
+      // Fetch all achievements
+      const { data: achievementsData, error: achievementsError } = await supabase
+        .from('achievements')
+        .select('*');
+      
+      if (achievementsError) throw achievementsError;
+      
+      // Fetch user achievements
+      const { data: userAchievementsData, error: userAchievementsError } = await supabase
+        .from('user_achievements')
+        .select('*')
+        .eq('user_id', userId);
+      
+      if (userAchievementsError) throw userAchievementsError;
+      
+      // Update state with fetched data
+      setAchievementStacks(stacksData || []);
+      setAchievements(achievementsData || []);
+      setUserAchievements(userAchievementsData || []);
+      
+      // Group achievements by stack
+      const grouped: GroupedAchievements = {};
+      
+      // Initialize groups with all stacks
+      (stacksData || []).forEach(stack => {
+        grouped[stack.id] = {
+          stack,
+          achievements: []
+        };
+      });
+      
+      // Map all achievements with user progress
+      const achievementsWithProgress: AchievementWithProgress[] = (achievementsData || []).map(achievement => {
+        // Find if user has this achievement
+        const userAchievement = (userAchievementsData || []).find(
+          ua => ua.achievement_id === achievement.id
+        );
+        
+        return {
+          ...achievement,
+          progress: userAchievement?.progress || 0,
+          completed: userAchievement?.completed || false,
+          completed_date: userAchievement?.completed_date,
+          user_achievement_id: userAchievement?.id
+        };
+      });
+      
+      // Add achievements to their respective stacks
+      achievementsWithProgress.forEach(achievement => {
+        if (grouped[achievement.stack_id]) {
+          grouped[achievement.stack_id].achievements.push(achievement);
+        }
+      });
+      
+      // Sort achievements within each stack by target value
+      Object.keys(grouped).forEach(stackId => {
+        grouped[stackId].achievements.sort((a, b) => a.target - b.target);
+      });
+      
+      setGroupedAchievements(grouped);
       
       // Calculate stats
-      const total = mockAchievements.length;
-      const completed = mockAchievements.filter(a => a.completed).length;
+      const total = achievementsWithProgress.length;
+      const completed = achievementsWithProgress.filter(a => a.completed).length;
       const progressPct = total > 0 ? Math.round((completed / total) * 100) : 0;
       
-      // Find next milestone
-      const nextMilestone = mockAchievements
+      // Find next milestone - closest to completion that isn't completed yet
+      const incompleteAchievements = achievementsWithProgress
         .filter(a => !a.completed)
-        .sort((a, b) => (b.progress / b.target) - (a.progress / a.target))[0]?.title || 'All achievements completed!';
+        .sort((a, b) => (b.progress / b.target) - (a.progress / a.target));
+      
+      const nextMilestone = incompleteAchievements.length > 0 
+        ? incompleteAchievements[0].title 
+        : 'All achievements completed!';
       
       setStats({
         totalAchievements: total,
@@ -158,26 +193,32 @@ function UserAchievements() {
   }, []);
 
   useEffect(() => {
-    fetchAchievements();
-  }, [fetchAchievements]);
+    fetchAchievementData();
+  }, [fetchAchievementData]);
 
   const getIconForAchievement = (icon: string) => {
     switch (icon) {
       case 'user':
-        return <IconUserCircle className="h-6 w-6" />;
+        return <IconUser className="h-6 w-6" />;
+      case 'userCheck':
+        return <IconUserCheck className="h-6 w-6" />;
       case 'gift':
         return <IconGift className="h-6 w-6" />;
+      case 'coin':
+        return <IconCoin className="h-6 w-6" />;
       case 'medal':
         return <IconMedal className="h-6 w-6" />;
       case 'award':
         return <IconAward className="h-6 w-6" />;
+      case 'calendar':
+        return <IconCalendar className="h-6 w-6" />;
       default:
         return <IconTrophy className="h-6 w-6" />;
     }
   };
 
   const handleRefresh = () => {
-    fetchAchievements();
+    fetchAchievementData();
   };
 
   if (error) {
@@ -195,7 +236,7 @@ function UserAchievements() {
               <p className="text-sm text-muted-foreground mb-6">
                 Please try again later.
               </p>
-              <Button onClick={fetchAchievements}>
+              <Button onClick={fetchAchievementData}>
                 Retry
               </Button>
             </div>
@@ -217,7 +258,7 @@ function UserAchievements() {
             onClick={handleRefresh}
             disabled={loading}
           >
-            {loading ? "Refreshing..." : "Refresh"}
+            {loading ? "Loading..." : "Refresh"}
           </Button>
         </div>
         
@@ -247,56 +288,80 @@ function UserAchievements() {
           </CardContent>
         </Card>
         
-        {/* Achievement Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {loading ? (
-            <div className="col-span-full flex justify-center items-center h-64">
-              <p>Loading achievements...</p>
-            </div>
-          ) : achievements.length === 0 ? (
-            <div className="col-span-full flex justify-center items-center h-32">
-              <p className="text-muted-foreground">No achievements found</p>
-            </div>
-          ) : (
-            achievements.map((achievement) => (
-              <Card key={achievement.id} className={`${achievement.completed ? 'border-green-500/30 dark:border-green-500/50 bg-green-50 dark:bg-green-950/30' : ''}`}>
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className={`p-2 rounded-full ${
-                        achievement.completed ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-300' : 'bg-muted'
+        {/* Achievement Stacks */}
+        {loading ? (
+          <div className="grid gap-6 mt-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="h-24 flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-muted-foreground">
+                      Loading achievements...
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          Object.values(groupedAchievements).map(({ stack, achievements }) => (
+            <Card key={stack.id} className="mb-6">
+              <CardHeader className="pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="rounded-full bg-muted p-2.5">
+                    {getIconForAchievement(stack.icon)}
+                  </div>
+                  <div>
+                    <CardTitle>{stack.title}</CardTitle>
+                    <CardDescription>{stack.description}</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-5">
+                  {achievements.map((achievement) => (
+                    <div key={achievement.id} className="flex items-start gap-4">
+                      <div className={`mt-0.5 rounded-full p-1.5 ${
+                        achievement.completed 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground'
                       }`}>
-                        {getIconForAchievement(achievement.icon)}
+                        <IconTrophy className="h-4 w-4" />
                       </div>
-                      <CardTitle className="text-lg">{achievement.title}</CardTitle>
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{achievement.title}</span>
+                          {achievement.completed && (
+                            <Badge variant="outline" className="bg-primary/10 text-xs">
+                              Completed
+                              {achievement.completed_date && ` on ${new Date(achievement.completed_date).toLocaleDateString()}`}
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="ml-auto bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                            {achievement.raffle_entries} {achievement.raffle_entries === 1 ? 'Entry' : 'Entries'}
+                          </Badge>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          {achievement.description}
+                        </p>
+                        <div className="pt-1">
+                          <div className="flex justify-between text-xs">
+                            <span>Progress</span>
+                            <span>{achievement.progress} / {achievement.target}</span>
+                          </div>
+                          <Progress 
+                            value={(achievement.progress / achievement.target) * 100} 
+                            className="h-1.5 mt-1.5"
+                          />
+                        </div>
+                      </div>
                     </div>
-                    {achievement.completed && (
-                      <Badge className="bg-green-500 hover:bg-green-600">Completed</Badge>
-                    )}
-                  </div>
-                  <CardDescription>{achievement.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className={`${achievement.completed ? 'text-green-800 dark:text-green-300' : ''}`}>Progress</span>
-                        <span className={`${achievement.completed ? 'text-green-800 dark:text-green-300' : ''}`}>{achievement.progress} / {achievement.target}</span>
-                      </div>
-                      <Progress value={(achievement.progress / achievement.target) * 100} className={achievement.completed ? 'bg-green-200 dark:bg-green-950' : ''} />
-                    </div>
-                    
-                    {achievement.completed && achievement.completed_date && (
-                      <div className="pt-2 text-xs text-green-700 dark:text-green-400">
-                        Completed on {new Date(achievement.completed_date).toLocaleDateString()}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-        </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
     </>
   );

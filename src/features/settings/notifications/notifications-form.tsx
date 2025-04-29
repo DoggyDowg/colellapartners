@@ -12,7 +12,7 @@ import {
   FormLabel,
 } from '@/components/ui/form'
 import { Switch } from '@/components/ui/switch'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import supabase from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -28,6 +28,7 @@ export function NotificationsForm() {
   const [loading, setLoading] = useState(false)
   const [commEmail, setCommEmail] = useState(true)
   const [marketingEmail, setMarketingEmail] = useState(true)
+  const [initialDataLoaded, setInitialDataLoaded] = useState(false)
   
   // Form with default values
   const form = useForm<NotificationsFormValues>({
@@ -37,6 +38,51 @@ export function NotificationsForm() {
       marketing_emails: true,
     },
   })
+
+  // Load existing preferences from database when component mounts
+  useEffect(() => {
+    async function loadUserPreferences() {
+      if (!user?.id) return
+      
+      setLoading(true)
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('communication_emails, marketing_emails')
+          .eq('id', user.id)
+          .single()
+        
+        if (error) {
+          // Silent error - don't show to user, just use defaults
+          // This helps when the profile doesn't exist yet
+          return
+        }
+        
+        if (data) {
+          // Set form values from database
+          const commValue = data.communication_emails ?? true
+          const marketingValue = data.marketing_emails ?? true
+          
+          form.setValue('communication_emails', commValue)
+          form.setValue('marketing_emails', marketingValue)
+          
+          // Update local state to match
+          setCommEmail(commValue)
+          setMarketingEmail(marketingValue)
+          
+          setInitialDataLoaded(true)
+        }
+      } catch (_err) {
+        // Silent error handling - use defaults
+        // Don't show error to user for initial data load
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    loadUserPreferences()
+  }, [user, form])
 
   // Handle form submission
   async function onSubmit(data: NotificationsFormValues) {
@@ -111,13 +157,14 @@ export function NotificationsForm() {
                       Communication emails
                     </FormLabel>
                     <FormDescription>
-                      Receive emails about your account activity.
+                      Receive emails about your account activity and referrals.
                     </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
                       checked={commEmail}
                       onCheckedChange={toggleCommEmails}
+                      disabled={loading && !initialDataLoaded}
                     />
                   </FormControl>
                 </FormItem>
@@ -133,13 +180,14 @@ export function NotificationsForm() {
                       Marketing emails
                     </FormLabel>
                     <FormDescription>
-                      Receive emails about new products, features, and more.
+                      Receive market updates, property insights, and special offers from Colella Property.
                     </FormDescription>
                   </div>
                   <FormControl>
                     <Switch
                       checked={marketingEmail}
                       onCheckedChange={toggleMarketingEmails}
+                      disabled={loading && !initialDataLoaded}
                     />
                   </FormControl>
                 </FormItem>

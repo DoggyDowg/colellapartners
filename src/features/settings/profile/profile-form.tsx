@@ -49,8 +49,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Separator } from "@/components/ui/separator"
 
 const profileFormSchema = z.object({
   name: z
@@ -75,8 +73,6 @@ const profileFormSchema = z.object({
       message: 'Please enter a valid Australian mobile number.',
     })
     .optional(),
-  communication_emails: z.boolean().optional().default(false),
-  marketing_emails: z.boolean().optional().default(false),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -86,8 +82,6 @@ const defaultValues: Partial<ProfileFormValues> = {
   name: '',
   email: '',
   phone_number: '',
-  communication_emails: false,
-  marketing_emails: false,
 }
 
 // Maximum file size allowed (10MB)
@@ -236,8 +230,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
               birthday_day,
               avatar_url: profile.avatar_url || '',
               phone_number: profile.phone_number || '',
-              communication_emails: profile.communication_emails || false,
-              marketing_emails: profile.marketing_emails || false,
             });
           } else {
             // No profile found
@@ -758,8 +750,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         name: data.name,
         email: data.email,
         updated_at: new Date().toISOString(),
-        communication_emails: data.communication_emails,
-        marketing_emails: data.marketing_emails,
       }
       
       // Only add these if they exist
@@ -1006,57 +996,6 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
             </FormItem>
           )}
         />
-
-        {/* Communication Preferences Section */}
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-lg font-medium">Communication Preferences</h3>
-            <p className="text-sm text-muted-foreground">Manage how we communicate with you</p>
-          </div>
-          <Separator className="my-4" />
-          
-          <FormField
-            control={form.control}
-            name="communication_emails"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Referral & Account Emails</FormLabel>
-                  <FormDescription>
-                    Receive emails about your account activity, referrals, and important updates.
-                  </FormDescription>
-                </div>
-              </FormItem>
-            )}
-          />
-          
-          <FormField
-            control={form.control}
-            name="marketing_emails"
-            render={({ field }) => (
-              <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
-                <FormControl>
-                  <Checkbox
-                    checked={field.value}
-                    onCheckedChange={field.onChange}
-                  />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel>Marketing Emails</FormLabel>
-                  <FormDescription>
-                    Receive market updates, property insights, and special offers from Colella Property.
-                  </FormDescription>
-                </div>
-              </FormItem>
-            )}
-          />
-        </div>
 
         <Button type='submit' disabled={loading} className="w-full md:w-auto">
           {loading ? 'Updating...' : 'Update profile'}

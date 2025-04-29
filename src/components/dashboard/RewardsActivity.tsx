@@ -6,21 +6,33 @@ import { IconGift, IconArrowRight, IconCoin, IconMoodEmpty } from '@tabler/icons
 import { Link } from '@tanstack/react-router';
 import supabase from '../../lib/supabase';
 
-interface RewardActivity {
+// Updated to match the Reward interface from the rewards page
+interface Reward {
   id: string;
-  type: 'earned' | 'redeemed';
+  referral_id: string;
+  referrer_id: string;
   amount: number;
-  description: string;
-  date: string;
-  user_id: string;
+  status: 'pending' | 'approved' | 'paid';
+  reward_type: 'cash' | 'gift_card';
+  gift_card_details?: {
+    provider?: string;
+    code?: string;
+    amount?: number;
+    expiry_date?: string;
+    notes?: string;
+  };
+  payment_date?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface RewardsActivityProps {
   userId?: string;
+  noCard?: boolean; // If true, don't wrap in a Card
 }
 
-export function RewardsActivity({ userId }: RewardsActivityProps) {
-  const [activities, setActivities] = useState<RewardActivity[]>([]);
+export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps) {
+  const [activities, setActivities] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalPoints, setTotalPoints] = useState(0);
   const [hasRewards, setHasRewards] = useState(false);
@@ -33,29 +45,29 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
     setError(null);
     
     try {
-      // Fetch reward activities from database
+      // Updated to use the correct 'rewards' table name and structure
       const { data, error } = await supabase
-        .from('reward_activities')
+        .from('rewards')
         .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false })
+        .eq('referrer_id', userId)
+        .order('created_at', { ascending: false })
         .limit(3);
         
       if (error) {
-        throw new Error(`Error fetching reward activities: ${error.message}`);
+        throw new Error(`Error fetching rewards: ${error.message}`);
       }
       
       if (data && data.length > 0) {
-        setActivities(data as RewardActivity[]);
+        setActivities(data as Reward[]);
         setHasRewards(true);
         
-        // Calculate total points
-        const total = data.reduce((sum, activity) => {
-          if (activity.type === 'earned') {
-            return sum + activity.amount;
-          } else {
-            return sum - activity.amount;
+        // Calculate total available rewards (pending + approved amounts)
+        const total = data.reduce((sum, reward) => {
+          // Only count pending and approved rewards, not paid ones
+          if (reward.status === 'pending' || reward.status === 'approved') {
+            return sum + reward.amount;
           }
+          return sum;
         }, 0);
         
         setTotalPoints(total);
@@ -96,8 +108,8 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
     </div>
   );
 
-  return (
-    <Card>
+  const RewardsContent = () => (
+    <>
       <CardHeader>
         <div className="flex justify-between items-start">
           <div>
@@ -105,12 +117,12 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
             <CardDescription>Your recent reward transactions</CardDescription>
           </div>
           <div className="text-right">
-            <p className="text-sm font-medium">Available Points</p>
-            <p className="text-2xl font-bold">{loading ? '...' : totalPoints}</p>
+            <p className="text-sm font-medium">Earned Rewards</p>
+            <p className="text-2xl font-bold">{loading ? '...' : `$${totalPoints.toFixed(2)}`}</p>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-grow">
         {loading ? (
           <div className="h-[148px] flex items-center justify-center">
             <p>Loading rewards activity...</p>
@@ -125,23 +137,27 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
               <div key={activity.id} className="flex items-center justify-between">
                 <div className="flex items-center">
                   <div className={`p-2 rounded-full mr-3 ${
-                    activity.type === 'earned' 
+                    activity.status === 'pending' || activity.status === 'approved' 
                       ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
                       : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
                   }`}>
-                    {activity.type === 'earned' ? (
+                    {activity.status === 'pending' || activity.status === 'approved' ? (
                       <IconCoin className="h-4 w-4" />
                     ) : (
                       <IconGift className="h-4 w-4" />
                     )}
                   </div>
                   <div>
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(activity.date)}</p>
+                    <p className="text-sm font-medium">
+                      {activity.reward_type === 'cash' ? 'Cash Reward' : 'Gift Card'} 
+                      {activity.status === 'pending' ? ' (Pending)' : 
+                       activity.status === 'approved' ? ' (Approved)' : ' (Paid)'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{formatDate(activity.created_at)}</p>
                   </div>
                 </div>
-                <Badge variant={activity.type === 'earned' ? 'default' : 'outline'}>
-                  {activity.type === 'earned' ? '+' : '-'}{activity.amount} pts
+                <Badge variant={activity.status === 'pending' || activity.status === 'approved' ? 'default' : 'outline'}>
+                  ${activity.amount.toFixed(2)}
                 </Badge>
               </div>
             ))}
@@ -150,7 +166,7 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
           <EmptyRewardsState />
         )}
       </CardContent>
-      <CardFooter>
+      <CardFooter className="mt-auto pt-2">
         <Button asChild variant="outline" className="w-full">
           <Link to="/rewards">
             View All Rewards
@@ -158,6 +174,14 @@ export function RewardsActivity({ userId }: RewardsActivityProps) {
           </Link>
         </Button>
       </CardFooter>
+    </>
+  );
+
+  return noCard ? (
+    <RewardsContent />
+  ) : (
+    <Card>
+      <RewardsContent />
     </Card>
   );
 } 

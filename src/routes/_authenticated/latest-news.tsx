@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { Header } from '@/components/layout/header'
 import Masonry from 'react-masonry-css'
 import '@/styles/masonry.css' // Import our custom masonry styles
+import { InstagramPostSkeleton } from '@/components/dashboard/InstagramPostSkeleton'; // Import the skeleton component
 
 // Define the structure of an Instagram post based on the API fields
 interface InstagramMedia {
@@ -121,11 +122,6 @@ function LatestNewsComponent() {
               alt={post.caption || 'Instagram album'} 
               className="w-full object-contain"
             />
-            <div className="absolute top-2 right-2 bg-primary text-white p-1 rounded-full">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"></path>
-              </svg>
-            </div>
           </div>
         );
       }
@@ -139,11 +135,6 @@ function LatestNewsComponent() {
               alt={post.caption || 'Instagram album'} 
               className="w-full object-contain"
             />
-            <div className="absolute top-2 right-2 bg-primary text-white p-1 rounded-full">
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"></path>
-              </svg>
-            </div>
           </div>
         );
       }
@@ -204,11 +195,6 @@ function LatestNewsComponent() {
                   </svg>
                 </div>
               </a>
-              {isReel && (
-                <div className="absolute bottom-2 left-2 bg-primary text-white px-2 py-1 rounded text-xs font-semibold">
-                  REEL
-                </div>
-              )}
             </div>
           ) : (
             <div className="w-full min-h-[180px] flex items-center justify-center bg-gray-100 dark:bg-gray-800">
@@ -217,11 +203,6 @@ function LatestNewsComponent() {
               </p>
             </div>
           )}
-          <div className="absolute top-2 right-2 bg-primary text-white p-1 rounded-full">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z"></path>
-            </svg>
-          </div>
         </div>
       );
     }
@@ -237,11 +218,13 @@ function LatestNewsComponent() {
     }
     
     return (
-      <img 
-        src={post.media_url} 
-        alt={post.caption || 'Instagram post'} 
-        className="w-full object-contain"
-      />
+      <div className="relative">
+        <img 
+          src={post.media_url} 
+          alt={post.caption || 'Instagram post'} 
+          className="w-full object-contain"
+        />
+      </div>
     );
   };
 
@@ -253,11 +236,18 @@ function LatestNewsComponent() {
           <h1 className="text-3xl font-bold">What's Happening at Colella</h1>
         </div>
 
-        {/* Loading State */}
+        {/* Loading State - Use Skeletons */}
         {isLoading && (
-          <div className="flex justify-center items-center h-40">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-          </div>
+          <Masonry
+            breakpointCols={breakpointColumnsObj}
+            className="my-masonry-grid"
+            columnClassName="my-masonry-grid-column"
+          >
+            {/* Render multiple skeleton loaders */}
+            {Array.from({ length: 6 }).map((_, index) => (
+              <InstagramPostSkeleton key={index} />
+            ))}
+          </Masonry>
         )}
 
         {/* Error State */}
@@ -282,19 +272,23 @@ function LatestNewsComponent() {
                   columnClassName="my-masonry-grid-column"
                 >
                   {posts.map((post) => (
-                    <div key={post.id} className="relative group bg-white rounded-lg shadow-md overflow-hidden dark:bg-card flex flex-col masonry-item">
-                      <p className="text-xs text-gray-500 dark:text-gray-400 px-4 pt-3 pb-1 group-hover:opacity-0 transition-opacity duration-300">
-                        {formatRelativeTime(post.timestamp)}
-                      </p>
-                      <div className="w-full group-hover:opacity-50 transition-opacity duration-300">
+                    <div key={post.id} className="relative group bg-white rounded-lg shadow-md overflow-hidden dark:bg-card dark:border dark:border-gray-800 flex flex-col masonry-item">
+                      <div className="w-full relative">
                         {renderMedia(post)}
+                        <div className="absolute top-0 left-0 right-0 p-2 bg-gradient-to-b from-black/50 to-transparent">
+                          <p className="text-xs text-white drop-shadow-sm font-medium px-2 py-1">
+                            {formatRelativeTime(post.timestamp)}
+                          </p>
+                        </div>
                       </div>
                       <div className="p-4 flex flex-col flex-grow">
-                        <p className="text-gray-700 text-sm mb-4 dark:text-gray-300 line-clamp-8 group-hover:opacity-0 transition-opacity duration-300">
-                          {post.caption || 'No caption provided'}
-                        </p>
+                        <div className="caption-wrapper mb-4">
+                          <p className="text-gray-700 text-sm dark:text-gray-300 custom-line-clamp-8">
+                            {post.caption || 'No caption provided'}
+                          </p>
+                        </div>
                         <div className="flex-grow"></div>
-                        <div className="flex justify-between items-center pt-2 border-t dark:border-gray-700 group-hover:opacity-0 transition-opacity duration-300">
+                        <div className="flex justify-between items-center pt-2 border-t dark:border-gray-700">
                           <span className="text-gray-500 text-xs dark:text-gray-400">
                             {new Date(post.timestamp).toLocaleDateString()}
                           </span>
@@ -308,25 +302,6 @@ function LatestNewsComponent() {
                           </a>
                         </div>
                       </div>
-                      {post.caption && (
-                        <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg p-4 flex flex-col pointer-events-none">
-                          <div className="overflow-y-auto h-full pointer-events-auto pr-2">
-                            <p className="text-white text-sm">
-                              {post.caption}
-                            </p>
-                          </div>
-                          <div className="pt-2 mt-auto text-right pointer-events-auto">
-                            <a
-                              href={post.permalink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-300 text-sm hover:underline font-semibold"
-                            >
-                              View on Instagram
-                            </a>
-                          </div>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </Masonry>

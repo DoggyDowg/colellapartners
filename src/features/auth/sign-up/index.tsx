@@ -12,7 +12,6 @@ export default function SignUp() {
             Create an account
           </h1>
           <p className='text-sm text-muted-foreground'>
-            Enter your email and password to create an account. <br />
             Already have an account?{' '}
             <Link
               to='/sign-in'

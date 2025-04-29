@@ -1,3 +1,72 @@
 @import "./spinner.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-/* Global styles can be defined here */ 
+/* Global styles can be defined here */
+
+/* Card transition */
+.masonry-item {
+  transition: height 0.3s ease, transform 0.3s ease;
+}
+
+/* Custom line clamp utility */
+.custom-line-clamp-8 {
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Caption container animation */
+.caption-wrapper {
+  max-height: 9em; /* Approximate height for 8 lines + some padding */
+  overflow: hidden;
+  transition: max-height 0.3s ease-in-out;
+}
+
+.masonry-item:hover .caption-wrapper {
+  max-height: 500px; /* Large enough for most captions */
+}
+
+/* Remove line clamp on hover */
+.masonry-item:hover .custom-line-clamp-8 {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+
+/* Card and caption styling */
+.masonry-item {
+  position: relative;
+}
+
+.caption-container {
+  position: relative;
+  z-index: 10;
+  transition: all 0.35s ease;
+}
+
+/* Expand caption upward on hover */
+.masonry-item:hover .caption-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem 1rem 0.5rem 1rem;
+  z-index: 20;
+  max-height: calc(100% - 40px); /* Leave room for timestamp at bottom */
+  overflow-y: auto;
+  /* Hide scrollbar for a cleaner look */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.masonry-item:hover .caption-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* When hovering, dim the image significantly to make text readable */
+.masonry-item:hover .media-container {
+  opacity: 0.15;
+} 

@@ -36,7 +36,7 @@ export function QuickActions() {
           <Button asChild variant="outline" className="flex flex-col h-20 py-2">
             <Link to="/for-sale">
               <IconHome className="h-5 w-5 mb-1" />
-              <span>Properties</span>
+              <span>For Sale</span>
             </Link>
           </Button>
         </div>

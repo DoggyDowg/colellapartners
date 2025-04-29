@@ -14,6 +14,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/_index'
+import { Route as OnboardingImport } from './routes/onboarding'
 import { Route as ForSaleImport } from './routes/for-sale'
 import { Route as DashboardImport } from './routes/dashboard'
 import { Route as AuthImport } from './routes/auth'
@@ -108,6 +109,12 @@ const LoginLazyRoute = LoginLazyImport.update({
   path: '/login',
   getParentRoute: () => rootRoute,
 } as any).lazy(() => import('./routes/login.lazy').then((d) => d.Route))
+
+const OnboardingRoute = OnboardingImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() => import('./routes/onboarding.lazy').then((d) => d.Route))
 
 const ForSaleRoute = ForSaleImport.update({
   id: '/for-sale',
@@ -502,6 +509,13 @@ declare module '@tanstack/react-router' {
       path: '/for-sale'
       fullPath: '/for-sale'
       preLoaderRoute: typeof ForSaleImport
+      parentRoute: typeof rootRoute
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingImport
       parentRoute: typeof rootRoute
     }
     '/login': {
@@ -913,6 +927,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof authAuthRoute
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
+  '/onboarding': typeof OnboardingRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
@@ -960,6 +975,7 @@ export interface FileRoutesByTo {
   '/auth': typeof authAuthRoute
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
+  '/onboarding': typeof OnboardingRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/500': typeof errors500LazyRoute
@@ -1009,6 +1025,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
+  '/onboarding': typeof OnboardingRoute
   '/login': typeof LoginLazyRoute
   '/register': typeof RegisterLazyRoute
   '/(auth)/500': typeof auth500Route
@@ -1062,6 +1079,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/for-sale'
+    | '/onboarding'
     | '/login'
     | '/register'
     | '/500'
@@ -1108,6 +1126,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/for-sale'
+    | '/onboarding'
     | '/login'
     | '/register'
     | '/500'
@@ -1155,6 +1174,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/dashboard'
     | '/for-sale'
+    | '/onboarding'
     | '/login'
     | '/register'
     | '/(auth)/500'
@@ -1208,6 +1228,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   ForSaleRoute: typeof ForSaleRoute
+  OnboardingRoute: typeof OnboardingRoute
   LoginLazyRoute: typeof LoginLazyRoute
   RegisterLazyRoute: typeof RegisterLazyRoute
   auth500Route: typeof auth500Route
@@ -1232,6 +1253,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRouteWithChildren,
   DashboardRoute: DashboardRoute,
   ForSaleRoute: ForSaleRoute,
+  OnboardingRoute: OnboardingRoute,
   LoginLazyRoute: LoginLazyRoute,
   RegisterLazyRoute: RegisterLazyRoute,
   auth500Route: auth500Route,
@@ -1265,6 +1287,7 @@ export const routeTree = rootRoute
         "/auth",
         "/dashboard",
         "/for-sale",
+        "/onboarding",
         "/login",
         "/register",
         "/(auth)/500",
@@ -1329,6 +1352,9 @@ export const routeTree = rootRoute
     },
     "/for-sale": {
       "filePath": "for-sale.tsx"
+    },
+    "/onboarding": {
+      "filePath": "onboarding.tsx"
     },
     "/login": {
       "filePath": "login.lazy.tsx"

@@ -40,9 +40,6 @@ export default function AuthTabs({ defaultTab = 'login' }: AuthTabsProps) {
               <h1 className='text-lg font-semibold tracking-tight'>
                 Create an account
               </h1>
-              <p className='text-sm text-muted-foreground'>
-                Enter your email and password to create an account
-              </p>
             </div>
             <SignUpForm />
           </TabsContent>

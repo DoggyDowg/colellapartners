@@ -44,6 +44,9 @@ export { PartnerDashboard };
 
 function PartnerDashboard() {
   const { user } = useAuth()
+  // Define hardcoded ID for database queries
+  // This is temporary until user authentication is properly fixed
+  const hardcodedId = '7e4b6261-8037-4136-8119-2944dc9453ff'
   const [stats, setStats] = useState({
     totalReferrals: 0,
     pendingReferrals: 0,
@@ -64,14 +67,11 @@ function PartnerDashboard() {
     setError(null)
     
     try {
-      // Use authenticated user's ID instead of hardcoded ID
-      const userId = user.id
-      
       // Fetch referrals
       const { data: referralsData, error: referralsError } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', userId)
+        .eq('referrer_id', hardcodedId)
         .order('created_at', { ascending: false })
       
       if (referralsError) {
@@ -117,7 +117,7 @@ function PartnerDashboard() {
       const { data: achievementsData, error: achievementsError } = await supabase
         .from('achievements') // This table name caused the error
         .select('*')
-        .eq('user_id', userId)
+        .eq('user_id', hardcodedId)
         .order('progress', { ascending: false })
         .limit(1)
       
@@ -134,7 +134,7 @@ function PartnerDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [user])
+  }, [user, hardcodedId])
 
   // Now use it in useEffect
   useEffect(() => {
@@ -304,12 +304,12 @@ function PartnerDashboard() {
 
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
               {/* Latest Referral */}
-              <Card className="col-span-2 md:col-span-1 lg:col-span-1">
+              <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex flex-col h-[350px]">
                 <CardHeader>
                   <CardTitle>Latest Referral</CardTitle>
                   <CardDescription>Your most recent client referral</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-grow">
                   {latestReferral ? (
                     <div>
                       <div className="mb-4 flex items-center justify-between">
@@ -337,7 +337,7 @@ function PartnerDashboard() {
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="mt-auto pt-2">
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/referrals">
                       View All Referrals
@@ -348,17 +348,17 @@ function PartnerDashboard() {
               </Card>
               
               {/* Rewards Activity */}
-              <Card className="col-span-2 md:col-span-1 lg:col-span-1">
-                <RewardsActivity userId={user?.id} />
+              <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex flex-col h-[350px]">
+                <RewardsActivity userId={hardcodedId} noCard={true} />
               </Card>
               
               {/* Next Achievement */}
-              <Card className="col-span-2 md:col-span-2 lg:col-span-1">
+              <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col h-[350px]">
                 <CardHeader>
                   <CardTitle>Next Achievement</CardTitle>
                   <CardDescription>Your progress towards the next milestone</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-grow">
                   {nextAchievement ? (
                     <div>
                       <div className="flex items-center gap-3 mb-4">
@@ -382,7 +382,7 @@ function PartnerDashboard() {
                     </div>
                   )}
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="mt-auto pt-2">
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/achievements">
                       View All Achievements

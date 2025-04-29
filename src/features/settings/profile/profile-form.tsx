@@ -1,8 +1,6 @@
 import { z } from 'zod'
-import { format } from 'date-fns'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { cn } from '@/lib/utils'
 import { toast } from '@/hooks/use-toast'
 import { Button } from '@/components/ui/button'
 import {
@@ -38,16 +36,19 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import {
-  CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
   ZoomInIcon,
   ZoomOutIcon,
   MoveIcon,
   Trash2,
   Camera,
 } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 const profileFormSchema = z.object({
   name: z
@@ -63,8 +64,15 @@ const profileFormSchema = z.object({
       required_error: 'Please enter a valid email.',
     })
     .email(),
-  dob: z.date().optional(),
+  birthday_month: z.string().optional(),
+  birthday_day: z.string().optional(),
   avatar_url: z.string().optional(),
+  phone: z
+    .string()
+    .regex(/^(\+61|0)[4-5]\d{8}$/, {
+      message: 'Please enter a valid Australian mobile number.',
+    })
+    .optional(),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -73,180 +81,24 @@ type ProfileFormValues = z.infer<typeof profileFormSchema>
 const defaultValues: Partial<ProfileFormValues> = {
   name: '',
   email: '',
+  phone: '',
 }
 
 // Maximum file size allowed (10MB)
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-// Custom DatePicker component to fix React hooks rules violations
-function DatePicker({ value, onChange }: { value?: Date, onChange: (date: Date) => void }) {
-  const [month, setMonth] = useState(value?.getMonth() || new Date().getMonth());
-  const [showMonthDropdown, setShowMonthDropdown] = useState(false);
-  const [showCalendar, setShowCalendar] = useState(false);
-  const calendarRef = useRef<HTMLDivElement>(null);
-  
-  // Add a click outside handler
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
-        setShowCalendar(false);
-        setShowMonthDropdown(false);
-      }
-    }
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-  
-  // Array of all months
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  
-  // Get days in month (accounting for leap years)
-  const getDaysInMonth = (month: number) => {
-    // Use current year or default to non-leap year
-    const year = new Date().getFullYear();
-    return new Date(year, month + 1, 0).getDate();
-  };
-  
-  // Create array of days for the selected month
-  const daysInMonth = getDaysInMonth(month);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  
-  // Handle day selection
-  const handleDaySelect = (day: number) => {
-    const date = new Date();
-    date.setMonth(month);
-    date.setDate(day);
-    // Keep the year as current year
-    onChange(date);
-  };
-  
-  // Handle month change
-  const handleMonthChange = (newMonth: number) => {
-    setMonth(newMonth);
-    setShowMonthDropdown(false);
-    
-    // Update the date if already selected
-    if (value) {
-      const newDate = new Date(value);
-      newDate.setMonth(newMonth);
-      // Adjust the day if needed (e.g., March 31 → Feb 28/29)
-      if (newDate.getDate() > getDaysInMonth(newMonth)) {
-        newDate.setDate(getDaysInMonth(newMonth));
-      }
-      onChange(newDate);
-    }
-  };
-  
-  // Check if a day is selected
-  const isDaySelected = (day: number) => {
-    if (!value) return false;
-    return value.getMonth() === month && value.getDate() === day;
-  };
-  
-  return (
-    <div className="relative" ref={calendarRef}>
-      <Button
-        type="button"
-        variant={'outline'}
-        className={cn(
-          'w-[240px] pl-3 text-left font-normal',
-          !value && 'text-muted-foreground'
-        )}
-        onClick={() => setShowCalendar(!showCalendar)}
-      >
-        {value ? (
-          format(value, 'MMM d')
-        ) : (
-          <span>Select your birthday</span>
-        )}
-        <CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
-      </Button>
-      
-      {showCalendar && (
-        <div className="absolute top-full left-0 z-50 mt-1 w-[280px] rounded-md border bg-popover p-0 text-popover-foreground shadow-md outline-none animate-in fade-in-80">
-          <div className="flex items-center justify-between p-2 border-b">
-            <button 
-              className="p-1 rounded-sm hover:bg-muted" 
-              onClick={(e) => {
-                e.preventDefault();
-                setMonth(prev => (prev - 1 + 12) % 12);
-              }}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            
-            <div className="relative">
-              <button 
-                className="flex items-center gap-1 text-base font-medium hover:underline"
-                onClick={(e) => {
-                  e.preventDefault();
-                  setShowMonthDropdown(!showMonthDropdown);
-                }}
-              >
-                {months[month]} <ChevronDown className="h-4 w-4" />
-              </button>
-              
-              {showMonthDropdown && (
-                <div className="absolute top-full left-0 z-50 mt-1 w-32 rounded-md border bg-popover p-2 text-popover-foreground shadow-md max-h-52 overflow-y-auto">
-                  {months.map((monthName, idx) => (
-                    <button
-                      key={idx}
-                      className={cn(
-                        "w-full text-left px-2 py-1 rounded-sm text-sm",
-                        month === idx ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                      )}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleMonthChange(idx);
-                      }}
-                    >
-                      {monthName}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            
-            <button 
-              className="p-1 rounded-sm hover:bg-muted" 
-              onClick={(e) => {
-                e.preventDefault();
-                setMonth(prev => (prev + 1) % 12);
-              }}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-          
-          <div className="p-3 grid grid-cols-7 gap-2 text-center">
-            {days.map((day) => (
-              <button
-                key={day}
-                className={cn(
-                  "h-8 w-8 rounded-md text-sm flex items-center justify-center",
-                  isDaySelected(day) ? "bg-primary text-primary-foreground" : "hover:bg-muted"
-                )}
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleDaySelect(day);
-                  setShowCalendar(false); // Close the calendar after selection
-                }}
-              >
-                {day}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+// Array of all months
+const months = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
+// Get days in month (accounting for leap years)
+const getDaysInMonth = (month: number) => {
+  // Always use 2024 (a leap year) to ensure February has 29 days
+  const year = 2024;
+  return new Date(year, month + 1, 0).getDate();
+};
 
 export default function ProfileForm() {
   const [loading, setLoading] = useState(true)
@@ -354,22 +206,38 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           
           // If profile exists, use it
           if (profile) {
-            // Format date from string to Date object
-            const dob = profile.dob ? new Date(profile.dob) : undefined
+            // Format date from string to Date object if it exists
+            let birthday_month = undefined;
+            let birthday_day = undefined;
+            
+            if (profile.birthday) {
+              try {
+                const birthdayDate = new Date(profile.birthday);
+                // Get month name from the months array
+                birthday_month = months[birthdayDate.getMonth()];
+                // Get day as string
+                birthday_day = String(birthdayDate.getDate());
+              } catch (_error) {
+                // Unable to parse date, will use undefined values
+                setDbDiagnostics(`Failed to parse birthday date from database: ${profile.birthday}`);
+              }
+            }
             
             form.reset({
               name: profile.name || user.user_metadata?.name || '',
               email: profile.email || user.email || '',
-              dob: dob,
+              birthday_month,
+              birthday_day,
               avatar_url: profile.avatar_url || '',
-            })
+              phone: profile.phone || '',
+            });
           } else {
             // No profile found
             form.reset({
               ...defaultValues,
               name: user.user_metadata?.name || '',
               email: user.email || '',
-            })
+            });
           }
         } catch (_fetchErr) {
           setDbDiagnostics(`Exception fetching profile: ${String(_fetchErr)}`)
@@ -885,12 +753,23 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
       }
       
       // Only add these if they exist
-      if (data.dob) {
-        profileData.dob = data.dob.toISOString().split('T')[0] // Format date to YYYY-MM-DD
+      if (data.birthday_month && data.birthday_day) {
+        const monthIndex = months.findIndex(m => m === data.birthday_month);
+        if (monthIndex !== -1) {
+          // Format month with leading zero if needed
+          const month = String(monthIndex + 1).padStart(2, '0');
+          const day = String(data.birthday_day).padStart(2, '0');
+          // Store as MM-DD format (character varying type in database)
+          profileData.birthday = `${month}-${day}`;
+        }
       }
       
       if (avatarUrl) {
         profileData.avatar_url = avatarUrl
+      }
+      
+      if (data.phone) {
+        profileData.phone_number = data.phone // Use phone_number, not phone
       }
       
       // Upsert the profile data
@@ -1024,18 +903,94 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
 
         <FormField
           control={form.control}
-          name='dob'
+          name="birthday_month"
           render={({ field }) => (
-            <FormItem className='flex flex-col'>
+            <FormItem className="flex flex-col">
               <FormLabel>Birthday</FormLabel>
-              <FormControl>
-                <DatePicker 
-                  value={field.value} 
-                  onChange={field.onChange} 
+              <div className="flex space-x-2">
+                <Select
+                  value={field.value}
+                  onValueChange={field.onChange}
+                >
+                  <FormControl>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent 
+                    position="popper" 
+                    align="start" 
+                    side="bottom" 
+                    sideOffset={4}
+                    className="max-h-[200px] overflow-y-auto"
+                  >
+                    {months.map((month) => (
+                      <SelectItem key={month} value={month}>
+                        {month}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <FormField
+                  control={form.control}
+                  name="birthday_day"
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={!form.getValues().birthday_month}
+                    >
+                      <FormControl>
+                        <SelectTrigger className="w-[100px]">
+                          <SelectValue placeholder="Day" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent 
+                        position="popper" 
+                        align="start" 
+                        side="bottom" 
+                        sideOffset={4}
+                        className="max-h-[200px] overflow-y-auto"
+                      >
+                        {form.getValues().birthday_month ? 
+                          Array.from(
+                            { length: getDaysInMonth(months.indexOf(form.getValues().birthday_month || "January")) }, 
+                            (_, i) => (i + 1).toString()
+                          ).map(day => (
+                            <SelectItem key={day} value={day}>
+                              {day}
+                            </SelectItem>
+                          ))
+                          : 
+                          <SelectItem disabled value="placeholder">
+                            Select month first
+                          </SelectItem>
+                        }
+                      </SelectContent>
+                    </Select>
+                  )}
                 />
+              </div>
+              <FormDescription>
+                Your birthday for sending you a special reward. We only need the month and day.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone Number</FormLabel>
+              <FormControl>
+                <Input placeholder="+61 400 000 000" {...field} />
               </FormControl>
               <FormDescription>
-                Add your birthday to receive additional benefits on your special day.
+                Your mobile phone number in Australian format (e.g., +61412345678 or 0412345678).
               </FormDescription>
               <FormMessage />
             </FormItem>

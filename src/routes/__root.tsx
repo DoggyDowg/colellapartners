@@ -11,8 +11,8 @@ import NotFoundError from '@/features/errors/not-found-error'
 import { useAuthStore } from '@/stores/authStore'
 
 // Define public paths that don't require authentication
-// Include root, login, register, and the auth callback
-const publicPaths = ['/', '/auth', '/auth/login', '/auth/register', '/auth/callback']
+// Include root, login, register, onboarding, and the auth callback
+const publicPaths = ['/', '/auth', '/auth/login', '/auth/register', '/auth/callback', '/onboarding']
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient

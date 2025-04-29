@@ -27,8 +27,21 @@ function AuthCallback() {
     // Let Supabase handle the session
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        // Determine where to redirect based on user role
+        // Check if the user needs to complete onboarding
         try {
+          // Get the user profile
+          const { data: profile, error: profileError } = await supabase
+            .from('user_profiles')
+            .select('name, phone_number, birthday')
+            .eq('id', session.user.id)
+            .single();
+          
+          // If no profile exists or missing required fields, redirect to onboarding
+          if (profileError || !profile || !profile.name || !profile.phone_number || !profile.birthday) {
+            navigate({ to: '/onboarding' });
+            return;
+          }
+          
           // If a specific redirect is provided in the URL, use that instead
           if (redirectParam && redirectParam !== '/') {
             navigate({ to: redirectParam });
@@ -69,8 +82,21 @@ function AuthCallback() {
         if (error) throw error;
         
         if (data.session) {
-          // Determine where to redirect based on user role
+          // Check if the user needs to complete onboarding
           try {
+            // Get the user profile
+            const { data: profile, error: profileError } = await supabase
+              .from('user_profiles')
+              .select('name, phone_number, birthday')
+              .eq('id', data.session.user.id)
+              .single();
+            
+            // If no profile exists or missing required fields, redirect to onboarding
+            if (profileError || !profile || !profile.name || !profile.phone_number || !profile.birthday) {
+              navigate({ to: '/onboarding' });
+              return;
+            }
+            
             // If a specific redirect is provided in the URL, use that instead
             if (redirectParam && redirectParam !== '/') {
               navigate({ to: redirectParam });

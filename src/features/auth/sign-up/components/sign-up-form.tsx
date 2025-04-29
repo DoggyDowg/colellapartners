@@ -16,15 +16,13 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
+import { Checkbox } from "@/components/ui/checkbox"
 import supabase from '@/lib/supabase'
 
 type SignUpFormProps = HTMLAttributes<HTMLDivElement>
 
 const formSchema = z
   .object({
-    fullName: z
-      .string()
-      .min(1, { message: 'Please enter your full name' }),
     email: z
       .string()
       .min(1, { message: 'Please enter your email' })
@@ -38,6 +36,8 @@ const formSchema = z
         message: 'Password must be at least 7 characters long',
       }),
     confirmPassword: z.string(),
+    communication_emails: z.boolean().optional().default(false),
+    marketing_emails: z.boolean().optional().default(false),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords don't match.",
@@ -53,10 +53,11 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      fullName: '',
       email: '',
       password: '',
       confirmPassword: '',
+      communication_emails: false,
+      marketing_emails: false,
     },
   })
 
@@ -73,13 +74,15 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       const emailDomain = data.email.split('@')[1]?.toLowerCase()
       const isAdmin = emailDomain ? adminDomains.includes(emailDomain) : false
       
-      // First, sign up without using the trigger
+      // Sign up with email and password
       const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email: data.email,
         password: data.password,
         options: {
+          // Note: We cannot reliably pass email preferences here
+          // as this data is stored in user_metadata, not user_profiles table
+          // We will insert into user_profiles AFTER successful sign up
           data: {
-            display_name: data.fullName,
             is_admin: isAdmin
           }
         }
@@ -89,44 +92,53 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
         throw signUpError
       }
       
-      // If signup was successful, immediately sign in
+      // If signup was successful and user object exists, create profile
       if (signUpData.user) {
+        // Immediately sign in the new user
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: data.password,
         })
         
         if (signInError) {
-          throw signInError
+          // Log sign-in error but proceed to profile creation attempt
+          console.error("Sign in after sign up failed:", signInError);
         }
         
-        // Now call the setup function
+        // Create a profile record with the email preferences
         try {
-          await supabase.rpc('complete_user_setup')
-          
-          // We don't throw if setup fails - we still created the account
-          // Just silently continue
-        } catch (_setupErr) {
-          // Don't throw, just silently continue
+          const { error: profileError } = await supabase
+            .from('user_profiles')
+            .insert({
+              id: signUpData.user.id,
+              email: data.email, // Email is required
+              name: data.email.split('@')[0] || 'New User', // Use part of email as default name
+              communication_emails: data.communication_emails ?? false,
+              marketing_emails: data.marketing_emails ?? false,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+          if (profileError) {
+            // Log error but continue navigation, onboarding will handle missing profile
+            // console.error("Error creating initial profile:", profileError);
+          }
+        } catch (profileCreationError) {
+          // console.error("Exception creating initial profile:", profileCreationError);
         }
         
-        // Redirect based on user role
-        if (isAdmin) {
-          // Redirect admin users to admin dashboard
-          navigate({ to: '/admin' })
-        } else {
-          // Redirect regular users to partner dashboard
-          navigate({ to: '/' })
-        }
+        // Redirect to the onboarding page regardless of profile creation success
+        navigate({ to: '/onboarding' })
+      } else if (signUpData.session === null && signUpData.user === null) {
+        // Handle cases where email confirmation is required
+        setSuccess('Registration successful! Please check your email to confirm your account.')
+        form.reset() // Clear form
       } else {
-        // Show success message if the user needs to confirm email
-        setSuccess('Registration successful! You can now log in with your credentials.')
-        
-        // Clear form
-        form.reset()
+        // Handle unexpected scenarios
+        setError("An unexpected issue occurred during sign up. Please try again.")
       }
-    } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during registration';
+    } catch (err: any) {
+      const errorMessage = err.message || 'An error occurred during registration';
       setError(errorMessage)
     } finally {
       setIsLoading(false)
@@ -172,20 +184,6 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
             
             <FormField
               control={form.control}
-              name='fullName'
-              render={({ field }) => (
-                <FormItem className='space-y-1'>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder='John Doe' {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            
-            <FormField
-              control={form.control}
               name='email'
               render={({ field }) => (
                 <FormItem className='space-y-1'>
@@ -228,9 +226,57 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
               />
             </div>
 
+            <FormField
+              control={form.control}
+              name="communication_emails"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="communication_emails"
+                    />
+                  </FormControl>
+                  <FormLabel htmlFor="communication_emails" className="text-xs font-normal text-muted-foreground">
+                    Ok to send referral & account emails.
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="marketing_emails"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      id="marketing_emails"
+                    />
+                  </FormControl>
+                  <FormLabel htmlFor="marketing_emails" className="text-xs font-normal text-muted-foreground">
+                    Ok to send market updates & offers from Colella Property.
+                  </FormLabel>
+                </FormItem>
+              )}
+            />
+
             <Button className='mt-2' disabled={isLoading}>
-              {isLoading ? 'Creating account...' : 'Create Account'}
+              {isLoading ? 'Creating account...' : 'Continue'}
             </Button>
+
+            <div className="relative my-2"> 
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or continue with Google
+                </span>
+              </div>
+            </div>
 
             <Button
               variant='outline'

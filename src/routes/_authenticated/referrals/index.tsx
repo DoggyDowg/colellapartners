@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import supabase from '../../../lib/supabase';
+import { useAuth } from '../../../hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { 
   Table, 
@@ -19,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { ErrorState } from '../../../components/ui/error-state';
 import { handleError } from '../../../utils/error-handler';
+import { PartnerReferralForm } from '../../../components/referrals/PartnerReferralForm';
 
 // Define interfaces for our data
 interface Referral {
@@ -50,6 +52,7 @@ export const Route = createFileRoute('/_authenticated/referrals/')({
 });
 
 function UserReferrals() {
+  const { user: authUser } = useAuth();
   const [referrals, setReferrals] = useState<Referral[]>([]);
   const [filteredReferrals, setFilteredReferrals] = useState<Referral[]>([]);
   const [loading, setLoading] = useState(true);
@@ -63,38 +66,62 @@ function UserReferrals() {
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  useEffect(() => {
-    fetchReferrals();
-  }, []);
-
-  // Apply search filter when searchQuery changes
-  useEffect(() => {
-    if (referrals.length > 0 && searchQuery) {
-      const query = searchQuery.toLowerCase();
-      const filtered = referrals.filter(
-        referral => 
-          referral.referee_name.toLowerCase().includes(query) ||
-          referral.referee_email.toLowerCase().includes(query) ||
-          referral.referee_type.toLowerCase().includes(query) ||
-          referral.status.toLowerCase().includes(query)
-      );
-      setFilteredReferrals(filtered);
-    } else {
-      setFilteredReferrals(referrals);
-    }
-  }, [referrals, searchQuery]);
-
-  const fetchReferrals = async () => {
+  // Move fetchReferrals to useCallback hook
+  const fetchReferrals = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Use the known working ID, replace with user.id when fixed
-      const hardcodedId = '7e4b6261-8037-4136-8119-2944dc9453ff';
+      if (!authUser || !authUser.id) {
+        const errorMessage = handleError(new Error("Authentication required"), {
+          context: 'UserReferrals.fetchReferrals',
+          toastMessage: 'Please log in to view your referrals',
+          showToast: false
+        });
+        setError(errorMessage);
+        return;
+      }
+
+      // First, get the current user's referrer record
+      let referrerId: string | null = null;
       
+      // Check if user has a referrer record
+      const { data: referrerData, error: referrerError } = await supabase
+        .from('referrers')
+        .select('id')
+        .eq('user_id', authUser.id)
+        .single();
+      
+      if (referrerError && referrerError.code !== 'PGRST116') {
+        // Only show error if it's not "No rows found" error
+        const errorMessage = handleError(referrerError, {
+          context: 'UserReferrals.fetchReferrals',
+          toastMessage: 'Error fetching your referrer profile',
+          showToast: false
+        });
+        setError(errorMessage);
+        return;
+      }
+      
+      if (referrerData) {
+        // Use the existing referrer ID
+        referrerId = referrerData.id;
+      } else {
+        // No referrer record found for this user
+        // We'll just show empty referrals
+        setReferrals([]);
+        setFilteredReferrals([]);
+        setTotalReferrals(0);
+        setCompletedReferrals(0);
+        setPendingReferrals(0);
+        setLoading(false);
+        return;
+      }
+      
+      // Now fetch referrals with the correct referrer ID
       const { data, error } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', hardcodedId)
+        .eq('referrer_id', referrerId)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -135,13 +162,34 @@ function UserReferrals() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [authUser]); // Only depends on authUser
+
+  useEffect(() => {
+    fetchReferrals();
+  }, [fetchReferrals]); // Add fetchReferrals to dependency array
+
+  // Apply search filter when searchQuery changes
+  useEffect(() => {
+    if (referrals.length > 0 && searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const filtered = referrals.filter(
+        referral => 
+          referral.referee_name.toLowerCase().includes(query) ||
+          referral.referee_email.toLowerCase().includes(query) ||
+          referral.referee_type.toLowerCase().includes(query) ||
+          referral.status.toLowerCase().includes(query)
+      );
+      setFilteredReferrals(filtered);
+    } else {
+      setFilteredReferrals(referrals);
+    }
+  }, [referrals, searchQuery]);
 
   const fetchStatusHistory = async (referralId: string) => {
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
-        .from('status_history')
+        .from('referral_status_history')
         .select('*')
         .eq('referral_id', referralId)
         .order('created_at', { ascending: false });
@@ -204,6 +252,24 @@ function UserReferrals() {
     return new Date(dateString).toLocaleDateString(undefined, options);
   };
 
+  // Add this new EmptyReferralsState component
+  const EmptyReferralsState = () => (
+    <Card className="w-full">
+      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+        <img 
+          src="/images/empty-folder.png" 
+          alt="Empty folder" 
+          className="mb-4 opacity-70 w-16 h-16"
+        />
+        <h3 className="text-xl font-semibold mb-2">No referrals yet</h3>
+        <p className="text-muted-foreground mb-6 max-w-md text-sm">
+          When you make a referral, you'll be able to track it here. Let's get started by referring your first client.
+        </p>
+        <PartnerReferralForm onSubmitSuccess={fetchReferrals} />
+      </CardContent>
+    </Card>
+  );
+
   if (error) {
     return (
       <>
@@ -235,120 +301,121 @@ function UserReferrals() {
           </Button>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Referrals
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalReferrals}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Completed Referrals
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{completedReferrals}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Pending Referrals
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{pendingReferrals}</div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-xl">
-              Referrals History
-              {!loading && (
-                <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({filteredReferrals.length} {filteredReferrals.length === 1 ? 'referral' : 'referrals'})
-                </span>
-              )}
-            </CardTitle>
-            <div className="relative w-full max-w-sm">
-              <IconSearch className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder="Search referrals..."
-                className="w-full pl-8"
-                value={searchQuery}
-                onChange={handleSearchChange}
-              />
+        {(referrals.length > 0 || loading) ? (
+          <>
+            <div className="grid gap-4 md:grid-cols-3 mb-6">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Total Referrals
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{totalReferrals}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Completed
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{completedReferrals}</div>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Pending
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{pendingReferrals}</div>
+                </CardContent>
+              </Card>
             </div>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <p>Loading referrals...</p>
-              </div>
-            ) : filteredReferrals.length === 0 ? (
-              <div className="flex justify-center items-center h-32">
-                <p className="text-muted-foreground">
-                  {searchQuery ? 'No matching referrals found' : 'No referrals found'}
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Referee</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredReferrals.map((referral) => (
-                      <TableRow key={referral.id}>
-                        <TableCell>
-                          <div>{new Date(referral.created_at).toLocaleDateString()}</div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="font-medium">{referral.referee_name}</div>
-                          <div className="text-sm text-muted-foreground">{referral.referee_email}</div>
-                        </TableCell>
-                        <TableCell>
-                          {referral.referee_type.charAt(0).toUpperCase() + referral.referee_type.slice(1)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadgeClass(referral.status)}>
-                            {referral.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => openReferralDetails(referral)}
-                          >
-                            Details
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+            
+            <Card className="mb-6">
+              <CardHeader>
+                <div className="flex justify-between items-center">
+                  <CardTitle>Referrals</CardTitle>
+                  <div className="relative w-64">
+                    <IconSearch className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search referrals..."
+                      className="pl-8 w-full bg-background"
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <p>Loading referrals...</p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Referred On</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Action</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredReferrals.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center">
+                              No matching referrals found.
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredReferrals.map(referral => (
+                            <TableRow key={referral.id}>
+                              <TableCell className="font-medium">
+                                {referral.referee_name}
+                              </TableCell>
+                              <TableCell>
+                                {referral.referee_type === 'seller' ? 'Seller' : 'Landlord'}
+                              </TableCell>
+                              <TableCell>
+                                {new Date(referral.created_at).toLocaleDateString()}
+                              </TableCell>
+                              <TableCell>
+                                <Badge className={getStatusBadgeClass(referral.status)}>
+                                  {referral.status}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => openReferralDetails(referral)}
+                                >
+                                  View Details
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <EmptyReferralsState />
+        )}
         
         {/* Referral Details Dialog */}
         {selectedReferral && (

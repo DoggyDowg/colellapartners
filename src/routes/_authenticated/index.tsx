@@ -44,9 +44,8 @@ export { PartnerDashboard };
 
 function PartnerDashboard() {
   const { user } = useAuth()
-  // Define hardcoded ID for database queries
-  // This is temporary until user authentication is properly fixed
-  const hardcodedId = '7e4b6261-8037-4136-8119-2944dc9453ff'
+  // Remove hardcoded ID and replace with state variable for referrer ID
+  const [referrerId, setReferrerId] = useState<string | null>(null)
   const [stats, setStats] = useState({
     totalReferrals: 0,
     pendingReferrals: 0,
@@ -59,6 +58,35 @@ function PartnerDashboard() {
   const [error, setError] = useState<string | null>(null)
   const [hasReferrals, setHasReferrals] = useState(false)
 
+  // Fetch referrer ID first
+  const fetchReferrerId = useCallback(async () => {
+    if (!user) return null
+    
+    try {
+      const { data, error } = await supabase
+        .from('referrers')
+        .select('id')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') {
+        // Only show error if it's not "No rows found" error
+        throw error
+      }
+      
+      if (data) {
+        setReferrerId(data.id)
+        return data.id
+      }
+      
+      return null
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setError(`Error fetching referrer profile: ${errorMessage}`)
+      return null
+    }
+  }, [user])
+
   // Define fetchDashboardData before using it in useEffect
   const fetchDashboardData = useCallback(async () => {
     if (!user) return
@@ -67,11 +95,28 @@ function PartnerDashboard() {
     setError(null)
     
     try {
-      // Fetch referrals
+      // Get referrer ID first
+      const currentReferrerId = referrerId || await fetchReferrerId()
+      
+      if (!currentReferrerId) {
+        // No referrer record found, show empty state
+        setHasReferrals(false)
+        setLatestReferral(null)
+        setStats({
+          totalReferrals: 0,
+          pendingReferrals: 0,
+          completedReferrals: 0,
+          conversionRate: 0
+        })
+        setLoading(false)
+        return
+      }
+      
+      // Fetch referrals with the current referrer ID
       const { data: referralsData, error: referralsError } = await supabase
         .from('referrals')
         .select('*')
-        .eq('referrer_id', hardcodedId)
+        .eq('referrer_id', currentReferrerId)
         .order('created_at', { ascending: false })
       
       if (referralsError) {
@@ -117,7 +162,7 @@ function PartnerDashboard() {
       const { data: achievementsData, error: achievementsError } = await supabase
         .from('achievements') // This table name caused the error
         .select('*')
-        .eq('user_id', hardcodedId)
+        .eq('user_id', user.id) // Use user.id instead of hardcoded ID
         .order('progress', { ascending: false })
         .limit(1)
       
@@ -134,14 +179,21 @@ function PartnerDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [user, hardcodedId])
+  }, [user, referrerId, fetchReferrerId])
 
-  // Now use it in useEffect
+  // Effect to fetch referrer ID when user changes
+  useEffect(() => {
+    if (user) {
+      fetchReferrerId()
+    }
+  }, [user, fetchReferrerId])
+
+  // Now use it in useEffect to fetch dashboard data when referrerId changes
   useEffect(() => {
     if (user) {
       fetchDashboardData()
     }
-  }, [user, fetchDashboardData])
+  }, [user, referrerId, fetchDashboardData])
 
   const getStatusBadgeClass = (status: string) => {
     const statusLower = status?.toLowerCase() || ''
@@ -349,7 +401,7 @@ function PartnerDashboard() {
               
               {/* Rewards Activity */}
               <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex flex-col h-[350px]">
-                <RewardsActivity userId={hardcodedId} noCard={true} />
+                <RewardsActivity userId={referrerId || undefined} noCard={true} />
               </Card>
               
               {/* Next Achievement */}

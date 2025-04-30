@@ -1,7 +1,6 @@
 import {
   IconHelp,
   IconLayoutDashboard,
-  IconNotification,
   IconPalette,
   IconSettings,
   IconUserCog,
@@ -14,6 +13,7 @@ import {
   IconUserCircle,
   IconBuilding,
   IconNews,
+  IconMail,
 } from '@tabler/icons-react'
 import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -137,9 +137,9 @@ export const sidebarData: SidebarData = {
               icon: IconPalette,
             },
             {
-              title: 'Notifications',
-              url: '/settings/notifications',
-              icon: IconNotification,
+              title: 'Communications',
+              url: '/settings/communications',
+              icon: IconMail,
             },
           ],
         },

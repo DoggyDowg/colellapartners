@@ -1,8 +1,8 @@
 import { Outlet } from '@tanstack/react-router'
 import {
-  IconNotification,
   IconPalette,
   IconUser,
+  IconMail,
 } from '@tabler/icons-react'
 import { Separator } from '@/components/ui/separator'
 import { Header } from '@/components/layout/header'
@@ -53,8 +53,8 @@ const sidebarNavItems = [
     href: '/settings/appearance',
   },
   {
-    title: 'Notifications',
-    icon: <IconNotification size={18} />,
-    href: '/settings/notifications',
+    title: 'Communications',
+    icon: <IconMail size={18} />,
+    href: '/settings/communications',
   },
 ]

@@ -32,7 +32,7 @@ export function NavGroupWithIndicators({ title, items }: NavGroup) {
               newSubItem.notificationIndicator = <NotificationDot />;
             }
             
-            if (subItem.title === 'Notifications' && communicationPreferencesMissing) {
+            if (subItem.title === 'Communications' && communicationPreferencesMissing) {
               newSubItem.notificationIndicator = <NotificationDot />;
             }
             

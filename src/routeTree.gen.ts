@@ -75,11 +75,11 @@ const AuthenticatedChatsIndexLazyImport = createFileRoute(
 const AuthenticatedAppsIndexLazyImport = createFileRoute(
   '/_authenticated/apps/',
 )()
-const AuthenticatedSettingsNotificationsLazyImport = createFileRoute(
-  '/_authenticated/settings/notifications',
-)()
 const AuthenticatedSettingsDisplayLazyImport = createFileRoute(
   '/_authenticated/settings/display',
+)()
+const AuthenticatedSettingsCommunicationsLazyImport = createFileRoute(
+  '/_authenticated/settings/communications',
 )()
 const AuthenticatedSettingsAppearanceLazyImport = createFileRoute(
   '/_authenticated/settings/appearance',
@@ -394,17 +394,6 @@ const AuthenticatedAchievementsIndexRoute =
     ),
   )
 
-const AuthenticatedSettingsNotificationsLazyRoute =
-  AuthenticatedSettingsNotificationsLazyImport.update({
-    id: '/notifications',
-    path: '/notifications',
-    getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
-  } as any).lazy(() =>
-    import('./routes/_authenticated/settings/notifications.lazy').then(
-      (d) => d.Route,
-    ),
-  )
-
 const AuthenticatedSettingsDisplayLazyRoute =
   AuthenticatedSettingsDisplayLazyImport.update({
     id: '/display',
@@ -412,6 +401,17 @@ const AuthenticatedSettingsDisplayLazyRoute =
     getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/display.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
+const AuthenticatedSettingsCommunicationsLazyRoute =
+  AuthenticatedSettingsCommunicationsLazyImport.update({
+    id: '/communications',
+    path: '/communications',
+    getParentRoute: () => AuthenticatedSettingsRouteLazyRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/settings/communications.lazy').then(
       (d) => d.Route,
     ),
   )
@@ -700,18 +700,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsAppearanceLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
+    '/_authenticated/settings/communications': {
+      id: '/_authenticated/settings/communications'
+      path: '/communications'
+      fullPath: '/settings/communications'
+      preLoaderRoute: typeof AuthenticatedSettingsCommunicationsLazyImport
+      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
+    }
     '/_authenticated/settings/display': {
       id: '/_authenticated/settings/display'
       path: '/display'
       fullPath: '/settings/display'
       preLoaderRoute: typeof AuthenticatedSettingsDisplayLazyImport
-      parentRoute: typeof AuthenticatedSettingsRouteLazyImport
-    }
-    '/_authenticated/settings/notifications': {
-      id: '/_authenticated/settings/notifications'
-      path: '/notifications'
-      fullPath: '/settings/notifications'
-      preLoaderRoute: typeof AuthenticatedSettingsNotificationsLazyImport
       parentRoute: typeof AuthenticatedSettingsRouteLazyImport
     }
     '/_authenticated/achievements/': {
@@ -784,8 +784,8 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedSettingsRouteLazyRouteChildren {
   AuthenticatedSettingsAppearanceLazyRoute: typeof AuthenticatedSettingsAppearanceLazyRoute
+  AuthenticatedSettingsCommunicationsLazyRoute: typeof AuthenticatedSettingsCommunicationsLazyRoute
   AuthenticatedSettingsDisplayLazyRoute: typeof AuthenticatedSettingsDisplayLazyRoute
-  AuthenticatedSettingsNotificationsLazyRoute: typeof AuthenticatedSettingsNotificationsLazyRoute
   AuthenticatedSettingsIndexLazyRoute: typeof AuthenticatedSettingsIndexLazyRoute
 }
 
@@ -793,10 +793,10 @@ const AuthenticatedSettingsRouteLazyRouteChildren: AuthenticatedSettingsRouteLaz
   {
     AuthenticatedSettingsAppearanceLazyRoute:
       AuthenticatedSettingsAppearanceLazyRoute,
+    AuthenticatedSettingsCommunicationsLazyRoute:
+      AuthenticatedSettingsCommunicationsLazyRoute,
     AuthenticatedSettingsDisplayLazyRoute:
       AuthenticatedSettingsDisplayLazyRoute,
-    AuthenticatedSettingsNotificationsLazyRoute:
-      AuthenticatedSettingsNotificationsLazyRoute,
     AuthenticatedSettingsIndexLazyRoute: AuthenticatedSettingsIndexLazyRoute,
   }
 
@@ -910,8 +910,8 @@ export interface FileRoutesByFullPath {
   '/admin/': typeof AdminIndexRoute
   '/admin/property/$id': typeof AdminPropertyIdRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/communications': typeof AuthenticatedSettingsCommunicationsLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/achievements': typeof AuthenticatedAchievementsIndexRoute
   '/referrals': typeof AuthenticatedReferralsIndexRoute
   '/rewards': typeof AuthenticatedRewardsIndexRoute
@@ -954,8 +954,8 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminIndexRoute
   '/admin/property/$id': typeof AdminPropertyIdRoute
   '/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/settings/communications': typeof AuthenticatedSettingsCommunicationsLazyRoute
   '/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/achievements': typeof AuthenticatedAchievementsIndexRoute
   '/referrals': typeof AuthenticatedReferralsIndexRoute
   '/rewards': typeof AuthenticatedRewardsIndexRoute
@@ -1005,8 +1005,8 @@ export interface FileRoutesById {
   '/admin/property/$id': typeof AdminPropertyIdRoute
   '/_authenticated/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/_authenticated/settings/appearance': typeof AuthenticatedSettingsAppearanceLazyRoute
+  '/_authenticated/settings/communications': typeof AuthenticatedSettingsCommunicationsLazyRoute
   '/_authenticated/settings/display': typeof AuthenticatedSettingsDisplayLazyRoute
-  '/_authenticated/settings/notifications': typeof AuthenticatedSettingsNotificationsLazyRoute
   '/_authenticated/achievements/': typeof AuthenticatedAchievementsIndexRoute
   '/_authenticated/referrals/': typeof AuthenticatedReferralsIndexRoute
   '/_authenticated/rewards/': typeof AuthenticatedRewardsIndexRoute
@@ -1053,8 +1053,8 @@ export interface FileRouteTypes {
     | '/admin/'
     | '/admin/property/$id'
     | '/settings/appearance'
+    | '/settings/communications'
     | '/settings/display'
-    | '/settings/notifications'
     | '/achievements'
     | '/referrals'
     | '/rewards'
@@ -1096,8 +1096,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/admin/property/$id'
     | '/settings/appearance'
+    | '/settings/communications'
     | '/settings/display'
-    | '/settings/notifications'
     | '/achievements'
     | '/referrals'
     | '/rewards'
@@ -1145,8 +1145,8 @@ export interface FileRouteTypes {
     | '/admin/property/$id'
     | '/_authenticated/property/$id'
     | '/_authenticated/settings/appearance'
+    | '/_authenticated/settings/communications'
     | '/_authenticated/settings/display'
-    | '/_authenticated/settings/notifications'
     | '/_authenticated/achievements/'
     | '/_authenticated/referrals/'
     | '/_authenticated/rewards/'
@@ -1347,8 +1347,8 @@ export const routeTree = rootRoute
       "parent": "/_authenticated",
       "children": [
         "/_authenticated/settings/appearance",
+        "/_authenticated/settings/communications",
         "/_authenticated/settings/display",
-        "/_authenticated/settings/notifications",
         "/_authenticated/settings/"
       ]
     },
@@ -1396,12 +1396,12 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/settings/appearance.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
-    "/_authenticated/settings/display": {
-      "filePath": "_authenticated/settings/display.lazy.tsx",
+    "/_authenticated/settings/communications": {
+      "filePath": "_authenticated/settings/communications.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
-    "/_authenticated/settings/notifications": {
-      "filePath": "_authenticated/settings/notifications.lazy.tsx",
+    "/_authenticated/settings/display": {
+      "filePath": "_authenticated/settings/display.lazy.tsx",
       "parent": "/_authenticated/settings"
     },
     "/_authenticated/achievements/": {

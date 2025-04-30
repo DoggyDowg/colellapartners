@@ -16,14 +16,19 @@ export function useProfileCompletion() {
       return;
     }
 
+    let isMounted = true;
+
     async function checkProfileStatus() {
-      setIsLoading(true);
+      if (!isMounted) return;
+      
       try {
         const { data: profile, error: profileError } = await supabase
           .from('user_profiles')
           .select('name, phone_number, birthday')
           .eq('id', user?.id ?? '')
           .single();
+
+        if (!isMounted) return;
 
         // Mark profile as incomplete if any of the required fields are missing
         const incomplete = profileError || !profile || !profile.name || !profile.phone_number || !profile.birthday;
@@ -33,10 +38,9 @@ export function useProfileCompletion() {
         // Only show the dialog if:
         // 1. The profile is incomplete
         // 2. We haven't shown it already this session
-        // 3. We're in the initial loading state
         const alreadyShownThisSession = sessionStorage.getItem(PROFILE_DIALOG_SHOWN_KEY) === 'true';
         
-        if (incomplete && !alreadyShownThisSession && isLoading) {
+        if (incomplete && !alreadyShownThisSession) {
           setIsDialogOpen(true);
           // Mark that we've shown the dialog this session
           sessionStorage.setItem(PROFILE_DIALOG_SHOWN_KEY, 'true');
@@ -44,14 +48,23 @@ export function useProfileCompletion() {
       } catch (_error) {
         // No need to show error to user here, just capture it silently
         // The profile will be treated as incomplete which is the safe default
-        setIsProfileComplete(false);
+        if (isMounted) {
+          setIsProfileComplete(false);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
+    setIsLoading(true);
     checkProfileStatus();
-  }, [user, isLoading]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]); // Remove isLoading from dependencies
 
   const openDialog = () => {
     setIsDialogOpen(true);

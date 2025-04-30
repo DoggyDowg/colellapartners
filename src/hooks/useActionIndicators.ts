@@ -26,6 +26,8 @@ export function useActionIndicators() {
       return;
     }
 
+    let isMounted = true;
+
     async function checkCommunicationPreferences() {
       try {
         // Check if the user has set communication preferences
@@ -34,6 +36,8 @@ export function useActionIndicators() {
           .select('communication_email_opt_in, communication_sms_opt_in')
           .eq('user_id', user?.id ?? '')
           .single();
+
+        if (!isMounted) return;
 
         if (error || !data) {
           // If no preferences found, they need to be set
@@ -47,13 +51,22 @@ export function useActionIndicators() {
         }
       } catch (_error) {
         // Default to showing the indicator if there's an error
-        setCommunicationPreferencesMissing(true);
+        if (isMounted) {
+          setCommunicationPreferencesMissing(true);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     }
 
+    setIsLoading(true);
     checkCommunicationPreferences();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   // Combined indicator for the Settings section - true if any setting needs attention

@@ -1,4 +1,5 @@
 import { LinkProps } from '@tanstack/react-router'
+import { ReactNode } from 'react'
 
 interface User {
   name: string
@@ -19,6 +20,7 @@ interface BaseNavItem {
   disabled?: boolean
   tooltip?: string
   rightIcon?: React.ElementType
+  notificationIndicator?: ReactNode
 }
 
 type NavLink = BaseNavItem & {

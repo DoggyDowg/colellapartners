@@ -81,6 +81,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
                   <span>{item.title}</span>
                   {item.badge && <NavBadge>{item.badge}</NavBadge>}
                   {item.rightIcon && <item.rightIcon className="ml-auto h-4 w-4 text-muted-foreground" />}
+                  {item.notificationIndicator}
                 </SidebarMenuButton>
               </div>
             </TooltipTrigger>
@@ -105,6 +106,7 @@ const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
           <span>{item.title}</span>
           {item.badge && <NavBadge>{item.badge}</NavBadge>}
           {item.rightIcon && <item.rightIcon className="ml-auto h-4 w-4" />}
+          {item.notificationIndicator}
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -133,6 +135,7 @@ const SidebarMenuCollapsible = ({
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
             {item.rightIcon && <item.rightIcon className="ml-auto mr-1 h-4 w-4" />}
             <ChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
+            {item.notificationIndicator}
           </SidebarMenuButton>
         </CollapsibleTrigger>
         <CollapsibleContent className='CollapsibleContent'>
@@ -149,6 +152,7 @@ const SidebarMenuCollapsible = ({
                             <span>{subItem.title}</span>
                             {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
                             {subItem.rightIcon && <subItem.rightIcon className="ml-auto h-4 w-4 text-muted-foreground" />}
+                            {subItem.notificationIndicator}
                           </SidebarMenuSubButton>
                         </div>
                       </TooltipTrigger>
@@ -167,6 +171,7 @@ const SidebarMenuCollapsible = ({
                       <span>{subItem.title}</span>
                       {subItem.badge && <NavBadge>{subItem.badge}</NavBadge>}
                       {subItem.rightIcon && <subItem.rightIcon className="ml-auto h-4 w-4" />}
+                      {subItem.notificationIndicator}
                     </Link>
                   </SidebarMenuSubButton>
                 )}
@@ -199,6 +204,7 @@ const SidebarMenuCollapsedDropdown = ({
             {item.badge && <NavBadge>{item.badge}</NavBadge>}
             {item.rightIcon && <item.rightIcon className="ml-auto mr-1 h-4 w-4" />}
             <ChevronRight className='ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90' />
+            {item.notificationIndicator}
           </SidebarMenuButton>
         </DropdownMenuTrigger>
         <DropdownMenuContent side='right' align='start' sideOffset={4}>
@@ -222,6 +228,7 @@ const SidebarMenuCollapsedDropdown = ({
                         <span className='max-w-52 text-wrap'>{sub.title}</span>
                         {sub.badge && <span className='ml-auto text-xs'>{sub.badge}</span>}
                         {sub.rightIcon && <sub.rightIcon className="ml-auto h-4 w-4 text-muted-foreground" />}
+                        {sub.notificationIndicator}
                       </div>
                     </TooltipTrigger>
                     <TooltipContent side="right">
@@ -238,6 +245,7 @@ const SidebarMenuCollapsedDropdown = ({
                   <span className='max-w-52 text-wrap'>{sub.title}</span>
                   {sub.badge && <span className='ml-auto text-xs'>{sub.badge}</span>}
                   {sub.rightIcon && <sub.rightIcon className="ml-auto h-4 w-4" />}
+                  {sub.notificationIndicator}
                 </Link>
               )}
             </DropdownMenuItem>

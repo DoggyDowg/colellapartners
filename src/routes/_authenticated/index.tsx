@@ -11,6 +11,8 @@ import { Link } from '@tanstack/react-router'
 import { QuickActions } from '../../components/dashboard/QuickActions'
 import { RewardsActivity } from '../../components/dashboard/RewardsActivity'
 import { useAuth } from '../../hooks/useAuth'
+import { useProfileCompletion } from '../../hooks/useProfileCompletion'
+import { ProfileCompletionDialog } from '../../features/auth/profile-completion/profile-completion-dialog'
 import { PartnerReferralForm } from '../../components/referrals/PartnerReferralForm'
 
 // Define interfaces for our data
@@ -44,6 +46,7 @@ export { PartnerDashboard };
 
 function PartnerDashboard() {
   const { user } = useAuth()
+  const { isDialogOpen, closeDialog, handleProfileCompleted } = useProfileCompletion()
   // Remove hardcoded ID and replace with state variable for referrer ID
   const [referrerId, setReferrerId] = useState<string | null>(null)
   const [stats, setStats] = useState({
@@ -266,6 +269,13 @@ function PartnerDashboard() {
   return (
     <>
       <Header title="Dashboard" />
+      
+      {/* Profile Completion Dialog */}
+      <ProfileCompletionDialog 
+        open={isDialogOpen} 
+        onOpenChange={closeDialog}
+        onComplete={handleProfileCompleted}
+      />
       
       <div className="container py-6">
         {/* Quick Actions */}

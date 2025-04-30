@@ -6,7 +6,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from '@/components/ui/sidebar'
-import { NavGroup } from '@/components/layout/nav-group'
+import { NavGroupWithIndicators } from '@/components/layout/nav-group-with-indicators'
 import { NavUser } from '@/components/layout/nav-user'
 import { TeamSwitcher } from '@/components/layout/team-switcher'
 import { sidebarData } from './data/sidebar-data'
@@ -108,7 +108,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarHeader>
         <SidebarContent>
           {filterNonAdminItems(sidebarData.navGroups).map((props) => (
-            <NavGroup key={props.title} {...props} />
+            <NavGroupWithIndicators key={props.title} {...props} />
           ))}
         </SidebarContent>
         <SidebarFooter>
@@ -126,7 +126,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         {navGroups.map((props) => (
-          <NavGroup key={props.title} {...props} />
+          <NavGroupWithIndicators key={props.title} {...props} />
         ))}
       </SidebarContent>
       <SidebarFooter>

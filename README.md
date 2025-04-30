@@ -17,6 +17,10 @@ I've been creating dashboard UIs at work and for my personal projects. I always 
 - Global Search Command
 - 10+ pages
 - Extra custom components
+- **Action Indicator Dots**: Visual cues (notification dots) in the sidebar guide users to sections requiring attention. Currently implemented for:
+    - **Profile Completion**: A dot appears on `Settings` and the `Profile` submenu if the user's name, phone, or birthday is missing.
+    - **Communication Preferences**: A dot appears on `Settings` and the `Notifications` submenu if the user hasn't set their email/SMS opt-in preferences.
+    - See `NotificationDot`, `useActionIndicators`, and `NavGroupWithIndicators` for implementation details.
 
 ## Tech Stack
 

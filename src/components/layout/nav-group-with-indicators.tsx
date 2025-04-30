@@ -3,6 +3,7 @@ import { NavGroup as OriginalNavGroup } from './nav-group';
 import { type NavGroup } from './types';
 import { useActionIndicators } from '@/hooks/useActionIndicators';
 import { NotificationDot } from '@/components/ui/notification-dot';
+import { useNotifications } from '@/hooks/useNotifications';
 
 export function NavGroupWithIndicators({ title, items }: NavGroup) {
   const { 
@@ -10,6 +11,8 @@ export function NavGroupWithIndicators({ title, items }: NavGroup) {
     communicationPreferencesMissing, 
     hasSettingsActions 
   } = useActionIndicators();
+  
+  const { unreadCount } = useNotifications();
 
   // Deep clone and augment navigation items with notification indicators
   const enhancedItems = useMemo(() => {
@@ -41,9 +44,18 @@ export function NavGroupWithIndicators({ title, items }: NavGroup) {
         }
       }
       
+      // Add notification badge to Notifications item
+      if (item.title === 'Notifications' && unreadCount > 0) {
+        newItem.notificationIndicator = (
+          <div className="flex items-center justify-center ml-auto rounded-full bg-red-500 text-white text-xs font-medium min-w-5 h-5 px-1">
+            {unreadCount > 99 ? '99+' : unreadCount}
+          </div>
+        );
+      }
+      
       return newItem;
     });
-  }, [items, profileIncomplete, communicationPreferencesMissing, hasSettingsActions]);
+  }, [items, profileIncomplete, communicationPreferencesMissing, hasSettingsActions, unreadCount]);
   
   return <OriginalNavGroup title={title} items={enhancedItems} />;
 } 

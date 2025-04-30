@@ -32,6 +32,7 @@ import { Route as AdminReferralsImport } from './routes/admin/referrals'
 import { Route as AdminRafflesImport } from './routes/admin/raffles'
 import { Route as AdminPropertiesImport } from './routes/admin/properties'
 import { Route as AdminEventsImport } from './routes/admin/events'
+import { Route as AuthenticatedNotificationsImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedLatestNewsImport } from './routes/_authenticated/latest-news'
 import { Route as authSignInImport } from './routes/(auth)/sign-in'
 import { Route as authOtpImport } from './routes/(auth)/otp'
@@ -278,6 +279,14 @@ const AdminEventsRoute = AdminEventsImport.update({
   path: '/events',
   getParentRoute: () => AdminRoute,
 } as any)
+
+const AuthenticatedNotificationsRoute = AuthenticatedNotificationsImport.update(
+  {
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any,
+)
 
 const AuthenticatedLatestNewsRoute = AuthenticatedLatestNewsImport.update({
   id: '/latest-news',
@@ -530,6 +539,13 @@ declare module '@tanstack/react-router' {
       path: '/latest-news'
       fullPath: '/latest-news'
       preLoaderRoute: typeof AuthenticatedLatestNewsImport
+      parentRoute: typeof AuthenticatedRouteImport
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsImport
       parentRoute: typeof AuthenticatedRouteImport
     }
     '/admin/events': {
@@ -807,6 +823,7 @@ const AuthenticatedSettingsRouteLazyRouteWithChildren =
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedLatestNewsRoute: typeof AuthenticatedLatestNewsRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyIdLazyRoute: typeof AuthenticatedPropertyIdLazyRoute
@@ -822,6 +839,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedLatestNewsRoute: AuthenticatedLatestNewsRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
@@ -888,6 +906,7 @@ export interface FileRoutesByFullPath {
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
   '/latest-news': typeof AuthenticatedLatestNewsRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -933,6 +952,7 @@ export interface FileRoutesByTo {
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
   '/latest-news': typeof AuthenticatedLatestNewsRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -981,6 +1001,7 @@ export interface FileRoutesById {
   '/(auth)/otp': typeof authOtpRoute
   '/(auth)/sign-in': typeof authSignInRoute
   '/_authenticated/latest-news': typeof AuthenticatedLatestNewsRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/admin/events': typeof AdminEventsRoute
   '/admin/properties': typeof AdminPropertiesRoute
   '/admin/raffles': typeof AdminRafflesRoute
@@ -1031,6 +1052,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/sign-in'
     | '/latest-news'
+    | '/notifications'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1075,6 +1097,7 @@ export interface FileRouteTypes {
     | '/otp'
     | '/sign-in'
     | '/latest-news'
+    | '/notifications'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1121,6 +1144,7 @@ export interface FileRouteTypes {
     | '/(auth)/otp'
     | '/(auth)/sign-in'
     | '/_authenticated/latest-news'
+    | '/_authenticated/notifications'
     | '/admin/events'
     | '/admin/properties'
     | '/admin/raffles'
@@ -1241,6 +1265,7 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/route.tsx",
       "children": [
         "/_authenticated/latest-news",
+        "/_authenticated/notifications",
         "/_authenticated/settings",
         "/_authenticated/",
         "/_authenticated/property/$id",
@@ -1301,6 +1326,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/latest-news": {
       "filePath": "_authenticated/latest-news.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/notifications": {
+      "filePath": "_authenticated/notifications.tsx",
       "parent": "/_authenticated"
     },
     "/admin/events": {

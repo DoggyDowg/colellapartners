@@ -14,11 +14,13 @@ import {
   IconBuilding,
   IconNews,
   IconMail,
+  IconBell,
 } from '@tabler/icons-react'
 import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ColellaSiteIcon } from '../ColellaSiteIcon'
 
+// We'll handle the notification indicator in a different way since we can't use JSX in a .ts file
 export const sidebarData: SidebarData = {
   user: {
     name: 'admin',
@@ -122,6 +124,11 @@ export const sidebarData: SidebarData = {
     {
       title: 'Other',
       items: [
+        {
+          title: 'Notifications',
+          url: '/notifications',
+          icon: IconBell,
+        },
         {
           title: 'Settings',
           icon: IconSettings,

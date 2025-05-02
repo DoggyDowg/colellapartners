@@ -4,7 +4,7 @@ import { Separator } from '@/components/ui/separator'
 interface ContentSectionProps {
   title: string
   desc: string
-  children: React.JSX.Element
+  children: React.ReactNode
 }
 
 export default function ContentSection({

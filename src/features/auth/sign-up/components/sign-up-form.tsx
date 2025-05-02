@@ -1,4 +1,4 @@
-import { HTMLAttributes, useState } from 'react'
+import { HTMLAttributes, useState, useEffect } from 'react'
 import { z } from 'zod'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,8 +19,16 @@ import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import { Checkbox } from "@/components/ui/checkbox"
 import supabase from '@/lib/supabase'
+import { CheckCircle2, XCircle } from 'lucide-react'
 
 type SignUpFormProps = HTMLAttributes<HTMLDivElement>
+
+// --- Password Requirements Constants (consistent with settings) ---
+const MIN_LENGTH = 8;
+const REGEX_UPPERCASE = /[A-Z]/;
+const REGEX_LOWERCASE = /[a-z]/;
+const REGEX_NUMBER = /[0-9]/;
+const REQUIREMENTS_TEXT = "Min 8 chars, upper, lower, number";
 
 const formSchema = z
   .object({
@@ -29,13 +38,13 @@ const formSchema = z
       .email({ message: 'Invalid email address' }),
     password: z
       .string()
-      .min(1, {
-        message: 'Please enter your password',
-      })
-      .min(7, {
-        message: 'Password must be at least 7 characters long',
-      }),
-    confirmPassword: z.string(),
+      .min(1, { message: 'Please enter your password' })
+      // Add complexity checks
+      .min(MIN_LENGTH, { message: `Password must be at least ${MIN_LENGTH} characters long` })
+      .regex(REGEX_UPPERCASE, { message: 'Password must contain at least one uppercase letter' })
+      .regex(REGEX_LOWERCASE, { message: 'Password must contain at least one lowercase letter' })
+      .regex(REGEX_NUMBER, { message: 'Password must contain at least one number' }),
+    confirmPassword: z.string().min(1, { message: 'Please confirm your password' }), // Ensure confirm is not empty
     communication_emails: z.boolean().optional().default(false),
     marketing_emails: z.boolean().optional().default(false),
   })
@@ -49,6 +58,9 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const navigate = useNavigate()
+  
+  // --- State for concise complexity feedback ---
+  const [complexityMet, setComplexityMet] = useState(false);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -56,10 +68,23 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
       email: '',
       password: '',
       confirmPassword: '',
-      communication_emails: false,
-      marketing_emails: false,
+      communication_emails: true,
+      marketing_emails: true,
     },
+    mode: 'onChange', // Validate on change
   })
+  
+  // --- Watch password field ---
+  const passwordValue = form.watch('password');
+
+  // --- Effect to check complexity --- 
+  useEffect(() => {
+    const isLengthMet = passwordValue.length >= MIN_LENGTH;
+    const isUpperMet = REGEX_UPPERCASE.test(passwordValue);
+    const isLowerMet = REGEX_LOWERCASE.test(passwordValue);
+    const isNumberMet = REGEX_NUMBER.test(passwordValue);
+    setComplexityMet(isLengthMet && isUpperMet && isLowerMet && isNumberMet);
+  }, [passwordValue]);
 
   async function onSubmit(data: z.infer<typeof formSchema>) {
     setIsLoading(true)
@@ -207,7 +232,6 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
                     <FormControl>
                       <PasswordInput placeholder='********' {...field} />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
@@ -225,6 +249,23 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
                 )}
               />
             </div>
+
+            {(passwordValue.length > 0 || form.formState.dirtyFields.password) && (
+              <FormDescription className={`flex items-center text-xs mt-1 ${complexityMet ? 'text-green-600' : 'text-muted-foreground'}`}>
+                {complexityMet ? (
+                   <CheckCircle2 className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                ) : (
+                   <XCircle className="mr-1.5 h-3 w-3 flex-shrink-0" />
+                )}
+                {REQUIREMENTS_TEXT}
+              </FormDescription>
+            )}
+
+            {form.formState.errors.password && (
+              <p className="text-sm font-medium text-destructive">
+                {form.formState.errors.password.message}
+              </p>
+            )}
 
             <FormField
               control={form.control}

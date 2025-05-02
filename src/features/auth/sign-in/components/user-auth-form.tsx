@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
 import supabase from '@/lib/supabase'
-import { Link } from '@tanstack/react-router'
+import { ForgotPasswordDialog } from '../../forgot-password/components/forgot-password-dialog'
 
 type UserAuthFormProps = HTMLAttributes<HTMLDivElement>
 
@@ -40,6 +40,7 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const [isForgotDialogOpen, setIsForgotDialogOpen] = useState(false)
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -138,12 +139,13 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
                 <FormItem className='space-y-1'>
                   <div className='flex items-center justify-between'>
                     <FormLabel>Password</FormLabel>
-                    <Link
-                      to='/forgot-password'
-                      className='text-sm font-medium text-muted-foreground hover:opacity-75'
+                    <button
+                      type="button"
+                      onClick={() => setIsForgotDialogOpen(true)}
+                      className='text-xs font-light text-muted-foreground hover:opacity-75'
                     >
                       Forgot password?
-                    </Link>
+                    </button>
                   </div>
                   <FormControl>
                     <PasswordInput placeholder='********' {...field} />
@@ -180,6 +182,11 @@ export function UserAuthForm({ className, ...props }: UserAuthFormProps) {
           </div>
         </form>
       </Form>
+      
+      <ForgotPasswordDialog 
+        open={isForgotDialogOpen} 
+        onOpenChange={setIsForgotDialogOpen} 
+      />
     </div>
   )
 }

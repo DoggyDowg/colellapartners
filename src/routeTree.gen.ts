@@ -45,6 +45,7 @@ import { Route as AdminPropertyIdImport } from './routes/admin/property.$id'
 
 // Create Virtual Routes
 
+const UpdatePasswordLazyImport = createFileRoute('/update-password')()
 const errors503LazyImport = createFileRoute('/(errors)/503')()
 const errors500LazyImport = createFileRoute('/(errors)/500')()
 const errors404LazyImport = createFileRoute('/(errors)/404')()
@@ -95,6 +96,14 @@ const IndexRoute = IndexImport.update({
   id: '/_index',
   getParentRoute: () => rootRoute,
 } as any)
+
+const UpdatePasswordLazyRoute = UpdatePasswordLazyImport.update({
+  id: '/update-password',
+  path: '/update-password',
+  getParentRoute: () => rootRoute,
+} as any).lazy(() =>
+  import('./routes/update-password.lazy').then((d) => d.Route),
+)
 
 const OnboardingRoute = OnboardingImport.update({
   id: '/onboarding',
@@ -506,6 +515,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingImport
       parentRoute: typeof rootRoute
     }
+    '/update-password': {
+      id: '/update-password'
+      path: '/update-password'
+      fullPath: '/update-password'
+      preLoaderRoute: typeof UpdatePasswordLazyImport
+      parentRoute: typeof rootRoute
+    }
     '/(auth)/500': {
       id: '/(auth)/500'
       path: '/500'
@@ -902,6 +918,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/update-password': typeof UpdatePasswordLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -948,6 +965,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/update-password': typeof UpdatePasswordLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
   '/sign-in': typeof authSignInRoute
@@ -996,6 +1014,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/update-password': typeof UpdatePasswordLazyRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/auth': typeof authAuthRoute
   '/(auth)/otp': typeof authOtpRoute
@@ -1048,6 +1067,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/update-password'
     | '/500'
     | '/otp'
     | '/sign-in'
@@ -1093,6 +1113,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/update-password'
     | '/500'
     | '/otp'
     | '/sign-in'
@@ -1139,6 +1160,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/update-password'
     | '/(auth)/500'
     | '/(auth)/auth'
     | '/(auth)/otp'
@@ -1191,6 +1213,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   ForSaleRoute: typeof ForSaleRoute
   OnboardingRoute: typeof OnboardingRoute
+  UpdatePasswordLazyRoute: typeof UpdatePasswordLazyRoute
   auth500Route: typeof auth500Route
   authAuthRoute: typeof authAuthRoute
   authOtpRoute: typeof authOtpRoute
@@ -1214,6 +1237,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   ForSaleRoute: ForSaleRoute,
   OnboardingRoute: OnboardingRoute,
+  UpdatePasswordLazyRoute: UpdatePasswordLazyRoute,
   auth500Route: auth500Route,
   authAuthRoute: authAuthRoute,
   authOtpRoute: authOtpRoute,
@@ -1246,6 +1270,7 @@ export const routeTree = rootRoute
         "/dashboard",
         "/for-sale",
         "/onboarding",
+        "/update-password",
         "/(auth)/500",
         "/(auth)/auth",
         "/(auth)/otp",
@@ -1311,6 +1336,9 @@ export const routeTree = rootRoute
     },
     "/onboarding": {
       "filePath": "onboarding.tsx"
+    },
+    "/update-password": {
+      "filePath": "update-password.lazy.tsx"
     },
     "/(auth)/500": {
       "filePath": "(auth)/500.tsx"

@@ -30,6 +30,8 @@ import {
   TableHeader,
   TableRow,
 } from "../../components/ui/table"
+import { PartnerDetailsDialog, Referrer } from '../../components/admin/PartnerDetailsDialog'
+import { formatDistance, parseISO } from 'date-fns'
 
 // Import our app CSS to ensure the spinner animations are loaded
 import '../../app.css'
@@ -153,6 +155,8 @@ function AdminDashboard() {
   const [rankingLoading, setRankingLoading] = useState(false);
   const [showRankingDropdown, setShowRankingDropdown] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const [isPartnerDialogOpen, setIsPartnerDialogOpen] = useState(false);
+  const [selectedPartner, setSelectedPartner] = useState<Referrer | null>(null);
 
   // Chart configs for the different charts
   const referralChartConfig = {
@@ -795,6 +799,78 @@ function AdminDashboard() {
     };
   }, [dropdownRef]);
 
+  // Utility functions for PartnerDetailsDialog
+  const formatTimeAgo = (dateString: string) => {
+    try {
+      const date = parseISO(dateString);
+      return formatDistance(date, new Date(), { addSuffix: true });
+    } catch (error) {
+      return "Invalid date";
+    }
+  };
+  
+  const parseNotes = (notesJson: string): { user: string; date: string; content: string }[] => {
+    try {
+      return JSON.parse(notesJson);
+    } catch (error) {
+      return [];
+    }
+  };
+  
+  const getInitials = (name: string): string => {
+    if (!name) return '??';
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+  
+  const formatDate = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString();
+    } catch (error) {
+      return "Invalid date";
+    }
+  };
+  
+  const getStatusBadgeClass = (status: string): string => {
+    switch (status?.toLowerCase()) {
+      case 'settled':
+        return 'bg-green-100 text-green-800';
+      case 'signed up':
+        return 'bg-blue-100 text-blue-800';
+      case 'contacted':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+  
+  // Function to open the partner details dialog
+  const openPartnerDetails = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('referrers')
+        .select('*')
+        .eq('id', userId)
+        .single();
+        
+      if (error) throw error;
+      
+      if (data) {
+        setSelectedPartner(data as Referrer);
+        setIsPartnerDialogOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching partner details:', error);
+    }
+  };
+
   return (
     <>
       <AdminCheck />
@@ -1030,7 +1106,14 @@ function AdminDashboard() {
                               index + 1
                             )}
                           </TableCell>
-                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell className="font-medium">
+                            <button 
+                              className="text-primary hover:underline text-left font-medium"
+                              onClick={() => openPartnerDetails(user.id)}
+                            >
+                              {user.name}
+                            </button>
+                          </TableCell>
                           <TableCell>{user.email}</TableCell>
                           <TableCell className="text-right">{formatRankingValue(user, rankingMetric)}</TableCell>
                         </TableRow>
@@ -1225,6 +1308,18 @@ function AdminDashboard() {
           </>
         )}
       </div>
+      
+      {/* Partner Details Dialog */}
+      <PartnerDetailsDialog
+        open={isPartnerDialogOpen}
+        onOpenChange={setIsPartnerDialogOpen}
+        referrer={selectedPartner}
+        formatTimeAgo={formatTimeAgo}
+        parseNotes={parseNotes}
+        getInitials={getInitials}
+        formatDate={formatDate}
+        getStatusBadgeClass={getStatusBadgeClass}
+      />
     </>
   );
 } 

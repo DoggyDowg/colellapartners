@@ -21,7 +21,15 @@ import {
 import { AdminCheck } from '../../components/admin/AdminCheck'
 import { ChartContainer, ChartTooltip } from '../../components/ui/chart'
 import { Spinner } from '../../components/ui/spinner'
-import { Ticket, Users, Gift } from 'lucide-react'
+import { Ticket, Users, Gift, Trophy, ChevronDown } from 'lucide-react'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../../components/ui/table"
 
 // Import our app CSS to ensure the spinner animations are loaded
 import '../../app.css'
@@ -34,7 +42,7 @@ export const Route = createFileRoute('/admin/')({
 type TimePeriod = '7d' | '30d' | '90d' | '6m' | '1y' | 'all'
 
 // Set this to false to ensure we're using real data
-const useMockData = true;
+const useMockData = false;
 
 // Referral types for filtering
 type ReferralType = 'all' | 'seller' | 'landlord'
@@ -107,6 +115,18 @@ interface RewardData {
   timestamp: number;
 }
 
+// Define types for user rankings
+interface RankedUser {
+  id: string;
+  name: string;
+  email: string;
+  rewardAmount: number;
+  referralCount: number;
+  successfulReferrals: number;
+}
+
+type RankingMetric = 'rewardAmount' | 'referralCount' | 'successfulReferrals';
+
 // Dashboard component with all the metrics and features
 function AdminDashboard() {
   const [totalReferrals, setTotalReferrals] = useState(0);
@@ -128,6 +148,11 @@ function AdminDashboard() {
     seller: 0,
     landlord: 0
   });
+  const [topUsers, setTopUsers] = useState<RankedUser[]>([]);
+  const [rankingMetric, setRankingMetric] = useState<RankingMetric>('rewardAmount');
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [showRankingDropdown, setShowRankingDropdown] = useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Chart configs for the different charts
   const referralChartConfig = {
@@ -431,7 +456,8 @@ function AdminDashboard() {
         const { data: pendingRewardsData } = await supabase
           .from('rewards')
           .select('amount')
-          .eq('status', 'pending');
+          .eq('status', 'pending')
+          .gte('created_at', startDate.toISOString());
         
         setPendingRewards(pendingRewardsData?.length || 0);
         
@@ -439,11 +465,12 @@ function AdminDashboard() {
         const { data: paidRewardsData } = await supabase
           .from('rewards')
           .select('amount')
-          .eq('status', 'paid');
+          .eq('status', 'paid')
+          .gte('created_at', startDate.toISOString());
         
-        // Calculate total rewards amount (pending + paid)
-        const pendingAmount = pendingRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
-        const paidAmount = paidRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount), 0) || 0;
+        // Calculate total rewards amount (pending + paid) for the selected period
+        const pendingAmount = pendingRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount || '0'), 0) || 0;
+        const paidAmount = paidRewardsData?.reduce((sum, reward) => sum + parseFloat(reward.amount || '0'), 0) || 0;
         
         setPendingRewardsAmount(pendingAmount);
         setPaidRewardsAmount(paidAmount);
@@ -453,7 +480,7 @@ function AdminDashboard() {
         try {
           const { data: referralsData, error: _referralsError } = await supabase
             .from('referrals')
-            .select('created_at, referee_type, status')
+            .select('id, referrer_id, status, referee_type, created_at')
             .gte('created_at', startDate.toISOString());
             
           if (_referralsError) throw _referralsError;
@@ -511,9 +538,147 @@ function AdminDashboard() {
     }
   }, [selectedTimePeriod, processRewardsData, processReferralsData, generateTrendData]);
 
+  // Define fetchUserRankings as a useCallback
+  const fetchUserRankings = useCallback(async () => {
+    setRankingLoading(true);
+    try {
+      const { startDate } = getDateRange(selectedTimePeriod);
+      
+      if (useMockData) {
+        // Generate mock user data for testing
+        const mockUsers: RankedUser[] = [
+          {
+            id: '1',
+            name: 'John Smith',
+            email: 'john.smith@example.com',
+            rewardAmount: 5800,
+            referralCount: 24,
+            successfulReferrals: 12
+          },
+          {
+            id: '2',
+            name: 'Sarah Johnson',
+            email: 'sarah.j@example.com',
+            rewardAmount: 4250,
+            referralCount: 18,
+            successfulReferrals: 9
+          },
+          {
+            id: '3',
+            name: 'Michael Chen',
+            email: 'm.chen@example.com',
+            rewardAmount: 3600,
+            referralCount: 15,
+            successfulReferrals: 8
+          },
+          {
+            id: '4',
+            name: 'Emma Wilson',
+            email: 'emma.w@example.com',
+            rewardAmount: 2950,
+            referralCount: 13,
+            successfulReferrals: 7
+          },
+          {
+            id: '5',
+            name: 'Alex Rodriguez',
+            email: 'alex.r@example.com',
+            rewardAmount: 2400,
+            referralCount: 10,
+            successfulReferrals: 5
+          }
+        ];
+        
+        setTopUsers(mockUsers);
+      } else {
+        // Step 1: Fetch all referrers basic info
+        const { data: referrersData, error: referrersError } = await supabase
+          .from('referrers')
+          .select(`id, full_name, email`);
+          
+        if (referrersError) throw referrersError;
+        if (!referrersData) throw new Error("No referrers data found");
+
+        // Step 2: Fetch relevant referrals within the date range
+        const { data: referralsData, error: referralsError } = await supabase
+          .from('referrals')
+          .select('id, referrer_id, status, referee_type, created_at')
+          .gte('created_at', startDate.toISOString());
+          
+        if (referralsError) throw referralsError;
+
+        // Step 3: Fetch relevant rewards within the date range
+        const { data: rewardsData, error: rewardsError } = await supabase
+          .from('rewards')
+          .select('id, referrer_id, amount, status, created_at')
+          .gte('created_at', startDate.toISOString());
+
+        if (rewardsError) throw rewardsError;
+        
+        // Step 4: Process and combine the data
+        const referralsByReferrer: Record<string, { id: string; status: string; referee_type: string; }[]> = {};
+        (referralsData || []).forEach(ref => {
+          if (!ref.referrer_id) return;
+          if (!referralsByReferrer[ref.referrer_id]) {
+            referralsByReferrer[ref.referrer_id] = [];
+          }
+          referralsByReferrer[ref.referrer_id].push({ 
+            id: ref.id, 
+            status: ref.status, 
+            referee_type: ref.referee_type || 'seller' // Default if null, adjust if needed
+          });
+        });
+
+        const rewardsByReferrer: Record<string, { amount: string; status: string; }[]> = {};
+        (rewardsData || []).forEach(rew => {
+          if (!rew.referrer_id) return;
+          if (!rewardsByReferrer[rew.referrer_id]) {
+            rewardsByReferrer[rew.referrer_id] = [];
+          }
+          rewardsByReferrer[rew.referrer_id].push({ amount: rew.amount, status: rew.status });
+        });
+
+        const processedUsers: RankedUser[] = referrersData.map(referrer => {
+          const userReferrals = referralsByReferrer[referrer.id] || [];
+          const userRewards = rewardsByReferrer[referrer.id] || [];
+          
+          const referralCount = userReferrals.length;
+          const successfulReferrals = userReferrals.filter(ref => 
+            (ref.referee_type === 'seller' && ref.status === 'Settled') ||
+            (ref.referee_type === 'landlord' && ref.status === 'Signed Up')
+          ).length;
+          const rewardAmount = userRewards.reduce((sum, reward) => sum + parseFloat(reward.amount || '0'), 0);
+          
+          return {
+            id: referrer.id,
+            name: referrer.full_name || 'Unknown',
+            email: referrer.email || '-',
+            referralCount,
+            successfulReferrals,
+            rewardAmount
+          };
+        });
+        
+        // Sort by the selected metric
+        const sortedUsers = [...processedUsers].sort((a, b) => b[rankingMetric] - a[rankingMetric]);
+        
+        // Take top 5 users
+        setTopUsers(sortedUsers.slice(0, 5));
+      }
+      
+      setRankingLoading(false);
+    } catch (error) {
+      console.error('Error fetching user rankings:', error);
+      // Ensure error state is handled if needed, e.g., setError('Failed to load rankings');
+      setTopUsers([]); // Clear rankings on error
+      setRankingLoading(false);
+    }
+  }, [selectedTimePeriod, rankingMetric]); // Keep dependencies minimal
+
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData, selectedTimePeriod]);
+    fetchUserRankings();
+  }, [fetchDashboardData, fetchUserRankings, selectedTimePeriod, rankingMetric]);
 
   // Process data whenever it changes
   useEffect(() => {
@@ -585,6 +750,50 @@ function AdminDashboard() {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  // Get display label for ranking metric
+  const getRankingMetricLabel = (metric: RankingMetric): string => {
+    switch (metric) {
+      case 'rewardAmount':
+        return 'Reward Amount';
+      case 'referralCount':
+        return 'Total Referrals';
+      case 'successfulReferrals':
+        return 'Successful Referrals';
+      default:
+        return 'Ranking';
+    }
+  };
+
+  // Format value based on ranking metric
+  const formatRankingValue = (user: RankedUser, metric: RankingMetric): string => {
+    switch (metric) {
+      case 'rewardAmount':
+        return formatCurrency(user.rewardAmount);
+      case 'referralCount':
+        return user.referralCount.toString();
+      case 'successfulReferrals':
+        return user.successfulReferrals.toString();
+      default:
+        return '-';
+    }
+  };
+
+  // Handle click outside to close dropdown
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowRankingDropdown(false);
+      }
+    }
+    
+    // Add click event listener
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      // Clean up event listener
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [dropdownRef]);
 
   return (
     <>
@@ -718,6 +927,117 @@ function AdminDashboard() {
                 <div className="flex items-baseline">
                   <div className="text-4xl font-bold">{formatCurrency(totalRewardsAmount)}</div>
                 </div>
+              </CardContent>
+            </Card>
+            
+            {/* User Rankings Card */}
+            <Card className="mt-6">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-lg font-medium flex items-center gap-2">
+                      Top Partners
+                      <Trophy className="h-4 w-4 text-amber-500" />
+                    </CardTitle>
+                    <CardDescription>
+                      Ranking of top partners based on performance
+                    </CardDescription>
+                  </div>
+                  
+                  <div className="relative" ref={dropdownRef}>
+                    <button 
+                      className="flex items-center gap-1 px-3 py-2 rounded-md bg-muted"
+                      onClick={() => setShowRankingDropdown(!showRankingDropdown)}
+                    >
+                      <span className="text-sm font-medium">Rank by: {getRankingMetricLabel(rankingMetric)}</span>
+                      <ChevronDown className="h-4 w-4" />
+                    </button>
+                    
+                    {showRankingDropdown && (
+                      <div className="absolute right-0 top-full mt-1 z-10 bg-card rounded-md border shadow-md p-1 w-48">
+                        <button 
+                          className={`w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-muted ${rankingMetric === 'rewardAmount' ? 'bg-muted' : ''}`}
+                          onClick={() => {
+                            setRankingMetric('rewardAmount');
+                            setShowRankingDropdown(false);
+                          }}
+                        >
+                          Rewards ($ Amount)
+                        </button>
+                        <button 
+                          className={`w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-muted ${rankingMetric === 'referralCount' ? 'bg-muted' : ''}`}
+                          onClick={() => {
+                            setRankingMetric('referralCount');
+                            setShowRankingDropdown(false);
+                          }}
+                        >
+                          Referrals (Count)
+                        </button>
+                        <button 
+                          className={`w-full text-left px-3 py-2 text-sm rounded-sm hover:bg-muted ${rankingMetric === 'successfulReferrals' ? 'bg-muted' : ''}`}
+                          onClick={() => {
+                            setRankingMetric('successfulReferrals');
+                            setShowRankingDropdown(false);
+                          }}
+                        >
+                          Successful Referrals
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </CardHeader>
+              
+              <CardContent>
+                {rankingLoading ? (
+                  <div className="flex justify-center items-center py-8">
+                    <Spinner size="medium" text="Loading rankings..." />
+                  </div>
+                ) : topUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-48 text-center">
+                    <p className="text-muted-foreground mb-2">No ranking data available for this period</p>
+                    <p className="text-xs text-muted-foreground max-w-md">
+                      There are no partners with activity in the selected time period.
+                    </p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-12 text-center">Rank</TableHead>
+                        <TableHead>Partner</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead className="text-right">{getRankingMetricLabel(rankingMetric)}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topUsers.map((user, index) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="text-center font-medium">
+                            {index === 0 ? (
+                              <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 text-amber-700">
+                                1
+                              </div>
+                            ) : index === 1 ? (
+                              <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-100 text-gray-700">
+                                2
+                              </div>
+                            ) : index === 2 ? (
+                              <div className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-50 text-amber-800">
+                                3
+                              </div>
+                            ) : (
+                              index + 1
+                            )}
+                          </TableCell>
+                          <TableCell className="font-medium">{user.name}</TableCell>
+                          <TableCell>{user.email}</TableCell>
+                          <TableCell className="text-right">{formatRankingValue(user, rankingMetric)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </CardContent>
             </Card>
             

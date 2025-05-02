@@ -134,6 +134,9 @@ importers:
       react-dom:
         specifier: ^19.0.0
         version: 19.0.0(react@19.0.0)
+      react-error-boundary:
+        specifier: ^5.0.0
+        version: 5.0.0(react@19.0.0)
       react-hook-form:
         specifier: ^7.54.0
         version: 7.54.0(react@19.0.0)
@@ -159,8 +162,8 @@ importers:
         specifier: ^3.23.8
         version: 3.23.8
       zustand:
-        specifier: ^5.0.2
-        version: 5.0.2(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0))
+        specifier: ^5.0.3
+        version: 5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0))
     devDependencies:
       '@eslint/js':
         specifier: ^9.16.0
@@ -2882,6 +2885,11 @@ packages:
     peerDependencies:
       react: ^19.0.0
 
+  react-error-boundary@5.0.0:
+    resolution: {integrity: sha512-tnjAxG+IkpLephNcePNA7v6F/QpWLH8He65+DmedchDwg162JZqx4NmbXj0mlAYVVEd81OW7aFhmbsScYfiAFQ==}
+    peerDependencies:
+      react: '>=16.13.1'
+
   react-hook-form@7.54.0:
     resolution: {integrity: sha512-PS05+UQy/IdSbJNojBypxAo9wllhHgGmyr8/dyGQcPoiMf3e7Dfb9PWYVRco55bLbxH9S+1yDDJeTdlYCSxO3A==}
     engines: {node: '>=18.0.0'}
@@ -3399,8 +3407,8 @@ packages:
   zod@3.23.8:
     resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
 
-  zustand@5.0.2:
-    resolution: {integrity: sha512-8qNdnJVJlHlrKXi50LDqqUNmUbuBjoKLrYQBnoChIbVph7vni+sY+YpvdjXG9YLd/Bxr6scMcR+rm5H3aSqPaw==}
+  zustand@5.0.4:
+    resolution: {integrity: sha512-39VFTN5InDtMd28ZhjLyuTnlytDr9HfwO512Ai4I8ZABCoyAj4F1+sr7sD1jP/+p7k77Iko0Pb5NhgBFDCX0kQ==}
     engines: {node: '>=12.20.0'}
     peerDependencies:
       '@types/react': '>=18.0.0'
@@ -5928,6 +5936,11 @@ snapshots:
       react: 19.0.0
       scheduler: 0.25.0
 
+  react-error-boundary@5.0.0(react@19.0.0):
+    dependencies:
+      '@babel/runtime': 7.26.0
+      react: 19.0.0
+
   react-hook-form@7.54.0(react@19.0.0):
     dependencies:
       react: 19.0.0
@@ -6440,7 +6453,7 @@ snapshots:
 
   zod@3.23.8: {}
 
-  zustand@5.0.2(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0)):
+  zustand@5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0)):
     optionalDependencies:
       '@types/react': 19.1.2
       react: 19.0.0

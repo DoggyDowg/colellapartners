@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Auth Test</title>
+    <style>
+        body { font-family: sans-serif; }
+        pre { background-color: #f4f4f4; padding: 1em; border: 1px solid #ddd; white-space: pre-wrap; word-wrap: break-word; }
+    </style>
+</head>
+<body>
+    <h1>Supabase Auth Diagnostic</h1>
+    <p>Make sure you are logged into your application (https://colellapartners.vercel.app) in another tab before running this test.</p>
+    <button onclick="runTest()">Run Diagnostic Test</button>
+    <h2>Result:</h2>
+    <pre id="result">Click the button to run the test...</pre>
+
+    <script>
+        async function runTest() {
+            const resultElement = document.getElementById('result');
+            resultElement.textContent = 'Running test...';
+
+            const supabaseUrl = 'https://oespdvpjxesldkmozntj.supabase.co';
+            const functionUrl = `${supabaseUrl.replace('.supabase.co', '.functions.supabase.co')}/auth_diagnostic`;
+            // --- Use the exact key name from localStorage ---
+            const sessionKey = 'sb-oespdvpjxesldkmozntj-auth-token'; 
+            // ---
+
+            let accessToken = null;
+            try {
+                const sessionDataString = localStorage.getItem(sessionKey);
+
+                if (sessionDataString) {
+                    const sessionData = JSON.parse(sessionDataString);
+                    if (sessionData && sessionData.access_token) {
+                        accessToken = sessionData.access_token;
+                    } else {
+                         resultElement.textContent = `Error: Could not find access token within the session data for key "${sessionKey}". Value: ${sessionDataString}`;
+                        return;
+                    }
+                } else {
+                    resultElement.textContent = `Error: Could not find Supabase session key "${sessionKey}" in localStorage. Make sure you are logged into the app (https://colellapartners.vercel.app) in another tab.`;
+                    return;
+                }
+            } catch (e) {
+                resultElement.textContent = `Error accessing localStorage or parsing session data: ${e.message}`;
+                return;
+            }
+
+            if (!accessToken) {
+                 resultElement.textContent = 'Error: Failed to retrieve access token.';
+                return;
+            }
+
+            try {
+                const response = await fetch(functionUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    resultElement.textContent = `Error ${response.status}: ${JSON.stringify(data, null, 2)}`;
+                } else {
+                    resultElement.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                resultElement.textContent = `Network or Fetch Error: ${error.message}`;
+            }
+        }
+    </script>
+</body>
+</html>

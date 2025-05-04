@@ -17,6 +17,7 @@ export interface ActionIndicators {
 export function useActionIndicators() {
   const { user } = useAuth();
   const { isProfileComplete } = useProfileCompletion();
+  // Restore state
   const [communicationPreferencesMissing, setCommunicationPreferencesMissing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -28,39 +29,47 @@ export function useActionIndicators() {
 
     let isMounted = true;
 
+    // Restore the function definition and fix it
     async function checkCommunicationPreferences() {
       try {
         // Check if the user has set communication preferences
         const { data, error } = await supabase
-          .from('user_preferences')
-          .select('communication_email_opt_in, communication_sms_opt_in')
-          .eq('user_id', user?.id ?? '')
+          .from('user_profiles') // Query the correct table
+          .select('communication_emails, marketing_emails') // Select existing columns
+          .eq('id', user?.id ?? '') // Use 'id' as the column for user ID in profiles
           .single();
 
         if (!isMounted) return;
 
-        if (error || !data) {
-          // If no preferences found, they need to be set
+        if (error && error.code !== 'PGRST116') { // Ignore 'PGRST116' (No rows found)
+          // Consider logging the error if needed, but treat as missing for the indicator
           setCommunicationPreferencesMissing(true);
+        } else if (!data) {
+            // If no profile row exists, preferences are missing
+            setCommunicationPreferencesMissing(true);
         } else {
           // Check if either preference is null/undefined (not explicitly set)
-          const emailNotSet = data.communication_email_opt_in === null || data.communication_email_opt_in === undefined;
-          const smsNotSet = data.communication_sms_opt_in === null || data.communication_sms_opt_in === undefined;
+          // Note: Supabase booleans are typically true/false, null indicates not set.
+          const commEmailNotSet = data.communication_emails === null || data.communication_emails === undefined;
+          const marketingEmailNotSet = data.marketing_emails === null || data.marketing_emails === undefined;
           
-          setCommunicationPreferencesMissing(emailNotSet || smsNotSet);
+          // Preferences are missing if either email setting hasn't been explicitly chosen
+          setCommunicationPreferencesMissing(commEmailNotSet || marketingEmailNotSet);
         }
       } catch (_error) {
-        // Default to showing the indicator if there's an error
+        // Default to showing the indicator if there's an error during fetch
         if (isMounted) {
           setCommunicationPreferencesMissing(true);
         }
       } finally {
+        // Restore loading state update
         if (isMounted) {
-          setIsLoading(false);
+          setIsLoading(false); 
         }
       }
     }
 
+    // Restore the call to the function
     setIsLoading(true);
     checkCommunicationPreferences();
 
@@ -69,13 +78,13 @@ export function useActionIndicators() {
     };
   }, [user]);
 
-  // Combined indicator for the Settings section - true if any setting needs attention
+  // Restore the combined indicator
   const hasSettingsActions = !isProfileComplete || communicationPreferencesMissing;
 
   return {
-    profileIncomplete: !isProfileComplete,
-    communicationPreferencesMissing,
-    hasSettingsActions,
     isLoading,
+    profileIncomplete: !isProfileComplete,
+    communicationPreferencesMissing, 
+    hasSettingsActions,
   };
 } 

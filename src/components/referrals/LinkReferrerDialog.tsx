@@ -7,21 +7,13 @@ import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { handleError } from '@/utils/error-handler';
-
-// Define interfaces for types
-interface Partner {
-  id: string;
-  name: string;
-  company_name: string | null;
-  email: string | null;
-  phone: string | null;
-}
+import { Partner } from './ReferralDetailsDialog';
 
 interface LinkReferrerDialogProps {
   referralId: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onLinkComplete: (updatedReferral: { referrer_partner_id: string, partnerDetails: Partner }) => void;
+  onLinkComplete: (updatedReferral: { referrer_id: string, partnerDetails: Partner }) => void;
 }
 
 export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkComplete }: LinkReferrerDialogProps) {
@@ -40,12 +32,12 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
       setSearchTerm('');
       try {
         const { data, error } = await supabase
-          .from('partners')
-          .select('id, name, company_name, email, phone')
-          .order('name');
+          .from('referrers')
+          .select('id, full_name, email, phone')
+          .order('full_name');
           
         if (error) throw error;
-        setPartners(data || []);
+        setPartners(data as Partner[] || []);
       } catch (error) {
         handleError(error, {
           context: 'LinkReferrerDialog.fetchPartners',
@@ -62,8 +54,7 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
   // Filter partners based on search term
   const filteredPartners = partners.filter(partner =>
     !searchTerm ||
-    (partner.name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (partner.company_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (partner.full_name?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (partner.email?.toLowerCase().includes(searchTerm.toLowerCase())) ||
     (partner.phone?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -83,7 +74,7 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
       // Update the referral table with the selected partner_id
       const { error: referralUpdateError } = await supabase
         .from('referrals')
-        .update({ referrer_partner_id: selectedPartnerId })
+        .update({ referrer_id: selectedPartnerId })
         .eq('id', referralId);
 
       if (referralUpdateError) {
@@ -98,9 +89,9 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
       toast.success("Partner linked successfully!");
       // Pass back the selected partner ID and details
       onLinkComplete({
-          referrer_partner_id: selectedPartnerId,
-          partnerDetails: selectedPartner 
-      }); 
+          referrer_id: selectedPartnerId,
+          partnerDetails: selectedPartner
+      });
       onOpenChange(false);
     } catch (error: unknown) {
       handleError(error, {
@@ -128,7 +119,7 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="Search partners by name, company, email..."
+              placeholder="Search partners by name, email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-8"
@@ -148,9 +139,8 @@ export function LinkReferrerDialog({ referralId, open, onOpenChange, onLinkCompl
                     className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPartnerId === partner.id ? 'bg-accent border-primary' : 'hover:bg-accent/50'}`}
                     onClick={() => setSelectedPartnerId(partner.id)}
                   >
-                    <p className="font-medium text-sm">{partner.name}</p>
+                    <p className="font-medium text-sm">{partner.full_name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {partner.company_name ? `${partner.company_name} • ` : ''}
                       {partner.email || partner.phone ? 
                         `${partner.email || ''}${partner.email && partner.phone ? ' • ' : ''}${partner.phone || ''}` : 
                         'No contact info'}

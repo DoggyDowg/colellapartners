@@ -519,7 +519,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   };
 
   // Callback for when partner linking is complete
-  const handleLinkPartnerComplete = async (update: { referrer_partner_id: string, partnerDetails: Partner }) => {
+  const handleLinkPartnerComplete = async (update: { referrer_id: string, partnerDetails: Partner }) => {
     if (referral) {
       try {
         // Immediately update local state for good UX
@@ -528,7 +528,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         // Update local referral state with the new referrer_id
         const updatedReferral = { 
           ...referral, 
-          referrer_id: update.referrer_partner_id,
+          referrer_id: update.referrer_id,
         };
         setReferral(updatedReferral);
         
@@ -539,7 +539,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         const { data: freshPartnerData, error } = await supabase
           .from('referrers')
           .select('id, full_name, email, phone')
-          .eq('id', update.referrer_partner_id)
+          .eq('id', update.referrer_id)
           .single();
           
         if (error) {
@@ -558,7 +558,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         if (onSyncComplete) {
           onSyncComplete({
             id: referral.id,
-            referrer_id: update.referrer_partner_id
+            referrer_id: update.referrer_id
           });
         }
       } catch (error: unknown) {
@@ -1104,26 +1104,11 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           onLinkComplete={
             // Define an interface for the expected structure
             (update: { 
-              referrer_partner_id: string; 
-              partnerDetails: { 
-                id: string;
-                name: string;
-                company_name?: string | null;
-                email: string | null;
-                phone: string | null;
-              }
+              referrer_id: string;
+              partnerDetails: Partner;
             }) => {
-              // Ensure the Partner type matches the expected format
-              const compatibleUpdate = {
-                referrer_partner_id: update.referrer_partner_id,
-                partnerDetails: {
-                  id: update.partnerDetails.id,
-                  full_name: update.partnerDetails.name || '',
-                  email: update.partnerDetails.email || '',
-                  phone: update.partnerDetails.phone || ''
-                }
-              };
-              handleLinkPartnerComplete(compatibleUpdate);
+              // Pass the update object directly as it now matches the expected Partner type
+              handleLinkPartnerComplete(update);
             }
           }
         />

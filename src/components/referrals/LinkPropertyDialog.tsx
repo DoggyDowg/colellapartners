@@ -7,9 +7,20 @@ import { Loader2, Search } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { handleError } from '@/utils/error-handler';
-import { PropertyDetails, extractPropertyAddressData } from '../../utils/property-utils';
+import { getLinkableProperties } from '@/lib/vault-re-api';
 
-// Define interfaces for types
+// Use type from vault-re-api to define our component's property state
+type PropertyDetails = {
+  id: string;
+  address: string;
+  parcel_id: string;
+  city: string;
+  state: string;
+  zip: string;
+  county: string;
+};
+
+// Define interfaces for component props
 interface LinkPropertyDialogProps {
   referralId: string | null;
   open: boolean;
@@ -24,7 +35,7 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
   const [isProcessing, setIsProcessing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Fetch properties when dialog opens
+  // Fetch properties from VaultRE API when dialog opens
   useEffect(() => {
     const fetchProperties = async () => {
       if (!open) return;
@@ -32,17 +43,79 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
       setSelectedPropertyId(null);
       setSearchTerm('');
       try {
-        const { data, error } = await supabase
-          .from('vault_properties')
-          .select('id, address, city, state, zip, county, parcel_id')
-          .order('address');
+        // Use the VaultRE API to fetch properties that can be linked
+        const propertiesData = await getLinkableProperties();
+
+        // Safety check - ensure we have an array
+        if (!Array.isArray(propertiesData)) {
+          throw new Error('VaultRE API did not return an array of properties');
+        }
+
+        // Map the VaultRE property data to our component's PropertyDetails format
+        const mappedProperties: PropertyDetails[] = propertiesData.map(property => {
+          // Ensure property is valid before accessing properties
+          if (!property) {
+            return {
+              id: 'unknown',
+              address: 'Unknown address',
+              parcel_id: 'unknown',
+              city: '',
+              state: '',
+              zip: '',
+              county: '',
+            };
+          }
+
+          // Extract display address from the property
+          const displayAddress = property.displayAddress || 
+                                (property.address?.fullAddress || 
+                                 property.address?.displayAddress || 
+                                 'Address not available');
           
-        if (error) throw error;
-        setProperties(data || []);
+          // Extract location details if available
+          let city = '';
+          let state = '';
+          let zip = '';
+          
+          // Handle suburb which can be either a string or an object
+          if (property.address?.suburb) {
+            if (typeof property.address.suburb === 'string') {
+              city = property.address.suburb;
+            } else if (typeof property.address.suburb === 'object') {
+              // It's an object with properties like name, postcode, state
+              city = property.address.suburb.name || '';
+              if (property.address.suburb.state?.abbreviation) {
+                state = property.address.suburb.state.abbreviation;
+              }
+              zip = property.address.suburb.postcode || '';
+            }
+          }
+          
+          // Fallback to direct properties if suburb object didn't provide values
+          if (!state && property.address?.state) {
+            state = property.address.state;
+          }
+          
+          if (!zip && property.address?.postcode) {
+            zip = property.address.postcode;
+          }
+
+          return {
+            id: property.id, // Use the VaultRE property ID
+            address: displayAddress,
+            parcel_id: String(property.id || ''), // Convert the VaultRE property ID to a string
+            city,
+            state,
+            zip,
+            county: '', // VaultRE doesn't seem to have a direct county field
+          };
+        });
+
+        setProperties(mappedProperties);
       } catch (error) {
         handleError(error, {
           context: 'LinkPropertyDialog.fetchProperties',
-          toastMessage: "Failed to load properties",
+          toastMessage: "Failed to load properties from VaultRE",
           showToast: true
         });
       } finally {
@@ -53,15 +126,23 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
   }, [open]);
 
   // Filter properties based on search term
-  const filteredProperties = properties.filter(property =>
-    !searchTerm ||
-    (property.address?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (property.city?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (property.state?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (property.zip?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (property.county?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (property.parcel_id?.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredProperties = properties.filter(property => {
+    // Safely convert all properties to lowercase strings
+    const searchableAddress = (property.address || '').toLowerCase();
+    const searchableCity = (property.city || '').toLowerCase();
+    const searchableState = (property.state || '').toLowerCase();
+    const searchableZip = (property.zip || '').toLowerCase();
+    const searchableId = String(property.parcel_id || '').toLowerCase(); // Ensure parcel_id is a string
+    const searchTermLower = searchTerm.toLowerCase();
+    
+    // Search within all available property fields
+    return !searchTerm ||
+           searchableAddress.includes(searchTermLower) ||
+           searchableCity.includes(searchTermLower) ||
+           searchableState.includes(searchTermLower) ||
+           searchableZip.includes(searchTermLower) ||
+           searchableId.includes(searchTermLower);
+  });
 
   // Handle linking the property
   const handleLinkProperty = async () => {
@@ -73,12 +154,25 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
       return;
     }
 
+    // We need the vault_property_id from the selected property to update the referral
+    const vaultPropertyIdToLink = selectedProperty.parcel_id; // This is now directly the VaultRE property ID
+    
+    if (!vaultPropertyIdToLink) {
+        toast.error("Could not find the VaultRE Property ID for the selected property.");
+        handleError(new Error("Missing vault_property_id"), {
+          context: 'LinkPropertyDialog.handleLinkProperty',
+          toastMessage: "Internal error: Missing VaultRE ID",
+          showToast: false,
+        });
+        return;
+    }
+
     setIsProcessing(true);
     try {
-      // Update the referral table with the selected property_id
+      // Update the referral table with the selected property's VAULT ID
       const { error: referralUpdateError } = await supabase
         .from('referrals')
-        .update({ vault_property_id: selectedPropertyId })
+        .update({ vault_property_id: vaultPropertyIdToLink })
         .eq('id', referralId);
 
       if (referralUpdateError) {
@@ -91,9 +185,9 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
       }
 
       toast.success("Property linked successfully!");
-      // Pass back the selected property ID and details
+      // Pass back the selected property's VAULT ID and details
       onLinkComplete({
-          vault_property_id: selectedPropertyId,
+          vault_property_id: vaultPropertyIdToLink,
           propertyDetails: selectedProperty 
       }); 
       onOpenChange(false);
@@ -114,7 +208,7 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
         <DialogHeader>
           <DialogTitle>Link Property</DialogTitle>
           <DialogDescription>
-            Select an existing property from the database to link to this referral.
+            Select an existing property from VaultRE to link to this referral.
           </DialogDescription>
         </DialogHeader>
 
@@ -143,15 +237,20 @@ export function LinkPropertyDialog({ referralId, open, onOpenChange, onLinkCompl
                     className={`p-3 border rounded-md cursor-pointer transition-colors ${selectedPropertyId === property.id ? 'bg-accent border-primary' : 'hover:bg-accent/50'}`}
                     onClick={() => setSelectedPropertyId(property.id)}
                   >
-                    <p className="font-medium text-sm">{extractPropertyAddressData(property)}</p>
+                    <p className="font-medium text-sm">{property.address}</p>
+                    {property.city && property.state && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {property.city}, {property.state} {property.zip}
+                      </p>
+                    )}
                     <p className="text-xs text-muted-foreground">
-                      County: {property.county || '-'} | Parcel ID: {property.parcel_id || '-'}
+                      VaultRE ID: {property.parcel_id}
                     </p>
                   </div>
                 ))
               ) : (
                 <p className="text-center text-sm text-muted-foreground py-4">
-                  {searchTerm ? 'No matching properties found.' : (loading ? '' : 'No properties found in the database.')}
+                  {searchTerm ? 'No matching properties found.' : (loading ? '' : 'No properties found in VaultRE.')}
                 </p>
               )}
             </div>

@@ -42,13 +42,6 @@ import {
   Trash2,
   Camera,
 } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 const profileFormSchema = z.object({
   name: z
@@ -95,7 +88,9 @@ const months = [
 const getDaysInMonth = (month: number) => {
   // Always use 2024 (a leap year) to ensure February has 29 days
   const year = 2024;
-  return new Date(year, month + 1, 0).getDate();
+  // Ensure valid month index (0-11)
+  const safeMonth = Math.max(0, Math.min(11, month));
+  return new Date(year, safeMonth + 1, 0).getDate();
 };
 
 export default function ProfileForm() {
@@ -104,6 +99,10 @@ export default function ProfileForm() {
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [dbDiagnostics, setDbDiagnostics] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  
+  // State to directly control birthday UI
+  const [birthdayMonth, setBirthdayMonth] = useState<string | undefined>(undefined)
+  const [birthdayDay, setBirthdayDay] = useState<string | undefined>(undefined)
   
   // Image editor state
   const [imageEditorOpen, setImageEditorOpen] = useState(false)
@@ -122,16 +121,17 @@ export default function ProfileForm() {
     defaultValues,
     mode: 'onChange',
   })
-
-  // Watch the birthday month field to reactively update the day field
-  const watchedBirthdayMonth = form.watch('birthday_month');
-
+  
+  // Use a ref to store form methods to avoid dependency issues
+  const formRef = useRef(form)
+  formRef.current = form
+  
   // Fetch the current user and profile data
   useEffect(() => {
+    let isMounted = true;
+    
     async function getUserData() {
       try {
-        setLoading(true)
-        
         // Get the current authenticated user
         const { data: { user } } = await supabase.auth.getUser()
         
@@ -197,7 +197,7 @@ This usually indicates a permissions issue with Row Level Security (RLS).
 Check if the RLS policies are correctly set up on the user_profiles table.`)
             
             // Still try to display with user info only
-            form.reset({
+            formRef.current.reset({
               ...defaultValues,
               name: user.user_metadata?.name || '',
               email: user.email || '',
@@ -224,7 +224,11 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
               }
             }
             
-            form.reset({
+            // Set our state variables
+            setBirthdayMonth(birthday_month);
+            setBirthdayDay(birthday_day);
+            
+            formRef.current.reset({
               name: profile.name || user.user_metadata?.name || '',
               email: profile.email || user.email || '',
               birthday_month,
@@ -234,7 +238,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
             });
           } else {
             // No profile found
-            form.reset({
+            formRef.current.reset({
               ...defaultValues,
               name: user.user_metadata?.name || '',
               email: user.email || '',
@@ -244,19 +248,28 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           setDbDiagnostics(`Exception fetching profile: ${String(_fetchErr)}`)
         }
       } catch (_error) {
-        setDbDiagnostics(`General error: ${String(_error)}`)
-        toast({
-          title: 'Error',
-          description: 'Failed to load profile data.',
-          variant: 'destructive',
-        })
+        if (isMounted) {
+          setDbDiagnostics(`General error: ${String(_error)}`)
+          toast({
+            title: 'Error',
+            description: 'Failed to load profile data.',
+            variant: 'destructive',
+          })
+        }
       } finally {
-        setLoading(false)
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     }
     
     getUserData()
-  }, [form])
+    
+    // Cleanup function to handle component unmounting during async operations
+    return () => {
+      isMounted = false;
+    };
+  }, []) // Only run on mount
 
   // Function to optimize the image
   const optimizeImage = async (file: File): Promise<Blob> => {
@@ -478,7 +491,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         
         // Create preview URL
         const previewUrl = URL.createObjectURL(optimizedFile);
-        form.setValue('avatar_url', previewUrl);
+        formRef.current.setValue('avatar_url', previewUrl);
         
         // Close editor
         setImageEditorOpen(false);
@@ -703,7 +716,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
       }
       
       // Reset the form
-      form.setValue('avatar_url', '')
+      formRef.current.setValue('avatar_url', '')
       
       // Success message
       toast({
@@ -753,13 +766,13 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         updated_at: new Date().toISOString(),
       }
       
-      // Only add these if they exist
-      if (data.birthday_month && data.birthday_day) {
-        const monthIndex = months.findIndex(m => m === data.birthday_month);
+      // Only add these if they exist - use our state variables directly to be safe
+      if (birthdayMonth && birthdayDay) {
+        const monthIndex = months.findIndex(m => m === birthdayMonth);
         if (monthIndex !== -1) {
           // Format month with leading zero if needed
           const month = String(monthIndex + 1).padStart(2, '0');
-          const day = String(data.birthday_day).padStart(2, '0');
+          const day = String(birthdayDay).padStart(2, '0');
           // Store as MM-DD format (character varying type in database)
           profileData.birthday = `${month}-${day}`;
         }
@@ -902,84 +915,71 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           )}
         />
 
-        <FormField
-          control={form.control}
-          name="birthday_month"
-          render={({ field }) => (
-            <FormItem className="flex flex-col">
-              <FormLabel>Birthday</FormLabel>
-              <div className="flex space-x-2">
-                <Select
-                  value={field.value}
-                  onValueChange={field.onChange}
-                >
-                  <FormControl>
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue placeholder="Month" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent 
-                    position="popper" 
-                    align="start" 
-                    side="bottom" 
-                    sideOffset={4}
-                    className="max-h-[200px] overflow-y-auto"
-                  >
-                    {months.map((month) => (
-                      <SelectItem key={month} value={month}>
-                        {month}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                
-                <FormField
-                  control={form.control}
-                  name="birthday_day"
-                  render={({ field }) => (
-                    <Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                      disabled={!watchedBirthdayMonth}
-                    >
-                      <FormControl>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Day" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent 
-                        position="popper" 
-                        align="start" 
-                        side="bottom" 
-                        sideOffset={4}
-                        className="max-h-[200px] overflow-y-auto"
-                      >
-                        {watchedBirthdayMonth ? 
-                          Array.from(
-                            { length: getDaysInMonth(months.indexOf(watchedBirthdayMonth || "January")) }, 
-                            (_, i) => (i + 1).toString()
-                          ).map(day => (
-                            <SelectItem key={day} value={day}>
-                              {day}
-                            </SelectItem>
-                          ))
-                          : 
-                          <SelectItem disabled value="placeholder">
-                            Select month first
-                          </SelectItem>
-                        }
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-              </div>
-              <FormDescription>
-                Your birthday for sending you a special reward. We only need the month and day.
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="flex flex-col">
+          <div className="mb-2">
+            <FormLabel>Birthday</FormLabel>
+          </div>
+          <div className="flex space-x-2">
+            {/* Hard-coded select with direct DOM manipulation for month */}
+            <div className="relative w-[180px]">
+              <select 
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={birthdayMonth || ""}
+                onChange={(e) => {
+                  // Set the month value
+                  const value = e.target.value;
+                  setBirthdayMonth(value);
+                  formRef.current.setValue('birthday_month', value);
+                  
+                  // Clear the day
+                  setBirthdayDay(undefined);
+                  formRef.current.setValue('birthday_day', undefined);
+                  
+                  // Enable the day dropdown
+                  const daySelect = document.getElementById('birthday-day-select') as HTMLSelectElement;
+                  if (daySelect) {
+                    daySelect.disabled = false;
+                  }
+                }}
+              >
+                <option value="" disabled>Month</option>
+                {months.map((month) => (
+                  <option key={month} value={month}>
+                    {month}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Hard-coded select for day */}
+            <div className="relative w-[100px]">
+              <select 
+                id="birthday-day-select"
+                className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={birthdayDay || ""}
+                disabled={!birthdayMonth}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setBirthdayDay(value);
+                  formRef.current.setValue('birthday_day', value);
+                }}
+              >
+                <option value="" disabled>Day</option>
+                {birthdayMonth && Array.from(
+                  { length: getDaysInMonth(months.indexOf(birthdayMonth)) }, 
+                  (_, i) => (i + 1).toString()
+                ).map(day => (
+                  <option key={day} value={day}>
+                    {day}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <FormDescription className="mt-2">
+            Your birthday for sending you a special reward. We only need the month and day.
+          </FormDescription>
+        </div>
 
         <FormField
           control={form.control}
@@ -998,7 +998,11 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           )}
         />
 
-        <Button type='submit' disabled={loading} className="w-full md:w-auto">
+        <Button 
+          type='submit' 
+          disabled={loading} 
+          className="w-full md:w-auto"
+        >
           {loading ? 'Updating...' : 'Update profile'}
         </Button>
         

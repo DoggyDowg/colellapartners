@@ -3,7 +3,6 @@ import {
   IconLayoutDashboard,
   IconPalette,
   IconSettings,
-  IconUserCog,
   IconTicket,
   IconUserPlus,
   IconGift,
@@ -11,12 +10,12 @@ import {
   IconClock,
   IconTrophy,
   IconUserCircle,
-  IconBuilding,
+  IconHome,
   IconNews,
   IconMail,
   IconBell,
 } from '@tabler/icons-react'
-import { AudioWaveform, GalleryVerticalEnd } from 'lucide-react'
+import { AudioWaveform, GalleryVerticalEnd, SquareUser } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ColellaSiteIcon } from '../ColellaSiteIcon'
 
@@ -97,7 +96,7 @@ export const sidebarData: SidebarData = {
         {
           title: 'For Sale',
           url: '/for-sale',
-          icon: IconBuilding,
+          icon: IconHome,
         },
         {
           title: 'Latest News',
@@ -136,7 +135,7 @@ export const sidebarData: SidebarData = {
             {
               title: 'Profile',
               url: '/settings',
-              icon: IconUserCog,
+              icon: SquareUser,
             },
             {
               title: 'Appearance',
@@ -154,6 +153,9 @@ export const sidebarData: SidebarData = {
           title: 'Help Center',
           url: '/help-center',
           icon: IconHelp,
+          disabled: true,
+          tooltip: "Coming Soon",
+          rightIcon: IconClock,
         },
       ],
     },

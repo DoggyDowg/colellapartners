@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserProfile } from '@/hooks/use-user-profile'
-import { BadgeCheck, Bell, LogOut } from 'lucide-react'
+import { Bell, LogOut, SquareUser } from 'lucide-react'
 
 export function ProfileDropdown() {
   const { signOut, user } = useAuth()
@@ -64,13 +64,13 @@ export function ProfileDropdown() {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild>
-            <Link to='/dashboard'>
-              <BadgeCheck className="mr-2 h-4 w-4" />
-              Account
+            <Link to='/settings'>
+              <SquareUser className="mr-2 h-4 w-4" />
+              Profile
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
-            <Link to='/dashboard'>
+            <Link to='/notifications'>
               <Bell className="mr-2 h-4 w-4" />
               Notifications
             </Link>

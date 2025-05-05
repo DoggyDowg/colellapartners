@@ -1,9 +1,9 @@
 import { Outlet } from '@tanstack/react-router'
 import {
   IconPalette,
-  IconUser,
   IconMail,
 } from '@tabler/icons-react'
+import { SquareUser } from 'lucide-react'
 import { Separator } from '@/components/ui/separator'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
@@ -44,7 +44,7 @@ export default function Settings() {
 const sidebarNavItems = [
   {
     title: 'Profile',
-    icon: <IconUser size={18} />,
+    icon: <SquareUser size={18} />,
     href: '/settings',
   },
   {

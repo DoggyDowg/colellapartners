@@ -53,26 +53,24 @@ import {
 const profileFormSchema = z.object({
   name: z
     .string()
-    .min(2, {
-      message: 'Name must be at least 2 characters.',
-    })
     .max(50, {
       message: 'Name must not be longer than 50 characters.',
-    }),
+    })
+    .optional()
+    .or(z.literal('')),
   email: z
     .string({
-      required_error: 'Please enter a valid email.',
     })
-    .email(),
+    .email({ message: 'Please enter a valid email format if provided.'})
+    .optional()
+    .or(z.literal('')),
   birthday_month: z.string().optional(),
   birthday_day: z.string().optional(),
   avatar_url: z.string().optional(),
   phone_number: z
     .string()
-    .regex(/^(\+61|0)[4-5]\d{8}$/, {
-      message: 'Please enter a valid Australian mobile number.',
-    })
-    .optional(),
+    .optional()
+    .or(z.literal('')),
 })
 
 type ProfileFormValues = z.infer<typeof profileFormSchema>
@@ -124,6 +122,9 @@ export default function ProfileForm() {
     defaultValues,
     mode: 'onChange',
   })
+
+  // Watch the birthday month field to reactively update the day field
+  const watchedBirthdayMonth = form.watch('birthday_month');
 
   // Fetch the current user and profile data
   useEffect(() => {
@@ -939,7 +940,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
                     <Select
                       value={field.value}
                       onValueChange={field.onChange}
-                      disabled={!form.getValues().birthday_month}
+                      disabled={!watchedBirthdayMonth}
                     >
                       <FormControl>
                         <SelectTrigger className="w-[100px]">
@@ -953,9 +954,9 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
                         sideOffset={4}
                         className="max-h-[200px] overflow-y-auto"
                       >
-                        {form.getValues().birthday_month ? 
+                        {watchedBirthdayMonth ? 
                           Array.from(
-                            { length: getDaysInMonth(months.indexOf(form.getValues().birthday_month || "January")) }, 
+                            { length: getDaysInMonth(months.indexOf(watchedBirthdayMonth || "January")) }, 
                             (_, i) => (i + 1).toString()
                           ).map(day => (
                             <SelectItem key={day} value={day}>

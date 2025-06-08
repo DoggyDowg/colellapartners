@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Home, Instagram, Facebook } from 'lucide-react'
+import { Home, Instagram, Facebook, ChevronsUpDown } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -59,6 +59,7 @@ function SidebarLogo() {
                   : "h-8 w-auto object-contain"
                 }
               />
+              {!isCollapsed && <ChevronsUpDown className='ml-auto size-4' />}
             </SidebarMenuButton>
           </DropdownMenuTrigger>
           <DropdownMenuContent 

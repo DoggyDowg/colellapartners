@@ -89,6 +89,12 @@ export interface ExtendedPropertyDetails extends PropertyDetails {
   price_text?: string;
   address_obj?: {
     display_address?: string;
+    street_address?: string;
+    suburb?: string;
+    state?: string;
+    post_code?: string;
+    postal_address?: string;
+    [key: string]: unknown;
   };
 }
 
@@ -245,8 +251,91 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
 
   // Update local linked property state when prop changes
   React.useEffect(() => {
-    setLinkedProperty(initialLinkedProperty || null);
-  }, [initialLinkedProperty]);
+    const fetchPropertyData = async () => {
+      if (!referral) return;
+      
+      // If no vault_property_id, no need to try loading
+      if (!referral.vault_property_id) {
+        setLinkedProperty(null);
+        setLoadingProperty(false);
+        return;
+      }
+      
+      setLoadingProperty(true);
+      
+      try {
+        // First look for a property with matching referral_id
+        const { data: propertyByReferral, error: referralError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('referral_id', referral.id)
+          .single();
+        
+        if (!referralError && propertyByReferral) {
+          // We found a direct match by referral_id
+          const propertyDetails: ExtendedPropertyDetails = {
+            id: propertyByReferral.id,
+            address: propertyByReferral.address?.display_address || 'Address Not Available',
+            city: propertyByReferral.address?.suburb || '',
+            state: propertyByReferral.address?.state || '',
+            zip: propertyByReferral.address?.post_code || '',
+            county: '',
+            parcel_id: propertyByReferral.vault_property_id,
+            status: propertyByReferral.status,
+            property_type: propertyByReferral.property_type,
+            price_text: propertyByReferral.price_text,
+            address_obj: propertyByReferral.address
+          };
+          
+          setLinkedProperty(propertyDetails);
+          setLoadingProperty(false);
+          return;
+        }
+        
+        // Fallback: Try finding by vault_property_id
+        const { data: propertyByVaultId, error: vaultError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('vault_property_id', referral.vault_property_id)
+          .single();
+        
+        if (!vaultError && propertyByVaultId) {
+          // We found a match by vault_property_id
+          const propertyDetails: ExtendedPropertyDetails = {
+            id: propertyByVaultId.id,
+            address: propertyByVaultId.address?.display_address || 'Address Not Available',
+            city: propertyByVaultId.address?.suburb || '',
+            state: propertyByVaultId.address?.state || '',
+            zip: propertyByVaultId.address?.post_code || '',
+            county: '',
+            parcel_id: propertyByVaultId.vault_property_id,
+            status: propertyByVaultId.status,
+            property_type: propertyByVaultId.property_type,
+            price_text: propertyByVaultId.price_text,
+            address_obj: propertyByVaultId.address
+          };
+          
+          setLinkedProperty(propertyDetails);
+        } else {
+          // No property found in our database, but we have a vault_property_id
+          // Optionally try to fetch from VaultRE here
+          setLinkedProperty(initialLinkedProperty || null);
+        }
+      } catch (error) {
+        handleError(error, {
+          context: 'ReferralDetailsDialog.fetchPropertyData',
+          toastMessage: 'Error loading property details',
+          showToast: false,
+          silent: true
+        });
+        setLinkedProperty(initialLinkedProperty || null);
+      } finally {
+        setLoadingProperty(false);
+      }
+    };
+    
+    fetchPropertyData();
+  }, [referral, initialLinkedProperty]);
   
   React.useEffect(() => {
     setLoadingProperty(initialLoadingProperty);
@@ -278,6 +367,42 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
     } else if (addressData && typeof addressData === 'object') {
       displayAddress = (addressData as AddressData).display_address || '';
     }
+    
+    // Direct address access as a fallback
+    if (!displayAddress && property.address && typeof property.address === 'object') {
+      const addressObj = property.address as Record<string, unknown>;
+      if (addressObj.fullAddress && typeof addressObj.fullAddress === 'string') {
+        displayAddress = addressObj.fullAddress;
+      } else if (addressObj.displayAddress && typeof addressObj.displayAddress === 'string') {
+        displayAddress = addressObj.displayAddress;
+      } else if (addressObj.postal_address && typeof addressObj.postal_address === 'string') {
+        displayAddress = addressObj.postal_address;
+      } else if (addressObj.display_address && typeof addressObj.display_address === 'string') {
+        displayAddress = addressObj.display_address;
+      }
+    }
+    
+    // Prepare the address_obj with all available address properties
+    let addressObj: ExtendedPropertyDetails['address_obj'] = { display_address: displayAddress };
+    
+    // If property has address object, try to map its fields to our structure
+    if (property.address && typeof property.address === 'object') {
+      const propAddress = property.address as Record<string, unknown>;
+      addressObj = {
+        display_address: displayAddress,
+        // Map known fields, keeping only string values
+        street_address: typeof propAddress.street_address === 'string' ? propAddress.street_address : 
+                        typeof propAddress.streetAddress === 'string' ? propAddress.streetAddress : undefined,
+        suburb: typeof propAddress.suburb === 'string' ? propAddress.suburb : 
+               typeof propAddress.suburb === 'object' && propAddress.suburb && typeof (propAddress.suburb as Record<string, unknown>).name === 'string' ? 
+               String((propAddress.suburb as Record<string, unknown>).name) : undefined,
+        state: typeof propAddress.state === 'string' ? propAddress.state : undefined,
+        post_code: typeof propAddress.postcode === 'string' ? propAddress.postcode : 
+                  typeof propAddress.post_code === 'string' ? propAddress.post_code : undefined,
+        postal_address: typeof propAddress.postal_address === 'string' ? propAddress.postal_address : 
+                       typeof propAddress.postalAddress === 'string' ? propAddress.postalAddress : undefined
+      };
+    }
       
     return {
       id: String(property.id || ''),
@@ -289,7 +414,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
         ? String((property.address as PropertyAddress)?.state || '')
         : '',
       zip: typeof property.address === 'object' && property.address 
-        ? String((property.address as PropertyAddress)?.postcode || '')
+        ? String((property.address as PropertyAddress)?.postcode || (property.address as Record<string, unknown>)?.post_code || '')
         : '',
       county: typeof property.agency === 'object' && property.agency 
         ? String((property.agency as VaultPropertyAgency)?.name || '')
@@ -298,9 +423,12 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
       status: typeof property.status === 'string' ? property.status.toLowerCase() : undefined,
       property_type: typeof property.type === 'object' && property.type 
         ? String((property.type as VaultPropertyType)?.name || property.propertyType || '')
-        : typeof property.propertyType === 'string' ? property.propertyType : undefined,
+        : typeof property.propertyType === 'string' ? property.propertyType 
+        : typeof property.property_type === 'string' ? property.property_type : undefined,
       price_text: typeof property.priceText === 'string' ? property.priceText 
-        : typeof property.displayPrice === 'string' ? property.displayPrice : undefined,
+        : typeof property.displayPrice === 'string' ? property.displayPrice
+        : typeof property.price_text === 'string' ? property.price_text : undefined,
+      address_obj: addressObj
     };
   };
 
@@ -310,13 +438,45 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
     setIsSyncing(true);
     setLoadingProperty(true); // Indicate loading
     try {
+      // First check if we have the property in our database
+      const { data: dbProperty, error: dbError } = await supabase
+        .from('properties')
+        .select('*')
+        .eq('vault_property_id', referral.vault_property_id)
+        .single();
+      
+      if (dbError && dbError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        handleError(dbError, {
+          context: 'ReferralDetailsDialog.handleSyncStatus.fetchDb',
+          toastMessage: 'Error checking local property database',
+          showToast: false,
+          silent: true
+        });
+      }
+      
+      // Then fetch the latest data from VaultRE
       const property = await getPropertyById(referral.vault_property_id);
       
       if (property) {
-          // Adapt property data to match our PropertyData interface
-          // First cast to unknown, then to our expected type to avoid TypeScript errors
-          const propertyData = adaptPropertyToPropertyDetails(property as unknown as VaultPropertyData);
-          setLinkedProperty(propertyData); // Update local property state
+        // Adapt property data to match our PropertyData interface
+        // First cast to unknown, then to our expected type to avoid TypeScript errors
+        const propertyData = adaptPropertyToPropertyDetails(property as unknown as VaultPropertyData);
+        
+        // Merge database data if available
+        if (dbProperty) {
+          // Directly use the values from the database
+          propertyData.status = dbProperty.status;
+          propertyData.property_type = dbProperty.property_type;
+          propertyData.price_text = dbProperty.price_text;
+          
+          // Use the address object directly
+          if (dbProperty.address) {
+            propertyData.address_obj = dbProperty.address;
+          }
+        }
+        
+        // Update local property state
+        setLinkedProperty(propertyData);
       }
 
       if (!property || !property.status) {
@@ -366,6 +526,41 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
       setReferral(updatedReferralState);
       
       toast.success(`Status updated from ${referral.status} to ${newStatus}`);
+      
+      // After successful sync, refresh the property data from our database
+      try {
+        const { data: refreshedProperty, error: refreshError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('vault_property_id', referral.vault_property_id)
+          .single();
+          
+        if (!refreshError && refreshedProperty) {
+          // Create ExtendedPropertyDetails from the refreshed data
+          const propertyDetails: ExtendedPropertyDetails = {
+            id: refreshedProperty.id,
+            address: refreshedProperty.address?.display_address || 'Address Not Available',
+            city: refreshedProperty.address?.suburb || '',
+            state: refreshedProperty.address?.state || '',
+            zip: refreshedProperty.address?.post_code || '',
+            county: '',
+            parcel_id: refreshedProperty.vault_property_id,
+            status: refreshedProperty.status,
+            property_type: refreshedProperty.property_type,
+            price_text: refreshedProperty.price_text,
+            address_obj: refreshedProperty.address
+          };
+          
+          setLinkedProperty(propertyDetails);
+        }
+      } catch (refreshError) {
+        // Just log the error, don't affect the main flow
+        handleError(refreshError, {
+          context: 'ReferralDetailsDialog.handleSyncStatus.refreshProperty',
+          silent: true,
+          showToast: false
+        });
+      }
       
       if (onSyncComplete) {
         // Pass back only status and ID as linkedProperty is handled locally
@@ -490,30 +685,74 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
   };
 
   // Callback for when property linking is complete
-  const handleLinkPropertyComplete = (update: { vault_property_id: string, propertyDetails: ExtendedPropertyDetails }) => {
+  const handleLinkPropertyComplete = async (update: { vault_property_id: string, propertyDetails: ExtendedPropertyDetails }) => {
     if (referral) {
-      // Update local referral state with the new vault_property_id
-      const updatedReferral = { ...referral, vault_property_id: update.vault_property_id };
-      setReferral(updatedReferral);
-      // Update local linked property state with the details passed back
-      setLinkedProperty(update.propertyDetails);
-      setIsLinkPropertyDialogOpen(false); // Close the dialog
-      
-      // Check if we came from property warning - if so, update the status too
-      if (pendingStatusChange) {
-        // For "Sold" status, we need to open the settlement dialog
-        if (pendingStatusChange.status === 'Sold') {
-          setIsSettlementDialogOpen(true);
-        } else {
-          // For other statuses requiring property, update immediately
-          onUpdateStatus(pendingStatusChange.referralId, pendingStatusChange.status);
-          setPendingStatusChange(null);
+      setIsSaving(true);
+      try {
+        // Update the referral with the new vault_property_id
+        const { error: referralUpdateError } = await supabase
+          .from("referrals")
+          .update({ vault_property_id: update.vault_property_id })
+          .eq("id", referral.id);
+
+        if (referralUpdateError) throw referralUpdateError;
+        
+        // Also update the property to link it back to this referral
+        const { data: existingProperty, error: propertyCheckError } = await supabase
+          .from("properties")
+          .select("id")
+          .eq("vault_property_id", update.vault_property_id)
+          .single();
+          
+        if (!propertyCheckError && existingProperty) {
+          // If property exists, update its referral_id
+          const { error: propertyUpdateError } = await supabase
+            .from("properties")
+            .update({ referral_id: referral.id })
+            .eq("vault_property_id", update.vault_property_id);
+            
+          if (propertyUpdateError) {
+            handleError(propertyUpdateError, {
+              context: 'ReferralDetailsDialog.handleLinkPropertyComplete.updateProperty',
+              toastMessage: 'Warning: Property updated but referral link may not be complete',
+              showToast: false,
+              silent: true
+            });
+          }
         }
-      }
-      
-      // Optionally call onSyncComplete or a similar prop to notify the parent
-      if (onSyncComplete) {
+        
+        // Update local referral state with the new vault_property_id
+        const updatedReferral = { ...referral, vault_property_id: update.vault_property_id };
+        setReferral(updatedReferral);
+        
+        // Update local linked property state with the details passed back
+        setLinkedProperty(update.propertyDetails);
+        setIsLinkPropertyDialogOpen(false); // Close the dialog
+        
+        // Check if we came from property warning - if so, update the status too
+        if (pendingStatusChange) {
+          // For "Sold" status, we need to open the settlement dialog
+          if (pendingStatusChange.status === 'Sold') {
+            setIsSettlementDialogOpen(true);
+          } else {
+            // For other statuses requiring property, update immediately
+            onUpdateStatus(pendingStatusChange.referralId, pendingStatusChange.status);
+            setPendingStatusChange(null);
+          }
+        }
+        
+        // Optionally call onSyncComplete or a similar prop to notify the parent
+        if (onSyncComplete) {
           onSyncComplete(updatedReferral); 
+        }
+      } catch (error: unknown) {
+        handleError(error, {
+          context: 'ReferralDetailsDialog.handleLinkPropertyComplete',
+          toastMessage: 'Error linking property to referral',
+          showToast: true
+        });
+      } finally {
+        setIsSaving(false);
       }
     }
   };
@@ -705,10 +944,36 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
 
   // Fix the display logic
   const renderPropertyAddress = (property: ExtendedPropertyDetails) => {
-    if (property.address_obj && property.address_obj.display_address) {
-      return property.address_obj.display_address;
+    // Direct handling of our database structure
+    if (property.address_obj) {
+      // First check postal_address which is the most complete format
+      if (property.address_obj.postal_address) {
+        return property.address_obj.postal_address;
+      }
+      
+      // Next try display_address
+      if (property.address_obj.display_address) {
+        return property.address_obj.display_address;
+      }
+      
+      // Next try to combine components
+      const parts = [];
+      if (property.address_obj.street_address) parts.push(property.address_obj.street_address);
+      if (property.address_obj.suburb) parts.push(property.address_obj.suburb);
+      if (property.address_obj.state) parts.push(property.address_obj.state);
+      if (property.address_obj.post_code) parts.push(property.address_obj.post_code);
+      
+      if (parts.length > 0) {
+        return parts.join(', ');
+      }
     }
-    return property.address || 'N/A';
+    
+    // Fallback to simple address string
+    if (property.address) {
+      return property.address;
+    }
+    
+    return 'N/A';
   };
 
   if (!referral) return null;
@@ -806,12 +1071,12 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
                     <h3 className="text-base font-semibold mb-2">Referral Details</h3>
                     <div className="mt-1 space-y-1 text-sm text-muted-foreground">
                       <p><span className="font-medium text-foreground">Created:</span> {formatDate(referral.created_at)}</p>
-                      <p className="flex items-center">
+                      <div className="flex items-center">
                         <span className="font-medium text-foreground">Status:</span>
                         <Badge className={`ml-2 ${getStatusBadgeClass(referral.status)}`}>
                           {referral.status || 'New'}
                         </Badge>
-                      </p>
+                      </div>
                       {renderSettlementDate()}
                     </div>
                   </div>
@@ -863,7 +1128,7 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
                     ) : linkedProperty ? (
                       <div className="space-y-1 text-sm text-muted-foreground">
                         <p><span className="font-medium text-foreground">Address:</span> {renderPropertyAddress(linkedProperty)}</p>
-                        <p><span className="font-medium text-foreground">Status:</span> {linkedProperty.status || 'N/A'}</p>
+                        <p><span className="font-medium text-foreground">Status:</span> {(linkedProperty.status && linkedProperty.status.charAt(0).toUpperCase() + linkedProperty.status.slice(1)) || 'N/A'}</p>
                         <p><span className="font-medium text-foreground">Type:</span> {linkedProperty.property_type || 'N/A'}</p>
                         <p><span className="font-medium text-foreground">Price:</span> {linkedProperty.price_text || 'N/A'}</p>
                       </div>
@@ -1077,20 +1342,65 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           open={isLinkPropertyDialogOpen}
           onOpenChange={setIsLinkPropertyDialogOpen}
           onLinkComplete={({ vault_property_id, propertyDetails }) => {
-            // Convert PropertyDetails to ExtendedPropertyDetails
+            // Convert PropertyDetails to ExtendedPropertyDetails with a proper address_obj structure
             const extendedDetails: ExtendedPropertyDetails = {
               ...propertyDetails,
               status: undefined,
               property_type: undefined,
               price_text: undefined,
               address_obj: {
-                display_address: propertyDetails.address
+                display_address: propertyDetails.address,
+                // Add any address components we might have
+                street_address: propertyDetails.address, // Best guess
+                suburb: propertyDetails.city,
+                state: propertyDetails.state,
+                post_code: propertyDetails.zip
               }
             };
-            handleLinkPropertyComplete({
-              vault_property_id,
-              propertyDetails: extendedDetails
-            });
+            
+            // Fetch the full property details from the database to ensure we have accurate data
+            supabase
+              .from('properties')
+              .select('*')
+              .eq('vault_property_id', vault_property_id)
+              .single()
+              .then(({ data, error }) => {
+                if (error) {
+                  handleError(error, {
+                    context: 'ReferralDetailsDialog.linkProperty',
+                    toastMessage: 'Error fetching complete property details',
+                    showToast: false,
+                    silent: true
+                  });
+                  // Continue with the basic property data we already have
+                  handleLinkPropertyComplete({
+                    vault_property_id,
+                    propertyDetails: extendedDetails
+                  });
+                } else if (data) {
+                  // If we found property data, create a more complete ExtendedPropertyDetails
+                  const fullPropertyDetails: ExtendedPropertyDetails = {
+                    ...extendedDetails,
+                    // Use exact values from the database
+                    status: data.status,
+                    property_type: data.property_type,
+                    price_text: data.price_text,
+                    // Use the address object directly from the database
+                    address_obj: data.address || { display_address: propertyDetails.address }
+                  };
+                  
+                  handleLinkPropertyComplete({
+                    vault_property_id,
+                    propertyDetails: fullPropertyDetails
+                  });
+                } else {
+                  // If no property found, fall back to the basic details
+                  handleLinkPropertyComplete({
+                    vault_property_id,
+                    propertyDetails: extendedDetails
+                  });
+                }
+              });
           }}
         />
       )}
@@ -1101,16 +1411,13 @@ export const ReferralDetailsDialog: React.FC<ReferralDetailsDialogProps> = ({
           referralId={referral.id}
           open={isLinkReferrerDialogOpen}
           onOpenChange={setIsLinkReferrerDialogOpen}
-          onLinkComplete={
-            // Define an interface for the expected structure
-            (update: { 
-              referrer_id: string;
-              partnerDetails: Partner;
-            }) => {
-              // Pass the update object directly as it now matches the expected Partner type
-              handleLinkPartnerComplete(update);
-            }
-          }
+          onLinkComplete={(update: { 
+            referrer_id: string;
+            partnerDetails: Partner;
+          }) => {
+            // Pass the update object directly as it now matches the expected Partner type
+            handleLinkPartnerComplete(update);
+          }}
         />
       )}
     </Dialog>

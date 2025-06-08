@@ -378,7 +378,7 @@ function AdminReferrals() {
     setLoadingHistory(true);
     try {
       const { data, error: historyError } = await supabase
-        .from('status_history')
+        .from('referral_status_history')
         .select('*, users(full_name)')
         .eq('referral_id', referralId)
         .order('created_at', { ascending: false });
@@ -387,7 +387,7 @@ function AdminReferrals() {
         setStatusHistory(data as StatusHistoryItem[]);
       }
     } catch (_error) {
-      // Removed console.error
+      // Error handling is silent
     } finally {
       setLoadingHistory(false);
     }

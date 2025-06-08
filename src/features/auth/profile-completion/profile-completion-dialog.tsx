@@ -96,6 +96,7 @@ export function ProfileCompletionDialog({
 }: ProfileCompletionDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasProfileBeenSet, setHasProfileBeenSet] = useState(false)
   const { user } = useAuth()
   
   const form = useForm<z.infer<typeof formSchema>>({
@@ -106,12 +107,12 @@ export function ProfileCompletionDialog({
       birthdayMonth: '',
       birthdayDay: '',
     },
-    mode: 'onChange',
+    mode: 'onSubmit',
   })
   
   // Fetch current user data to pre-fill the form
   useEffect(() => {
-    if (!user) return;
+    if (!user || hasProfileBeenSet) return;
     
     async function fetchUserProfile() {
       try {
@@ -146,9 +147,14 @@ export function ProfileCompletionDialog({
         } else if (user?.user_metadata) {
           // If no profile but user has metadata in auth
           const metadata = user.user_metadata;
-          form.setValue('fullName', metadata.full_name || '');
-          form.setValue('phoneNumber', metadata.phone || '');
+          form.reset({
+            fullName: metadata.full_name || '',
+            phoneNumber: metadata.phone || '',
+            birthdayMonth: '',
+            birthdayDay: '',
+          });
         }
+        setHasProfileBeenSet(true);
       } catch (_err) {
         // Replace console.error with setting a state that can be displayed to the user if needed
         setError('Could not load your profile data. You can still complete the form.');
@@ -156,7 +162,7 @@ export function ProfileCompletionDialog({
     }
     
     fetchUserProfile();
-  }, [user, form]);
+  }, [user, form, hasProfileBeenSet]);
   
   async function onSubmit(data: z.infer<typeof formSchema>) {
     if (!user) {

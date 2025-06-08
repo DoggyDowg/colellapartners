@@ -14,7 +14,13 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserProfile } from '@/hooks/use-user-profile'
 import { Bell, LogOut, SquareUser } from 'lucide-react'
 
-export function ProfileDropdown() {
+interface ProfileDropdownProps {
+  children?: React.ReactNode
+  align?: 'start' | 'center' | 'end'
+  side?: 'top' | 'right' | 'bottom' | 'left'
+}
+
+export function ProfileDropdown({ children, align = 'end', side = 'bottom' }: ProfileDropdownProps) {
   const { signOut, user } = useAuth()
   const { getProfilePicture } = useUserProfile()
   const navigate = useNavigate()
@@ -42,17 +48,22 @@ export function ProfileDropdown() {
     navigate({ to: '/auth' })
   }
 
+  // Default trigger if none provided
+  const defaultTrigger = (
+    <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
+      <Avatar className='h-8 w-8'>
+        <AvatarImage src={avatarSrc} alt={displayName} />
+        <AvatarFallback>{initials}</AvatarFallback>
+      </Avatar>
+    </Button>
+  )
+
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button variant='ghost' className='relative h-8 w-8 rounded-full'>
-          <Avatar className='h-8 w-8'>
-            <AvatarImage src={avatarSrc} alt={displayName} />
-            <AvatarFallback>{initials}</AvatarFallback>
-          </Avatar>
-        </Button>
+        {children || defaultTrigger}
       </DropdownMenuTrigger>
-      <DropdownMenuContent className='w-56' align='end' forceMount>
+      <DropdownMenuContent className='w-56' align={align} side={side} forceMount>
         <DropdownMenuLabel className='font-normal'>
           <div className='flex flex-col space-y-1'>
             <p className='text-sm font-medium leading-none'>{displayName}</p>

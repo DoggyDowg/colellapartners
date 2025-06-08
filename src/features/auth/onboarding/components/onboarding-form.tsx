@@ -85,7 +85,9 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [formError, setFormError] = useState<Error | null>(null)
   const navigate = useNavigate()
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const [retryCount, setRetryCount] = useState(0)
+  const maxRetries = 3
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -111,19 +113,34 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
     }
   }, []);
 
+  // Check for user data and retry if needed
+  useEffect(() => {
+    if (!authLoading && !user && retryCount < maxRetries) {
+      // If auth loading is complete but no user is found, retry after a delay
+      const retryDelay = Math.pow(2, retryCount) * 500; // Exponential backoff
+      
+      const retryTimer = setTimeout(() => {
+        // Retry to get user data
+        setRetryCount(prev => prev + 1);
+      }, retryDelay);
+      
+      return () => clearTimeout(retryTimer);
+    }
+  }, [user, authLoading, retryCount]);
+
   async function onSubmit(data: z.infer<typeof formSchema>) {
     if (!user) {
-      setError('No user found. Please try logging in again.')
-      return
+      setError('No user found. Please try logging in again.');
+      return;
     }
 
-    setIsLoading(true)
-    setError(null)
+    setIsLoading(true);
+    setError(null);
     
     try {
       // Format birthday as MM-DD (month and day only)
       // The column is actually character varying type, not DATE
-      const formattedBirthday = `${data.birthdayMonth}-${data.birthdayDay}`
+      const formattedBirthday = `${data.birthdayMonth}-${data.birthdayDay}`;
       
       // First update user metadata
       const { error: metadataError } = await supabase.auth.updateUser({
@@ -131,10 +148,10 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
           full_name: data.fullName,
           phone: data.phoneNumber
         }
-      })
+      });
       
       if (metadataError) {
-        throw metadataError
+        throw metadataError;
       }
       
       // Prepare profile data with proper column names
@@ -145,39 +162,70 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
         birthday: formattedBirthday,
         phone_number: data.phoneNumber, // Use phone_number, not phone
         updated_at: new Date().toISOString()
+      };
+      
+      // Then update or create user profile with retry mechanism
+      let profileUpdateSuccessful = false;
+      let profileRetryCount = 0;
+      const profileMaxRetries = 2;
+      let errorMessage = '';
+      
+      while (!profileUpdateSuccessful && profileRetryCount <= profileMaxRetries) {
+        try {
+          const { error } = await supabase
+            .from('user_profiles')
+            .upsert(profileData, {
+              onConflict: 'id'
+            });
+          
+          if (error) {
+            // Safely extract error message
+            errorMessage = typeof error.message === 'string' ? error.message : 'Unknown database error';
+            profileRetryCount++;
+            
+            if (profileRetryCount <= profileMaxRetries) {
+              // Wait briefly before retry (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, 500 * profileRetryCount));
+            }
+          } else {
+            profileUpdateSuccessful = true;
+          }
+        } catch (err) {
+          // Safely extract error message from caught exception
+          errorMessage = err instanceof Error ? err.message : 'Unknown error during profile update';
+          profileRetryCount++;
+          
+          if (profileRetryCount <= profileMaxRetries) {
+            // Wait briefly before retry
+            await new Promise(resolve => setTimeout(resolve, 500 * profileRetryCount));
+          }
+        }
       }
       
-      // Then update or create user profile
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .upsert(profileData, {
-          onConflict: 'id'
-        })
-      
-      if (profileError) {
-        throw new Error(`Profile update failed: ${profileError.message || 'Unknown error'}`);
+      if (!profileUpdateSuccessful) {
+        throw new Error(`Profile update failed: ${errorMessage}`);
       }
       
       // Call the setup function to ensure everything is set up correctly
       try {
-        await supabase.rpc('complete_user_setup')
+        await supabase.rpc('complete_user_setup');
       } catch (_setupError) {
         // Silently handle setup errors, since the basic profile is created
       }
       
       // Redirect to dashboard
-      const { data: isAdmin } = await supabase.rpc('is_admin')
+      const { data: isAdmin } = await supabase.rpc('is_admin');
       
       if (isAdmin) {
-        navigate({ to: '/admin' })
+        navigate({ to: '/admin' });
       } else {
-        navigate({ to: '/' })
+        navigate({ to: '/' });
       }
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred while updating your profile'
-      setError(errorMessage)
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred while updating your profile';
+      setError(errorMessage);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
   }
 
@@ -194,6 +242,29 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
           >
             Refresh Page
           </Button>
+        </div>
+      ) : authLoading ? (
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-t-2 border-primary"></div>
+          <p className="mt-4 text-sm text-muted-foreground">Loading your profile...</p>
+        </div>
+      ) : !user && retryCount >= maxRetries ? (
+        <div className="p-4 rounded-md bg-destructive/15 text-destructive">
+          <h3 className="font-medium mb-2">Authentication Failed</h3>
+          <p className="text-sm">We couldn't retrieve your profile. This could be due to a temporary issue.</p>
+          <div className="flex gap-2 mt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+            >
+              Refresh Page
+            </Button>
+            <Button 
+              onClick={() => navigate({ to: '/sign-in' })}
+            >
+              Sign In Again
+            </Button>
+          </div>
         </div>
       ) : (
         <Form {...form}>

@@ -126,34 +126,64 @@ export function SignUpForm({ className, ...props }: SignUpFormProps) {
         })
         
         if (signInError) {
-          // Log sign-in error but proceed to profile creation attempt
+          // Log sign-in error but don't proceed to profile creation if we couldn't sign in
           console.error("Sign in after sign up failed:", signInError);
+          throw new Error("We couldn't sign you in automatically. Please try signing in manually after registration.");
         }
         
         // Create a profile record with the email preferences
-        try {
-          const { error: profileError } = await supabase
-            .from('user_profiles')
-            .insert({
-              id: signUpData.user.id,
-              email: data.email, // Email is required
-              name: data.email.split('@')[0] || 'New User', // Use part of email as default name
-              communication_emails: data.communication_emails ?? false,
-              marketing_emails: data.marketing_emails ?? false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-            });
+        let profileCreated = false;
+        let profileError = null;
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        // Try to create profile with retries
+        while (!profileCreated && retryCount <= maxRetries) {
+          try {
+            const { error } = await supabase
+              .from('user_profiles')
+              .insert({
+                id: signUpData.user.id,
+                email: data.email, // Email is required
+                name: data.email.split('@')[0] || 'New User', // Use part of email as default name
+                communication_emails: data.communication_emails ?? false,
+                marketing_emails: data.marketing_emails ?? false,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
 
-          if (profileError) {
-            // Log error but continue navigation, onboarding will handle missing profile
-            // console.error("Error creating initial profile:", profileError);
+            if (error) {
+              profileError = error;
+              retryCount++;
+              
+              if (retryCount <= maxRetries) {
+                // Wait briefly before retry (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+              }
+            } else {
+              // Profile created successfully
+              profileCreated = true;
+            }
+          } catch (e) {
+            profileError = e;
+            retryCount++;
+            
+            if (retryCount <= maxRetries) {
+              // Wait briefly before retry
+              await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+            }
           }
-        } catch (profileCreationError) {
-          // console.error("Exception creating initial profile:", profileCreationError);
         }
         
-        // Redirect to the onboarding page regardless of profile creation success
-        navigate({ to: '/onboarding' })
+        // Only redirect if profile was created successfully
+        if (profileCreated) {
+          // Redirect to the onboarding page
+          navigate({ to: '/onboarding' });
+        } else {
+          // Profile creation failed even after retries
+          console.error("Failed to create user profile:", profileError);
+          throw new Error("Your account was created, but we couldn't set up your profile. Please try signing in and completing your profile.");
+        }
       } else if (signUpData.session === null && signUpData.user === null) {
         // Handle cases where email confirmation is required
         setSuccess('Registration successful! Please check your email to confirm your account.')

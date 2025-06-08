@@ -1,14 +1,24 @@
 import { useEffect, useState } from 'react'
+import { Home, Instagram, Facebook } from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarRail,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  useSidebar,
 } from '@/components/ui/sidebar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { NavGroupWithIndicators } from '@/components/layout/nav-group-with-indicators'
 import { NavUser } from '@/components/layout/nav-user'
-import { TeamSwitcher } from '@/components/layout/team-switcher'
 import { sidebarData } from './data/sidebar-data'
 import supabase from '@/lib/supabase'
 
@@ -26,6 +36,76 @@ type NavGroupType = typeof sidebarData.navGroups[0];
 const filterNonAdminItems = (groups: NavGroupType[]): NavGroupType[] => {
   return groups.filter(group => group.title !== 'Admin');
 };
+
+// Simple Logo Component for Sidebar Header with External Links Dropdown
+function SidebarLogo() {
+  const { state, isMobile } = useSidebar()
+  const isCollapsed = state === 'collapsed'
+
+  return (
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton size='lg' className='h-12 justify-start px-4'>
+              <img 
+                src={isCollapsed 
+                  ? "/images/custom/colellapartners_logo_square.png" 
+                  : "/images/custom/colellapartners_logo_landscape.png"
+                }
+                alt="Colella Partners" 
+                className={isCollapsed 
+                  ? "h-8 w-8 object-contain" 
+                  : "h-8 w-auto object-contain"
+                }
+              />
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            className='w-56' 
+            align='start' 
+            side={isMobile ? 'bottom' : 'right'}
+            sideOffset={4}
+          >
+            <DropdownMenuItem asChild>
+              <a 
+                href="https://www.colella.com.au" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <Home className="h-4 w-4" />
+                Home Page
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a 
+                href="https://www.instagram.com/colellaproperty" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <Instagram className="h-4 w-4" />
+                Instagram
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a 
+                href="https://www.facebook.com/colellaproperty" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-2"
+              >
+                <Facebook className="h-4 w-4" />
+                Facebook
+              </a>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+    </SidebarMenu>
+  )
+}
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Start with non-admin view by default (safer assumption)
@@ -104,7 +184,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
       <Sidebar collapsible='icon' variant='floating' {...props}>
         <SidebarHeader>
-          <TeamSwitcher teams={sidebarData.teams} />
+          <SidebarLogo />
         </SidebarHeader>
         <SidebarContent>
           {filterNonAdminItems(sidebarData.navGroups).map((props) => (
@@ -122,7 +202,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar collapsible='icon' variant='floating' {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={sidebarData.teams} />
+        <SidebarLogo />
       </SidebarHeader>
       <SidebarContent>
         {navGroups.map((props) => (

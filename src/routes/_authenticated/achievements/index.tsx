@@ -6,6 +6,7 @@ import { Header } from '../../../components/layout/header';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '../../../components/ui/badge';
+import { Separator } from '../../../components/ui/separator';
 import { 
   IconTrophy, 
   IconGift, 
@@ -308,14 +309,15 @@ function UserAchievements() {
   return (
     <>
       <Header title="Achievements" />
-      <div className="container py-6">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-3xl font-bold">Achievements</h1>
+      <div className="container py-4 sm:py-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <h1 className="text-2xl sm:text-3xl font-bold">Achievements</h1>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handleRefresh}
             disabled={loading}
+            className="self-start sm:self-auto"
           >
             {loading ? "Loading..." : "Refresh"}
           </Button>
@@ -324,8 +326,8 @@ function UserAchievements() {
         {/* Overview Card */}
         <Card className="mb-6">
           <CardHeader className="pb-2">
-            <CardTitle>Achievement Progress</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Achievement Progress</CardTitle>
+            <CardDescription className="text-sm">
               You've completed {stats.completedAchievements} out of {stats.totalAchievements} achievements
             </CardDescription>
           </CardHeader>
@@ -341,7 +343,7 @@ function UserAchievements() {
               
               <div className="pt-2">
                 <div className="text-sm font-medium">Next milestone:</div>
-                <div className="text-sm text-muted-foreground">{stats.nextMilestone}</div>
+                <div className="text-sm text-muted-foreground break-words">{stats.nextMilestone}</div>
               </div>
             </div>
           </CardContent>
@@ -365,52 +367,68 @@ function UserAchievements() {
         ) : (
           Object.values(groupedAchievements).map(({ stack, achievements }) => (
             <Card key={stack.id} className="mb-6">
-              <CardHeader className="pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="rounded-full bg-muted p-2.5">
+              <CardHeader className="pb-6 text-center sm:text-left">
+                <div className="flex flex-col items-center sm:items-start gap-4">
+                  <div className="rounded-full bg-muted p-3">
                     {getIconForAchievement(stack.icon)}
                   </div>
-                  <div>
-                    <CardTitle>{stack.title}</CardTitle>
-                    <CardDescription>{stack.description}</CardDescription>
+                  <div className="space-y-2">
+                    <CardTitle className="text-lg sm:text-xl break-words">{stack.title}</CardTitle>
+                    <CardDescription className="text-sm break-words max-w-2xl">
+                      {stack.description}
+                    </CardDescription>
+                  </div>
+                  <div className="w-[60%] pt-2 self-center sm:self-start">
+                    <Separator />
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-5">
                   {achievements.map((achievement) => (
-                    <div key={achievement.id} className="flex items-start gap-4">
-                      <div className={`mt-0.5 rounded-full p-1.5 ${
+                    <div key={achievement.id} className="flex items-start gap-3 sm:gap-4">
+                      <div className={`mt-0.5 rounded-full p-1.5 flex-shrink-0 ${
                         achievement.completed 
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted text-muted-foreground'
                       }`}>
                         <IconTrophy className="h-4 w-4" />
                       </div>
-                      <div className="flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{achievement.title}</span>
-                          {achievement.completed && (
-                            <Badge variant="outline" className="bg-primary/10 text-xs">
-                              Completed
-                              {achievement.completed_date && ` on ${new Date(achievement.completed_date).toLocaleDateString()}`}
+                      <div className="min-w-0 flex-1 space-y-2">
+                        {/* Title and badges row - responsive layout */}
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <span className="font-medium break-words">{achievement.title}</span>
+                          <div className="flex flex-wrap gap-2">
+                            {achievement.completed && (
+                              <Badge variant="outline" className="bg-primary/10 text-xs flex-shrink-0">
+                                Completed
+                                {achievement.completed_date && (
+                                  <span className="hidden sm:inline">
+                                    {` on ${new Date(achievement.completed_date).toLocaleDateString()}`}
+                                  </span>
+                                )}
+                              </Badge>
+                            )}
+                            <Badge variant="outline" className="bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200 text-xs flex-shrink-0">
+                              {achievement.raffle_entries} {achievement.raffle_entries === 1 ? 'Entry' : 'Entries'}
                             </Badge>
-                          )}
-                          <Badge variant="outline" className="ml-auto bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200">
-                            {achievement.raffle_entries} {achievement.raffle_entries === 1 ? 'Entry' : 'Entries'}
-                          </Badge>
+                          </div>
                         </div>
-                        <p className="text-sm text-muted-foreground">
+                        
+                        {/* Description */}
+                        <p className="text-sm text-muted-foreground break-words">
                           {achievement.description}
                         </p>
-                        <div className="pt-1">
+                        
+                        {/* Progress bar */}
+                        <div className="space-y-1.5">
                           <div className="flex justify-between text-xs">
                             <span>Progress</span>
                             <span>{achievement.progress} / {achievement.target}</span>
                           </div>
                           <Progress 
                             value={(achievement.progress / achievement.target) * 100} 
-                            className="h-1.5 mt-1.5"
+                            className="h-1.5"
                           />
                         </div>
                       </div>

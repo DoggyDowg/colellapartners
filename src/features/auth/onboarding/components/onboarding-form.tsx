@@ -213,13 +213,13 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
         // Silently handle setup errors, since the basic profile is created
       }
       
-      // Redirect to dashboard
+      // Redirect based on user role
       const { data: isAdmin } = await supabase.rpc('is_admin');
       
       if (isAdmin) {
         navigate({ to: '/admin' });
       } else {
-        navigate({ to: '/' });
+        navigate({ to: '/partner-setup' });
       }
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred while updating your profile';
@@ -388,7 +388,7 @@ export function OnboardingForm({ className, ...props }: OnboardingFormProps) {
               />
 
               <Button className='mt-2' disabled={isLoading}>
-                {isLoading ? 'Completing setup...' : 'Complete Setup'}
+                {isLoading ? 'Setting up...' : 'Next Step'}
               </Button>
             </div>
           </form>

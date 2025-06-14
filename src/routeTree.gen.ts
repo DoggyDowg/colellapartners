@@ -46,6 +46,9 @@ import { Route as AdminPropertyIdImport } from './routes/admin/property.$id'
 // Create Virtual Routes
 
 const UpdatePasswordLazyImport = createFileRoute('/update-password')()
+const AuthenticatedReferralToolkitLazyImport = createFileRoute(
+  '/_authenticated/referral-toolkit',
+)()
 const errors503LazyImport = createFileRoute('/(errors)/503')()
 const errors500LazyImport = createFileRoute('/(errors)/500')()
 const errors404LazyImport = createFileRoute('/(errors)/404')()
@@ -53,6 +56,7 @@ const errors403LazyImport = createFileRoute('/(errors)/403')()
 const errors401LazyImport = createFileRoute('/(errors)/401')()
 const authSignUpLazyImport = createFileRoute('/(auth)/sign-up')()
 const authSignIn2LazyImport = createFileRoute('/(auth)/sign-in-2')()
+const authPartnerSetupLazyImport = createFileRoute('/(auth)/partner-setup')()
 const authForgotPasswordLazyImport = createFileRoute(
   '/(auth)/forgot-password',
 )()
@@ -154,6 +158,17 @@ const AuthenticatedIndexRoute = AuthenticatedIndexImport.update({
   import('./routes/_authenticated/index.lazy').then((d) => d.Route),
 )
 
+const AuthenticatedReferralToolkitLazyRoute =
+  AuthenticatedReferralToolkitLazyImport.update({
+    id: '/referral-toolkit',
+    path: '/referral-toolkit',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any).lazy(() =>
+    import('./routes/_authenticated/referral-toolkit.lazy').then(
+      (d) => d.Route,
+    ),
+  )
+
 const errors503LazyRoute = errors503LazyImport
   .update({
     id: '/(errors)/503',
@@ -209,6 +224,14 @@ const authSignIn2LazyRoute = authSignIn2LazyImport
     getParentRoute: () => rootRoute,
   } as any)
   .lazy(() => import('./routes/(auth)/sign-in-2.lazy').then((d) => d.Route))
+
+const authPartnerSetupLazyRoute = authPartnerSetupLazyImport
+  .update({
+    id: '/(auth)/partner-setup',
+    path: '/partner-setup',
+    getParentRoute: () => rootRoute,
+  } as any)
+  .lazy(() => import('./routes/(auth)/partner-setup.lazy').then((d) => d.Route))
 
 const authForgotPasswordLazyRoute = authForgotPasswordLazyImport
   .update({
@@ -648,6 +671,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof authForgotPasswordLazyImport
       parentRoute: typeof rootRoute
     }
+    '/(auth)/partner-setup': {
+      id: '/(auth)/partner-setup'
+      path: '/partner-setup'
+      fullPath: '/partner-setup'
+      preLoaderRoute: typeof authPartnerSetupLazyImport
+      parentRoute: typeof rootRoute
+    }
     '/(auth)/sign-in-2': {
       id: '/(auth)/sign-in-2'
       path: '/sign-in-2'
@@ -696,6 +726,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/503'
       preLoaderRoute: typeof errors503LazyImport
       parentRoute: typeof rootRoute
+    }
+    '/_authenticated/referral-toolkit': {
+      id: '/_authenticated/referral-toolkit'
+      path: '/referral-toolkit'
+      fullPath: '/referral-toolkit'
+      preLoaderRoute: typeof AuthenticatedReferralToolkitLazyImport
+      parentRoute: typeof AuthenticatedRouteImport
     }
     '/_authenticated/': {
       id: '/_authenticated/'
@@ -841,6 +878,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedLatestNewsRoute: typeof AuthenticatedLatestNewsRoute
   AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
   AuthenticatedSettingsRouteLazyRoute: typeof AuthenticatedSettingsRouteLazyRouteWithChildren
+  AuthenticatedReferralToolkitLazyRoute: typeof AuthenticatedReferralToolkitLazyRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedPropertyIdLazyRoute: typeof AuthenticatedPropertyIdLazyRoute
   AuthenticatedAchievementsIndexRoute: typeof AuthenticatedAchievementsIndexRoute
@@ -858,6 +896,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
   AuthenticatedSettingsRouteLazyRoute:
     AuthenticatedSettingsRouteLazyRouteWithChildren,
+  AuthenticatedReferralToolkitLazyRoute: AuthenticatedReferralToolkitLazyRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedPropertyIdLazyRoute: AuthenticatedPropertyIdLazyRoute,
   AuthenticatedAchievementsIndexRoute: AuthenticatedAchievementsIndexRoute,
@@ -936,12 +975,14 @@ export interface FileRoutesByFullPath {
   '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/forgot-password': typeof authForgotPasswordLazyRoute
+  '/partner-setup': typeof authPartnerSetupLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
   '/sign-up': typeof authSignUpLazyRoute
   '/401': typeof errors401LazyRoute
   '/403': typeof errors403LazyRoute
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
+  '/referral-toolkit': typeof AuthenticatedReferralToolkitLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/property/$id': typeof AdminPropertyIdRoute
@@ -982,12 +1023,14 @@ export interface FileRoutesByTo {
   '/auth/login': typeof AuthLoginRoute
   '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
   '/forgot-password': typeof authForgotPasswordLazyRoute
+  '/partner-setup': typeof authPartnerSetupLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
   '/sign-up': typeof authSignUpLazyRoute
   '/401': typeof errors401LazyRoute
   '/403': typeof errors403LazyRoute
   '/404': typeof errors404LazyRoute
   '/503': typeof errors503LazyRoute
+  '/referral-toolkit': typeof AuthenticatedReferralToolkitLazyRoute
   '/': typeof AuthenticatedIndexRoute
   '/admin': typeof AdminIndexRoute
   '/admin/property/$id': typeof AdminPropertyIdRoute
@@ -1033,6 +1076,7 @@ export interface FileRoutesById {
   '/property/$id': typeof PropertyIdRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
+  '/(auth)/partner-setup': typeof authPartnerSetupLazyRoute
   '/(auth)/sign-in-2': typeof authSignIn2LazyRoute
   '/(auth)/sign-up': typeof authSignUpLazyRoute
   '/(errors)/401': typeof errors401LazyRoute
@@ -1040,6 +1084,7 @@ export interface FileRoutesById {
   '/(errors)/404': typeof errors404LazyRoute
   '/(errors)/500': typeof errors500LazyRoute
   '/(errors)/503': typeof errors503LazyRoute
+  '/_authenticated/referral-toolkit': typeof AuthenticatedReferralToolkitLazyRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/property/$id': typeof AdminPropertyIdRoute
@@ -1085,12 +1130,14 @@ export interface FileRouteTypes {
     | '/property/$id'
     | '/settings'
     | '/forgot-password'
+    | '/partner-setup'
     | '/sign-in-2'
     | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
     | '/503'
+    | '/referral-toolkit'
     | '/'
     | '/admin/'
     | '/admin/property/$id'
@@ -1130,12 +1177,14 @@ export interface FileRouteTypes {
     | '/auth/login'
     | '/property/$id'
     | '/forgot-password'
+    | '/partner-setup'
     | '/sign-in-2'
     | '/sign-up'
     | '/401'
     | '/403'
     | '/404'
     | '/503'
+    | '/referral-toolkit'
     | '/'
     | '/admin'
     | '/admin/property/$id'
@@ -1179,6 +1228,7 @@ export interface FileRouteTypes {
     | '/property/$id'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
+    | '/(auth)/partner-setup'
     | '/(auth)/sign-in-2'
     | '/(auth)/sign-up'
     | '/(errors)/401'
@@ -1186,6 +1236,7 @@ export interface FileRouteTypes {
     | '/(errors)/404'
     | '/(errors)/500'
     | '/(errors)/503'
+    | '/_authenticated/referral-toolkit'
     | '/_authenticated/'
     | '/admin/'
     | '/admin/property/$id'
@@ -1220,6 +1271,7 @@ export interface RootRouteChildren {
   authSignInRoute: typeof authSignInRoute
   PropertyIdRoute: typeof PropertyIdRoute
   authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
+  authPartnerSetupLazyRoute: typeof authPartnerSetupLazyRoute
   authSignIn2LazyRoute: typeof authSignIn2LazyRoute
   authSignUpLazyRoute: typeof authSignUpLazyRoute
   errors401LazyRoute: typeof errors401LazyRoute
@@ -1244,6 +1296,7 @@ const rootRouteChildren: RootRouteChildren = {
   authSignInRoute: authSignInRoute,
   PropertyIdRoute: PropertyIdRoute,
   authForgotPasswordLazyRoute: authForgotPasswordLazyRoute,
+  authPartnerSetupLazyRoute: authPartnerSetupLazyRoute,
   authSignIn2LazyRoute: authSignIn2LazyRoute,
   authSignUpLazyRoute: authSignUpLazyRoute,
   errors401LazyRoute: errors401LazyRoute,
@@ -1277,6 +1330,7 @@ export const routeTree = rootRoute
         "/(auth)/sign-in",
         "/property/$id",
         "/(auth)/forgot-password",
+        "/(auth)/partner-setup",
         "/(auth)/sign-in-2",
         "/(auth)/sign-up",
         "/(errors)/401",
@@ -1292,6 +1346,7 @@ export const routeTree = rootRoute
         "/_authenticated/latest-news",
         "/_authenticated/notifications",
         "/_authenticated/settings",
+        "/_authenticated/referral-toolkit",
         "/_authenticated/",
         "/_authenticated/property/$id",
         "/_authenticated/achievements/",
@@ -1412,6 +1467,9 @@ export const routeTree = rootRoute
     "/(auth)/forgot-password": {
       "filePath": "(auth)/forgot-password.lazy.tsx"
     },
+    "/(auth)/partner-setup": {
+      "filePath": "(auth)/partner-setup.lazy.tsx"
+    },
     "/(auth)/sign-in-2": {
       "filePath": "(auth)/sign-in-2.lazy.tsx"
     },
@@ -1432,6 +1490,10 @@ export const routeTree = rootRoute
     },
     "/(errors)/503": {
       "filePath": "(errors)/503.lazy.tsx"
+    },
+    "/_authenticated/referral-toolkit": {
+      "filePath": "_authenticated/referral-toolkit.lazy.tsx",
+      "parent": "/_authenticated"
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",

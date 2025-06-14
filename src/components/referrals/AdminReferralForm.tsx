@@ -551,8 +551,8 @@ export function AdminReferralForm({ onSubmitSuccess, triggerButton }: AdminRefer
             onClick={handleOpenDialog}
             className="bg-black hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-black font-semibold"
           >
-            <PlusCircle className="h-4 w-4 mr-1" />
-            New Referral
+            <PlusCircle className="h-4 w-4 sm:mr-1" />
+            <span className="hidden sm:inline">New Referral</span>
           </Button>
         )}
       </DialogTrigger>

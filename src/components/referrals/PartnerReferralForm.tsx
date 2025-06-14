@@ -246,8 +246,8 @@ export function PartnerReferralForm({ onSubmitSuccess }: PartnerReferralFormProp
           size="sm"
           className="bg-black hover:bg-gray-800 text-white dark:bg-white dark:hover:bg-gray-100 dark:text-black font-semibold"
         >
-          <CircleDollarSign className="h-4 w-4 mr-1" />
-          Refer Someone Now
+          <CircleDollarSign className="h-4 w-4 sm:mr-1" />
+          <span className="hidden sm:inline">Refer Someone Now</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">

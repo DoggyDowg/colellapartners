@@ -106,7 +106,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-
   // Read Credentials from environment variables
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
   const accountId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
@@ -125,6 +124,53 @@ export default async function handler(req, res) {
 
   console.log(`[IG API] Using Account ID: ${accountId ? 'Provided' : 'MISSING'}, Filter Tag: "${cleanFilterTag}"`);
 
+  // MOCK MODE: Return mock data when Instagram API fails (e.g., expired token)
+  // Set this to true temporarily while refreshing your Instagram token
+  const MOCK_MODE = process.env.INSTAGRAM_MOCK_MODE === 'true';
+  
+  if (MOCK_MODE) {
+    console.log('[IG API] 🎭 MOCK MODE: Returning mock Instagram data');
+    const mockPosts = [
+      {
+        id: 'mock_1',
+        media_url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=400&h=400&fit=crop&crop=center',
+        permalink: 'https://instagram.com/p/mock_1',
+        caption: `🏠 Another amazing property from the Colella team! This stunning home features modern design with classic touches. ${cleanFilterTag.replace('#', '#')} #realestate #property`,
+        timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        media_type: 'IMAGE'
+      },
+      {
+        id: 'mock_2', 
+        media_url: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=400&h=600&fit=crop&crop=center',
+        permalink: 'https://instagram.com/p/mock_2',
+        caption: `✨ Just listed! This beautiful family home is perfect for those looking for space and style. Contact us today! ${cleanFilterTag.replace('#', '#')} #newlisting`,
+        timestamp: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        media_type: 'IMAGE'
+      },
+      {
+        id: 'mock_3',
+        media_url: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=400&h=500&fit=crop&crop=center',
+        permalink: 'https://instagram.com/p/mock_3',
+        caption: `🌟 Sold! Another successful sale by our dedicated team. Thank you to our amazing clients! ${cleanFilterTag.replace('#', '#')} #sold #success`,
+        timestamp: new Date(Date.now() - 86400000).toISOString(), // 1 day ago  
+        media_type: 'IMAGE'
+      },
+      {
+        id: 'mock_4',
+        media_url: 'https://images.unsplash.com/photo-1570129477492-45c003edd2be?w=400&h=450&fit=crop&crop=center',
+        permalink: 'https://instagram.com/p/mock_4',
+        caption: `🏡 Market update: The spring property market is heating up! Now is a great time to buy or sell. Get in touch with our experts. ${cleanFilterTag.replace('#', '#')} #marketupdate`,
+        timestamp: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
+        media_type: 'IMAGE'
+      }
+    ];
+    
+    return res.status(200).json({ 
+      data: mockPosts,
+      _mock: true,
+      _message: 'This is mock data. Set INSTAGRAM_MOCK_MODE=false and refresh your Instagram token to get real data.'
+    });
+  }
 
   try {
     let posts = [];

@@ -14,6 +14,9 @@ import {
   IconNews,
   IconMail,
   IconBell,
+  IconQrcode,
+  IconInfoCircle,
+  IconFileText,
 } from '@tabler/icons-react'
 import { AudioWaveform, GalleryVerticalEnd, SquareUser } from 'lucide-react'
 import { type SidebarData } from '../types'
@@ -114,6 +117,11 @@ export const sidebarData: SidebarData = {
           icon: IconUserCircle,
         },
         {
+          title: 'Referral Toolkit',
+          url: '/referral-toolkit',
+          icon: IconQrcode,
+        },
+        {
           title: 'Achievements',
           url: '/achievements',
           icon: IconTrophy,
@@ -127,6 +135,18 @@ export const sidebarData: SidebarData = {
           title: 'Notifications',
           url: '/notifications',
           icon: IconBell,
+        },
+        {
+          title: 'Program Details',
+          url: 'https://www.colellapartners.com.au/program-details',
+          icon: IconInfoCircle,
+          external: true,
+        },
+        {
+          title: 'Terms & Conditions',
+          url: 'https://www.colellapartners.com.au/terms-and-conditions',
+          icon: IconFileText,
+          external: true,
         },
         {
           title: 'Settings',

@@ -21,15 +21,16 @@ interface BaseNavItem {
   tooltip?: string
   rightIcon?: React.ElementType
   notificationIndicator?: ReactNode
+  external?: boolean
 }
 
 type NavLink = BaseNavItem & {
-  url: LinkProps['to']
+  url: LinkProps['to'] | string
   items?: never
 }
 
 type NavCollapsible = BaseNavItem & {
-  items: (BaseNavItem & { url: LinkProps['to'], disabled?: boolean, tooltip?: string, rightIcon?: React.ElementType })[]
+  items: (BaseNavItem & { url: LinkProps['to'] | string, disabled?: boolean, tooltip?: string, rightIcon?: React.ElementType, external?: boolean })[]
   url?: never
 }
 

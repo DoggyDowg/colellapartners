@@ -158,12 +158,15 @@ importers:
       tailwindcss-animate:
         specifier: ^1.0.7
         version: 1.0.7(tailwindcss@3.4.16)
+      use-sync-external-store:
+        specifier: ^1.5.0
+        version: 1.5.0(react@19.0.0)
       zod:
         specifier: ^3.23.8
         version: 3.23.8
       zustand:
         specifier: ^5.0.3
-        version: 5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0))
+        version: 5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.5.0(react@19.0.0))
     devDependencies:
       '@eslint/js':
         specifier: ^9.16.0
@@ -3274,10 +3277,10 @@ packages:
       '@types/react':
         optional: true
 
-  use-sync-external-store@1.2.2:
-    resolution: {integrity: sha512-PElTlVMwpblvbNqQ82d2n6RjStvdSoNe9FG28kNfz3WiXilJm4DdNkEzRhCZuIDwY8U08WVihhGR5iRqAwfDiw==}
+  use-sync-external-store@1.5.0:
+    resolution: {integrity: sha512-Rb46I4cGGVBmjamjphe8L/UnvJD+uPPtTkNvX5mZgqdbavhI4EbgIWJiIHXJ8bc/i9EQGPRh4DwEURJ552Do0A==}
     peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
   util-deprecate@1.0.2:
     resolution: {integrity: sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw==}
@@ -4661,7 +4664,7 @@ snapshots:
       '@tanstack/store': 0.6.0
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
-      use-sync-external-store: 1.2.2(react@19.0.0)
+      use-sync-external-store: 1.5.0(react@19.0.0)
 
   '@tanstack/react-table@8.20.5(react-dom@19.0.0(react@19.0.0))(react@19.0.0)':
     dependencies:
@@ -5066,7 +5069,7 @@ snapshots:
       '@radix-ui/react-primitive': 2.0.0(@types/react-dom@19.1.2(@types/react@19.1.2))(@types/react@19.1.2)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
       react: 19.0.0
       react-dom: 19.0.0(react@19.0.0)
-      use-sync-external-store: 1.2.2(react@19.0.0)
+      use-sync-external-store: 1.5.0(react@19.0.0)
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
@@ -6354,7 +6357,7 @@ snapshots:
     optionalDependencies:
       '@types/react': 19.1.2
 
-  use-sync-external-store@1.2.2(react@19.0.0):
+  use-sync-external-store@1.5.0(react@19.0.0):
     dependencies:
       react: 19.0.0
 
@@ -6453,8 +6456,8 @@ snapshots:
 
   zod@3.23.8: {}
 
-  zustand@5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.2.2(react@19.0.0)):
+  zustand@5.0.4(@types/react@19.1.2)(react@19.0.0)(use-sync-external-store@1.5.0(react@19.0.0)):
     optionalDependencies:
       '@types/react': 19.1.2
       react: 19.0.0
-      use-sync-external-store: 1.2.2(react@19.0.0)
+      use-sync-external-store: 1.5.0(react@19.0.0)

@@ -13,7 +13,41 @@ export default defineConfig({
       // fix loading all icon chunks in dev mode
       // https://github.com/tabler/tabler-icons/issues/1233
       '@tabler/icons-react': '@tabler/icons-react/dist/esm/icons/index.mjs',
+      
+      // Fix React 19 compatibility by redirecting to our custom polyfill
+      'use-sync-external-store/shim/with-selector': path.resolve(__dirname, './src/polyfills.ts'),
+      'use-sync-external-store/shim/with-selector.js': path.resolve(__dirname, './src/polyfills.ts'),
     },
+  },
+  define: {
+    // Fix for useSyncExternalStoreWithSelector compatibility with React 19
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+    // Define global for React 19 compatibility
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    exclude: [
+      '@tanstack/react-router',
+      '@tanstack/react-query',
+      '@tanstack/react-table',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-tooltip'
+    ],
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'jsesc',
+      'recharts',
+      'lucide-react',
+      'lodash/get',
+      'lodash/isString',
+      'lodash/isNaN',
+      'lodash/isNumber'
+    ]
   },
   // Add server proxy configuration
   server: {

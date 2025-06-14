@@ -104,7 +104,7 @@ export function ProfileEditor({ partnerData, onUpdate }: ProfileEditorProps) {
         use_my_details: false,
       })
     }
-  }, [partnerData, form])
+  }, [partnerData])
 
   // Auto-fill contact person fields when "I am the main contact" is checked
   useEffect(() => {
@@ -121,7 +121,7 @@ export function ProfileEditor({ partnerData, onUpdate }: ProfileEditorProps) {
       // Clear contact person when unchecked
       form.setValue('contact_person', '')
     }
-  }, [useMyDetails, isBusiness, form])
+  }, [useMyDetails, isBusiness])
 
   // Check for changes
   useEffect(() => {

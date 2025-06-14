@@ -14,6 +14,7 @@ import { createFileRoute } from '@tanstack/react-router'
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as IndexImport } from './routes/_index'
+import { Route as ReferralImport } from './routes/referral'
 import { Route as OnboardingImport } from './routes/onboarding'
 import { Route as ForSaleImport } from './routes/for-sale'
 import { Route as DashboardImport } from './routes/dashboard'
@@ -22,6 +23,7 @@ import { Route as AdminImport } from './routes/admin'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated/route'
 import { Route as AdminIndexImport } from './routes/admin/index'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
+import { Route as ReferCodeImport } from './routes/refer.$code'
 import { Route as PropertyIdImport } from './routes/property.$id'
 import { Route as AuthLoginImport } from './routes/auth/login'
 import { Route as AuthCallbackImport } from './routes/auth/callback'
@@ -108,6 +110,12 @@ const UpdatePasswordLazyRoute = UpdatePasswordLazyImport.update({
 } as any).lazy(() =>
   import('./routes/update-password.lazy').then((d) => d.Route),
 )
+
+const ReferralRoute = ReferralImport.update({
+  id: '/referral',
+  path: '/referral',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const OnboardingRoute = OnboardingImport.update({
   id: '/onboarding',
@@ -251,6 +259,12 @@ const AuthenticatedSettingsRouteLazyRoute =
   } as any).lazy(() =>
     import('./routes/_authenticated/settings/route.lazy').then((d) => d.Route),
   )
+
+const ReferCodeRoute = ReferCodeImport.update({
+  id: '/refer/$code',
+  path: '/refer/$code',
+  getParentRoute: () => rootRoute,
+} as any)
 
 const PropertyIdRoute = PropertyIdImport.update({
   id: '/property/$id',
@@ -538,6 +552,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OnboardingImport
       parentRoute: typeof rootRoute
     }
+    '/referral': {
+      id: '/referral'
+      path: '/referral'
+      fullPath: '/referral'
+      preLoaderRoute: typeof ReferralImport
+      parentRoute: typeof rootRoute
+    }
     '/update-password': {
       id: '/update-password'
       path: '/update-password'
@@ -655,6 +676,13 @@ declare module '@tanstack/react-router' {
       path: '/property/$id'
       fullPath: '/property/$id'
       preLoaderRoute: typeof PropertyIdImport
+      parentRoute: typeof rootRoute
+    }
+    '/refer/$code': {
+      id: '/refer/$code'
+      path: '/refer/$code'
+      fullPath: '/refer/$code'
+      preLoaderRoute: typeof ReferCodeImport
       parentRoute: typeof rootRoute
     }
     '/_authenticated/settings': {
@@ -957,6 +985,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/referral': typeof ReferralRoute
   '/update-password': typeof UpdatePasswordLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
@@ -973,6 +1002,7 @@ export interface FileRoutesByFullPath {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
+  '/refer/$code': typeof ReferCodeRoute
   '/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/partner-setup': typeof authPartnerSetupLazyRoute
@@ -1006,6 +1036,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/referral': typeof ReferralRoute
   '/update-password': typeof UpdatePasswordLazyRoute
   '/500': typeof errors500LazyRoute
   '/otp': typeof authOtpRoute
@@ -1022,6 +1053,7 @@ export interface FileRoutesByTo {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/property/$id': typeof AuthenticatedPropertyIdLazyRoute
+  '/refer/$code': typeof ReferCodeRoute
   '/forgot-password': typeof authForgotPasswordLazyRoute
   '/partner-setup': typeof authPartnerSetupLazyRoute
   '/sign-in-2': typeof authSignIn2LazyRoute
@@ -1057,6 +1089,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/for-sale': typeof ForSaleRoute
   '/onboarding': typeof OnboardingRoute
+  '/referral': typeof ReferralRoute
   '/update-password': typeof UpdatePasswordLazyRoute
   '/(auth)/500': typeof auth500Route
   '/(auth)/auth': typeof authAuthRoute
@@ -1074,6 +1107,7 @@ export interface FileRoutesById {
   '/auth/callback': typeof AuthCallbackRoute
   '/auth/login': typeof AuthLoginRoute
   '/property/$id': typeof PropertyIdRoute
+  '/refer/$code': typeof ReferCodeRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRouteLazyRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordLazyRoute
   '/(auth)/partner-setup': typeof authPartnerSetupLazyRoute
@@ -1112,6 +1146,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/referral'
     | '/update-password'
     | '/500'
     | '/otp'
@@ -1128,6 +1163,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/property/$id'
+    | '/refer/$code'
     | '/settings'
     | '/forgot-password'
     | '/partner-setup'
@@ -1160,6 +1196,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/referral'
     | '/update-password'
     | '/500'
     | '/otp'
@@ -1176,6 +1213,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/property/$id'
+    | '/refer/$code'
     | '/forgot-password'
     | '/partner-setup'
     | '/sign-in-2'
@@ -1209,6 +1247,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/for-sale'
     | '/onboarding'
+    | '/referral'
     | '/update-password'
     | '/(auth)/500'
     | '/(auth)/auth'
@@ -1226,6 +1265,7 @@ export interface FileRouteTypes {
     | '/auth/callback'
     | '/auth/login'
     | '/property/$id'
+    | '/refer/$code'
     | '/_authenticated/settings'
     | '/(auth)/forgot-password'
     | '/(auth)/partner-setup'
@@ -1264,12 +1304,14 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   ForSaleRoute: typeof ForSaleRoute
   OnboardingRoute: typeof OnboardingRoute
+  ReferralRoute: typeof ReferralRoute
   UpdatePasswordLazyRoute: typeof UpdatePasswordLazyRoute
   auth500Route: typeof auth500Route
   authAuthRoute: typeof authAuthRoute
   authOtpRoute: typeof authOtpRoute
   authSignInRoute: typeof authSignInRoute
   PropertyIdRoute: typeof PropertyIdRoute
+  ReferCodeRoute: typeof ReferCodeRoute
   authForgotPasswordLazyRoute: typeof authForgotPasswordLazyRoute
   authPartnerSetupLazyRoute: typeof authPartnerSetupLazyRoute
   authSignIn2LazyRoute: typeof authSignIn2LazyRoute
@@ -1289,12 +1331,14 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   ForSaleRoute: ForSaleRoute,
   OnboardingRoute: OnboardingRoute,
+  ReferralRoute: ReferralRoute,
   UpdatePasswordLazyRoute: UpdatePasswordLazyRoute,
   auth500Route: auth500Route,
   authAuthRoute: authAuthRoute,
   authOtpRoute: authOtpRoute,
   authSignInRoute: authSignInRoute,
   PropertyIdRoute: PropertyIdRoute,
+  ReferCodeRoute: ReferCodeRoute,
   authForgotPasswordLazyRoute: authForgotPasswordLazyRoute,
   authPartnerSetupLazyRoute: authPartnerSetupLazyRoute,
   authSignIn2LazyRoute: authSignIn2LazyRoute,
@@ -1323,12 +1367,14 @@ export const routeTree = rootRoute
         "/dashboard",
         "/for-sale",
         "/onboarding",
+        "/referral",
         "/update-password",
         "/(auth)/500",
         "/(auth)/auth",
         "/(auth)/otp",
         "/(auth)/sign-in",
         "/property/$id",
+        "/refer/$code",
         "/(auth)/forgot-password",
         "/(auth)/partner-setup",
         "/(auth)/sign-in-2",
@@ -1392,6 +1438,9 @@ export const routeTree = rootRoute
     "/onboarding": {
       "filePath": "onboarding.tsx"
     },
+    "/referral": {
+      "filePath": "referral.tsx"
+    },
     "/update-password": {
       "filePath": "update-password.lazy.tsx"
     },
@@ -1453,6 +1502,9 @@ export const routeTree = rootRoute
     },
     "/property/$id": {
       "filePath": "property.$id.tsx"
+    },
+    "/refer/$code": {
+      "filePath": "refer.$code.tsx"
     },
     "/_authenticated/settings": {
       "filePath": "_authenticated/settings/route.lazy.tsx",

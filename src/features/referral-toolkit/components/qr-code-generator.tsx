@@ -13,10 +13,11 @@ import { generateReferralUrl } from '../utils/code-validation'
 
 // QR Code customization options
 const QR_SIZES = [
-  { label: 'Small (128px)', value: 128 },
-  { label: 'Medium (256px)', value: 256 },
+  { label: 'Small (256px)', value: 256 },
+  { label: 'Medium (384px)', value: 384 },
   { label: 'Large (512px)', value: 512 },
-  { label: 'Extra Large (1024px)', value: 1024 }
+  { label: 'Extra Large (768px)', value: 768 },
+  { label: 'Poster Size (1024px)', value: 1024 }
 ]
 
 const QR_COLORS = [
@@ -29,7 +30,7 @@ const QR_COLORS = [
 ]
 
 export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCodeGeneratorProps) {
-  const [size, setSize] = useState(256)
+  const [size, setSize] = useState(512)
   const [colorScheme, setColorScheme] = useState(QR_COLORS[0])
   const [includeText, setIncludeText] = useState(true)
   const [customText, setCustomText] = useState('')
@@ -57,71 +58,12 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
     if (!qrRef.current) return
 
     try {
-      const qrElement = qrRef.current.querySelector('canvas') || qrRef.current.querySelector('svg')
-      if (!qrElement) return
-
       const displayText = customText || `Scan to refer someone to ${businessName || 'Colella Partners'}`
-
+      
       if (format === 'png') {
-        // Handle PNG download
-        let canvas: HTMLCanvasElement
-
-        if (qrElement.tagName === 'CANVAS') {
-          canvas = qrElement as HTMLCanvasElement
-        } else {
-          // Convert SVG to canvas
-          canvas = document.createElement('canvas')
-          const ctx = canvas.getContext('2d')
-          if (!ctx) return
-
-          const svgData = new XMLSerializer().serializeToString(qrElement)
-          const svgWithText = createSVGWithText(svgData, displayText, includeText, size, colorScheme)
-          
-          const img = new Image()
-          const svgBlob = new Blob([svgWithText], { type: 'image/svg+xml' })
-          const svgUrl = URL.createObjectURL(svgBlob)
-
-          await new Promise((resolve) => {
-            img.onload = () => {
-              canvas.width = img.width
-              canvas.height = img.height
-              ctx.drawImage(img, 0, 0)
-              resolve(void 0)
-            }
-            img.src = svgUrl
-          })
-
-          URL.revokeObjectURL(svgUrl)
-        }
-
-        // Download canvas as PNG
-        canvas.toBlob((blob) => {
-          if (blob) {
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url
-            a.download = `qr-code-${partnerCode}.png`
-            document.body.appendChild(a)
-            a.click()
-            document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }
-        }, 'image/png')
-
+        await downloadAsPNG(displayText)
       } else if (format === 'svg') {
-        // Handle SVG download
-        const svgData = new XMLSerializer().serializeToString(qrElement)
-        const svgWithText = createSVGWithText(svgData, displayText, includeText, size, colorScheme)
-        
-        const blob = new Blob([svgWithText], { type: 'image/svg+xml' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `qr-code-${partnerCode}.svg`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        URL.revokeObjectURL(url)
+        await downloadAsSVG(displayText)
       }
 
       onDownload(format)
@@ -131,24 +73,151 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
     }
   }
 
-  const createSVGWithText = (originalSvg: string, text: string, showText: boolean, qrSize: number, colors: typeof QR_COLORS[0]) => {
-    const textHeight = showText ? 30 : 0
-    const padding = 20
-    const totalHeight = qrSize + textHeight + (padding * 2)
-    const totalWidth = qrSize + (padding * 2)
+  const downloadAsPNG = async (displayText: string) => {
+    // Get the actual QR code SVG element from the DOM
+    const qrElement = qrRef.current?.querySelector('svg')
+    if (!qrElement) return
+
+    // Create a high-resolution canvas
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    // Calculate dimensions with proper padding
+    const padding = 60 // Increased padding for better appearance
+    const textHeight = includeText ? 100 : 0 // More space for text
+    const canvasWidth = size + (padding * 2)
+    const canvasHeight = size + textHeight + (padding * 2)
+
+    // Set canvas size for high resolution
+    const scale = 2 // 2x for high DPI
+    canvas.width = canvasWidth * scale
+    canvas.height = canvasHeight * scale
+    canvas.style.width = canvasWidth + 'px'
+    canvas.style.height = canvasHeight + 'px'
+
+    // Scale the context for high DPI
+    ctx.scale(scale, scale)
+
+    // Fill background
+    ctx.fillStyle = colorScheme.bg
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+
+    // Get the QR code SVG data and create a new SVG with proper dimensions
+    const qrSvgData = new XMLSerializer().serializeToString(qrElement)
+    const cleanSvgData = qrSvgData
+      .replace(/width="[^"]*"/, `width="${size}"`)
+      .replace(/height="[^"]*"/, `height="${size}"`)
+    
+    // Convert SVG to image and draw on canvas
+    const img = new Image()
+    const svgBlob = new Blob([cleanSvgData], { type: 'image/svg+xml' })
+    const svgUrl = URL.createObjectURL(svgBlob)
+
+    await new Promise<void>((resolve) => {
+      img.onload = () => {
+        // Draw QR code centered
+        ctx.drawImage(img, padding, padding, size, size)
+        
+        // Add text if enabled
+        if (includeText && displayText) {
+          ctx.fillStyle = colorScheme.value
+          ctx.font = 'bold 28px Arial, sans-serif'
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'top'
+          
+          // Word wrap text if too long
+          const maxWidth = size
+          const words = displayText.split(' ')
+          let line = ''
+          let y = size + padding + 20
+          const lineHeight = 32
+          
+          for (let i = 0; i < words.length; i++) {
+            const testLine = line + words[i] + ' '
+            const metrics = ctx.measureText(testLine)
+            const testWidth = metrics.width
+            
+            if (testWidth > maxWidth && i > 0) {
+              ctx.fillText(line.trim(), canvasWidth / 2, y)
+              line = words[i] + ' '
+              y += lineHeight
+            } else {
+              line = testLine
+            }
+          }
+          if (line.trim()) {
+            ctx.fillText(line.trim(), canvasWidth / 2, y)
+          }
+        }
+        
+        resolve()
+      }
+      img.src = svgUrl
+    })
+
+    URL.revokeObjectURL(svgUrl)
+
+    // Download canvas as PNG
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `qr-code-${partnerCode}.png`
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+        URL.revokeObjectURL(url)
+      }
+    }, 'image/png', 1.0) // Maximum quality
+  }
+
+  const downloadAsSVG = async (displayText: string) => {
+    // Get the actual QR code SVG element from the DOM
+    const qrElement = qrRef.current?.querySelector('svg')
+    if (!qrElement) return
+
+    const svgWithText = createSVGWithText(qrElement, displayText)
+    
+    const blob = new Blob([svgWithText], { type: 'image/svg+xml' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `qr-code-${partnerCode}.svg`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const createSVGWithText = (qrElement: Element, text: string) => {
+    const padding = 60
+    const textHeight = includeText ? 100 : 0
+    const totalWidth = size + (padding * 2)
+    const totalHeight = size + textHeight + (padding * 2)
+
+    // Get the QR code SVG content
+    const qrSvgData = new XMLSerializer().serializeToString(qrElement)
+    const qrContent = qrSvgData
+      .replace(/<svg[^>]*>/, '')
+      .replace(/<\/svg>/, '')
 
     return `
       <svg width="${totalWidth}" height="${totalHeight}" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="${colors.bg}"/>
+        <rect width="100%" height="100%" fill="${colorScheme.bg}"/>
         <g transform="translate(${padding}, ${padding})">
-          ${originalSvg.replace(/<svg[^>]*>/, '').replace('</svg>', '')}
+          <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+            ${qrContent}
+          </svg>
         </g>
-        ${showText ? `
-          <text x="${totalWidth / 2}" y="${totalHeight - 10}" 
+        ${includeText && text ? `
+          <text x="${totalWidth / 2}" y="${size + padding + 40}" 
                 text-anchor="middle" 
                 font-family="Arial, sans-serif" 
-                font-size="16" 
-                fill="${colors.value}">
+                font-size="24" 
+                font-weight="bold"
+                fill="${colorScheme.value}">
             ${text}
           </text>
         ` : ''}
@@ -170,34 +239,53 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
   return (
     <div className="space-y-6">
       {/* QR Code Preview */}
-      <div className="flex flex-col items-center space-y-4">
-        <div 
-          ref={qrRef}
-          className="p-4 bg-white rounded-lg shadow-sm border"
-          style={{ backgroundColor: colorScheme.bg }}
-        >
-          <QRCode
-            value={referralUrl}
-            size={size}
-            fgColor={colorScheme.value}
-            bgColor={colorScheme.bg}
-            level="M"
-          />
-          {includeText && displayText && (
-            <p 
-              className="text-center mt-2 text-sm font-medium"
-              style={{ color: colorScheme.value }}
-            >
-              {displayText}
-            </p>
-          )}
+      <div className="flex flex-col items-center space-y-6">
+        {/* Main QR Code Display */}
+        <div className="flex flex-col items-center space-y-4">
+          <div 
+            ref={qrRef}
+            className="p-8 bg-white rounded-2xl shadow-lg border-2 border-gray-100 flex flex-col items-center justify-center"
+            style={{ 
+              backgroundColor: colorScheme.bg,
+              minWidth: `${size + 64}px`, // Ensure container is larger than QR code
+              minHeight: `${size + 64 + (includeText ? 60 : 0)}px` // Add space for text
+            }}
+          >
+            {/* QR Code */}
+            <div className="flex items-center justify-center">
+              <QRCode
+                value={referralUrl}
+                size={size}
+                fgColor={colorScheme.value}
+                bgColor={colorScheme.bg}
+                level="M"
+              />
+            </div>
+            
+            {/* Text below QR code */}
+            {includeText && displayText && (
+              <div className="mt-6 px-4 text-center">
+                <p 
+                  className="text-lg font-semibold leading-relaxed max-w-sm"
+                  style={{ color: colorScheme.value }}
+                >
+                  {displayText}
+                </p>
+              </div>
+            )}
+          </div>
+          
+          {/* Size indicator */}
+          <p className="text-sm text-muted-foreground font-medium">
+            {size}px × {size}px
+          </p>
         </div>
 
         {/* URL Display */}
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-2xl">
           <Label className="text-sm font-medium">Referral URL</Label>
-          <div className="mt-1 flex items-center space-x-2">
-            <div className="flex-1 p-2 bg-muted rounded-md font-mono text-sm break-all">
+          <div className="mt-2 flex items-center space-x-2">
+            <div className="flex-1 p-3 bg-muted rounded-lg font-mono text-sm break-all">
               {referralUrl}
             </div>
             <Button
@@ -220,18 +308,18 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
 
       {/* Customization Options */}
       <Card>
-        <CardContent className="pt-6 space-y-4">
-          <div className="flex items-center space-x-2 mb-4">
+        <CardContent className="pt-6 space-y-6">
+          <div className="flex items-center space-x-2 mb-2">
             <Palette className="h-5 w-5" />
             <h3 className="font-medium">Customization Options</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Size Selection */}
             <div>
-              <Label htmlFor="qr-size">Size</Label>
+              <Label htmlFor="qr-size" className="text-sm font-medium">QR Code Size</Label>
               <Select value={size.toString()} onValueChange={(value) => setSize(parseInt(value))}>
-                <SelectTrigger>
+                <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -242,11 +330,14 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Choose larger sizes for print materials
+              </p>
             </div>
 
             {/* Color Selection */}
             <div>
-              <Label htmlFor="qr-color">Color Scheme</Label>
+              <Label htmlFor="qr-color" className="text-sm font-medium">Color Scheme</Label>
               <Select 
                 value={colorScheme.label} 
                 onValueChange={(value) => {
@@ -254,7 +345,7 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
                   if (selected) setColorScheme(selected)
                 }}
               >
-                <SelectTrigger>
+                <SelectTrigger className="mt-2">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -271,34 +362,42 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Black is recommended for best scanning
+              </p>
             </div>
           </div>
 
           {/* Text Options */}
-          <div className="space-y-3">
-            <div className="flex items-center space-x-2">
+          <div className="space-y-4 border-t pt-4">
+            <div className="flex items-start space-x-3">
               <input
                 type="checkbox"
                 id="include-text"
                 checked={includeText}
                 onChange={(e) => setIncludeText(e.target.checked)}
-                className="rounded"
+                className="rounded mt-1"
               />
-              <Label htmlFor="include-text">Include text below QR code</Label>
+              <div className="flex-1">
+                <Label htmlFor="include-text" className="text-sm font-medium">Include text below QR code</Label>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Helps users understand what the QR code is for
+                </p>
+              </div>
             </div>
 
             {includeText && (
-              <div>
-                <Label htmlFor="custom-text">Custom Text (optional)</Label>
+              <div className="ml-6">
+                <Label htmlFor="custom-text" className="text-sm font-medium">Custom Text (optional)</Label>
                 <Input
                   id="custom-text"
                   value={customText}
                   onChange={(e) => setCustomText(e.target.value)}
                   placeholder={`Scan to refer someone to ${businessName || 'Colella Partners'}`}
-                  className="mt-1"
+                  className="mt-2"
                 />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Leave empty to use default text
+                <p className="text-xs text-muted-foreground mt-2">
+                  Leave empty to use default text. Keep it short and clear for best results.
                 </p>
               </div>
             )}
@@ -311,31 +410,36 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
         <CardContent className="pt-6">
           <div className="flex items-center space-x-2 mb-4">
             <Download className="h-5 w-5" />
-            <h3 className="font-medium">Download Options</h3>
+            <h3 className="font-medium">Download QR Code</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Button
-              variant="outline"
               onClick={() => downloadQRCode('png')}
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center space-x-2 h-12"
             >
-              <Download className="h-4 w-4" />
-              <span>PNG Image</span>
+              <Download className="h-5 w-5" />
+              <span>Download PNG</span>
             </Button>
             <Button
               variant="outline"
               onClick={() => downloadQRCode('svg')}
-              className="flex items-center space-x-2"
+              className="flex items-center justify-center space-x-2 h-12"
             >
-              <Download className="h-4 w-4" />
-              <span>SVG Vector</span>
+              <Download className="h-5 w-5" />
+              <span>Download SVG</span>
             </Button>
           </div>
 
-          <div className="mt-4 text-sm text-muted-foreground">
-            <p><strong>PNG:</strong> Best for web use and social media</p>
-            <p><strong>SVG:</strong> Best for print materials and scalable graphics</p>
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg text-sm text-muted-foreground space-y-2">
+            <div className="flex items-start space-x-2">
+              <span className="font-semibold">PNG:</span>
+              <span>Perfect for digital use - websites, social media, emails</span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="font-semibold">SVG:</span>
+              <span>Best for print materials - posters, business cards, flyers</span>
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -95,7 +95,7 @@ export function ToolkitPartnerSetupForm({ className, onComplete, onCancel, ...pr
     } else if (businessType === 'no') {
       form.setValue('is_business', false)
     }
-  }, [businessType, form])
+  }, [businessType])
 
   // Auto-fill contact person fields when "I am the main contact" is checked
   useEffect(() => {
@@ -125,7 +125,7 @@ export function ToolkitPartnerSetupForm({ className, onComplete, onCancel, ...pr
       form.setValue('contact_person_name', '')
       form.setValue('contact_person_phone', '')
     }
-  }, [useMyDetails, user, form])
+  }, [useMyDetails, user])
 
   async function onSubmit(data: z.infer<typeof partnerSetupSchema>) {
     if (!user) {

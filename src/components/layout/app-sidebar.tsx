@@ -21,6 +21,7 @@ import { NavGroupWithIndicators } from '@/components/layout/nav-group-with-indic
 import { NavUser } from '@/components/layout/nav-user'
 import { sidebarData } from './data/sidebar-data'
 import supabase from '@/lib/supabase'
+import { useTheme } from '@/context/theme-context'
 
 // Utility function for error handling
 const logError = (_message: string, _error: unknown): void => {
@@ -41,6 +42,16 @@ const filterNonAdminItems = (groups: NavGroupType[]): NavGroupType[] => {
 function SidebarLogo() {
   const { state, isMobile } = useSidebar()
   const isCollapsed = state === 'collapsed'
+  const { theme } = useTheme()
+
+  const lightModeLogo = "/images/custom/colellapartners_logo_landscape.png"
+  const darkModeLogo = "/images/custom/colellapartners_logo_landscape_lightversion.png"
+  const squareLightModeLogo = "/images/custom/colellapartners_logo_square.png"
+  const squareDarkModeLogo = "/images/custom/colellapartners_logo_square_lightversion.png"
+
+  const currentLogo = isCollapsed
+    ? (theme === 'dark' ? squareDarkModeLogo : squareLightModeLogo)
+    : (theme === 'dark' ? darkModeLogo : lightModeLogo)
 
   return (
     <SidebarMenu>
@@ -49,10 +60,7 @@ function SidebarLogo() {
           <DropdownMenuTrigger asChild>
             <SidebarMenuButton size='lg' className='h-12 justify-start px-4'>
               <img 
-                src={isCollapsed 
-                  ? "/images/custom/colellapartners_logo_square.png" 
-                  : "/images/custom/colellapartners_logo_landscape.png"
-                }
+                src={currentLogo}
                 alt="Colella Partners" 
                 className={isCollapsed 
                   ? "h-8 w-8 object-contain" 

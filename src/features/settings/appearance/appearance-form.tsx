@@ -180,20 +180,11 @@ export function AppearanceForm() {
                       <RadioGroupItem value='light' className='sr-only' />
                     </FormControl>
                     <div className='items-center rounded-md border-2 border-muted p-1 hover:border-accent'>
-                      <div className='space-y-2 rounded-sm bg-[#ecedef] p-2'>
-                        <div className='space-y-2 rounded-md bg-white p-2 shadow-sm'>
-                          <div className='h-2 w-[80px] rounded-lg bg-[#ecedef]' />
-                          <div className='h-2 w-[100px] rounded-lg bg-[#ecedef]' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-[#ecedef]' />
-                          <div className='h-2 w-[100px] rounded-lg bg-[#ecedef]' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-white p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-[#ecedef]' />
-                          <div className='h-2 w-[100px] rounded-lg bg-[#ecedef]' />
-                        </div>
-                      </div>
+                      <img
+                        src='/images/profile_icons/lightmode.png'
+                        alt='Light theme preview'
+                        className='w-full h-auto object-cover rounded-sm'
+                      />
                     </div>
                     <span className='block w-full p-2 text-center font-normal'>
                       Light
@@ -206,20 +197,11 @@ export function AppearanceForm() {
                       <RadioGroupItem value='dark' className='sr-only' />
                     </FormControl>
                     <div className='items-center rounded-md border-2 border-muted bg-popover p-1 hover:bg-accent hover:text-accent-foreground'>
-                      <div className='space-y-2 rounded-sm bg-slate-950 p-2'>
-                        <div className='space-y-2 rounded-md bg-slate-800 p-2 shadow-sm'>
-                          <div className='h-2 w-[80px] rounded-lg bg-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-slate-400' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-slate-400' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-slate-800 p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-slate-400' />
-                        </div>
-                      </div>
+                      <img
+                        src='/images/profile_icons/darkmode.png'
+                        alt='Dark theme preview'
+                        className='w-full h-auto object-cover rounded-sm'
+                      />
                     </div>
                     <span className='block w-full p-2 text-center font-normal'>
                       Dark
@@ -232,20 +214,11 @@ export function AppearanceForm() {
                       <RadioGroupItem value='system' className='sr-only' />
                     </FormControl>
                     <div className='items-center rounded-md border-2 border-muted p-1 hover:border-accent'>
-                      <div className='space-y-2 rounded-sm bg-gradient-to-br from-[#ecedef] to-slate-900 p-2'>
-                        <div className='space-y-2 rounded-md bg-gradient-to-r from-white to-slate-800 p-2 shadow-sm'>
-                          <div className='h-2 w-[80px] rounded-lg bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-gradient-to-r from-white to-slate-800 p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                        </div>
-                        <div className='flex items-center space-x-2 rounded-md bg-gradient-to-r from-white to-slate-800 p-2 shadow-sm'>
-                          <div className='h-4 w-4 rounded-full bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                          <div className='h-2 w-[100px] rounded-lg bg-gradient-to-r from-[#ecedef] to-slate-400' />
-                        </div>
-                      </div>
+                      <img
+                        src='/images/profile_icons/systemmode.png'
+                        alt='System theme preview'
+                        className='w-full h-auto object-cover rounded-sm'
+                      />
                     </div>
                     <span className='block w-full p-2 text-center font-normal'>
                       System

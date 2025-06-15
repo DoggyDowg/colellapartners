@@ -7,6 +7,7 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { ReferralCTAButton } from '@/components/referrals/ReferralCTAButton'
 import supabase from '../../lib/supabase'
+import { useTheme } from '@/context/theme-context'
 
 // Utility function for error handling
 const logError = (_message: string, _error: unknown): void => {
@@ -21,6 +22,12 @@ const BrandedSidebarTrigger = React.forwardRef<
   React.ComponentProps<typeof Button>
 >(({ className, onClick, ...props }, ref) => {
   const { toggleSidebar } = useSidebar()
+  const { theme } = useTheme()
+
+  const squareLightModeLogo = "/images/custom/colellapartners_logo_square.png"
+  const squareDarkModeLogo = "/images/custom/colellapartners_logo_square_lightversion.png"
+
+  const currentMobileLogo = theme === 'dark' ? squareDarkModeLogo : squareLightModeLogo
 
   return (
     <Button
@@ -36,7 +43,7 @@ const BrandedSidebarTrigger = React.forwardRef<
       {...props}
     >
       <img
-        src="/images/custom/colellapartners_logo_square.png"
+        src={currentMobileLogo}
         alt="Colella Partners"
         className="h-full w-full object-contain"
       />
@@ -98,10 +105,10 @@ export const Header = ({
       {...props}
     >
       {/* Show branded trigger on mobile/tablet, original on desktop */}
-      <div className="lg:hidden">
+      <div className="md:hidden">
         <BrandedSidebarTrigger />
       </div>
-      <div className="hidden lg:block">
+      <div className="hidden md:block">
         <SidebarTrigger variant='outline' className='scale-125 sm:scale-100' />
       </div>
       

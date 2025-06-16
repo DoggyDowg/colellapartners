@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../../hooks/useAuth';
+import { useUserRole } from '../../../hooks/useUserRole';
 import supabase from '../../../lib/supabase';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../components/ui/card';
 import { 
@@ -14,6 +15,8 @@ import {
 import { Button } from '../../../components/ui/button';
 import { Header } from '../../../components/layout/header';
 import RewardDetailsDialog from '../../../components/rewards/RewardDetailsDialog';
+import { Dialog, DialogContent } from '../../../components/ui/dialog';
+import { ToolkitPartnerSetupForm } from '../../../features/referral-toolkit/components/toolkit-partner-setup-form';
 import { toast } from 'sonner';
 import { Input } from '../../../components/ui/input';
 import { IconSearch } from '@tabler/icons-react';
@@ -57,11 +60,13 @@ export const Route = createFileRoute('/_authenticated/rewards/')({
 
 function UserRewards() {
   const { user: authUser } = useAuth();
+  const { userRole: _userRole, isUser } = useUserRole();
   const [rewards, setRewards] = useState<Reward[]>([]);
   const [filteredRewards, setFilteredRewards] = useState<Reward[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedReward, setSelectedReward] = useState<Reward | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [showPartnerSetup, setShowPartnerSetup] = useState(false);
   const [totalEarned, setTotalEarned] = useState(0);
   const [totalPending, setTotalPending] = useState(0);
   const [totalPaid, setTotalPaid] = useState(0);
@@ -194,27 +199,58 @@ function UserRewards() {
   };
 
   // Add EmptyRewardsState component
-  const EmptyRewardsState = () => (
-    <Card className="w-full">
-      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-        <img 
-          src="/images/empty-folder.png" 
-          alt="Empty folder" 
-          className="mb-4 opacity-70 w-16 h-16"
-        />
-        <h3 className="text-xl font-semibold mb-2">No rewards yet</h3>
-        <p className="text-muted-foreground mb-6 max-w-md text-sm">
-          When you make successful referrals, you'll earn rewards that will appear here. 
-          Get started by making your first referral!
-        </p>
-        <PartnerReferralForm onSubmitSuccess={() => {
-          toast.success('Referral submitted successfully!');
-          // We don't need to refresh rewards immediately as they won't show up until 
-          // the referral progresses, but we could if needed
-        }} />
-      </CardContent>
-    </Card>
-  );
+  const EmptyRewardsState = () => {
+    // Show different content based on user role
+    if (isUser) {
+      // User role - show partner setup prompt
+      return (
+        <Card className="w-full">
+          <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+            <img 
+              src="/images/empty-folder.png" 
+              alt="Empty folder" 
+              className="mb-4 opacity-70 w-16 h-16"
+            />
+            <h3 className="text-xl font-semibold mb-2">Only Partners Can Earn Rewards</h3>
+            <p className="text-muted-foreground mb-6 max-w-md text-sm">
+              To start earning rewards from referrals, you need to become a Partner. 
+              Partners can refer clients and earn rewards for successful conversions.
+            </p>
+            <Button 
+              onClick={() => setShowPartnerSetup(true)}
+              className="flex items-center gap-2"
+            >
+              <span>💼</span>
+              Become a Partner
+            </Button>
+          </CardContent>
+        </Card>
+      );
+    }
+
+    // Partner role - show regular empty state
+    return (
+      <Card className="w-full">
+        <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+          <img 
+            src="/images/empty-folder.png" 
+            alt="Empty folder" 
+            className="mb-4 opacity-70 w-16 h-16"
+          />
+          <h3 className="text-xl font-semibold mb-2">No rewards yet</h3>
+          <p className="text-muted-foreground mb-6 max-w-md text-sm">
+            When you make successful referrals, you'll earn rewards that will appear here. 
+            Get started by making your first referral!
+          </p>
+          <PartnerReferralForm onSubmitSuccess={() => {
+            toast.success('Referral submitted successfully!');
+            // We don't need to refresh rewards immediately as they won't show up until 
+            // the referral progresses, but we could if needed
+          }} />
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (error) {
     return (
@@ -393,6 +429,21 @@ function UserRewards() {
             referrerName={authUser?.email || ''}
           />
         )}
+
+        {/* Partner Setup Dialog */}
+        <Dialog open={showPartnerSetup} onOpenChange={setShowPartnerSetup}>
+          <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+            <ToolkitPartnerSetupForm
+              onComplete={() => {
+                setShowPartnerSetup(false);
+                // Refresh the page data after partner setup
+                fetchRewards();
+                toast.success('Partner account created successfully!');
+              }}
+              onCancel={() => setShowPartnerSetup(false)}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     </>
   );

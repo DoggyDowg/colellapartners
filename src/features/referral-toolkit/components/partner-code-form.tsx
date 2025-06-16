@@ -7,7 +7,7 @@ import { Badge } from '../../../components/ui/badge'
 import { Loader2, Check, X, Copy, ExternalLink } from 'lucide-react'
 import { usePartnerCode } from '../hooks/usePartnerCode'
 
-export function PartnerCodeForm({ partnerData, onCodeUpdate, onSave }: PartnerCodeFormProps) {
+export function PartnerCodeForm({ partnerData, onCodeUpdate, onSave: _onSave }: PartnerCodeFormProps) {
   const {
     code,
     partnerCode,
@@ -15,21 +15,60 @@ export function PartnerCodeForm({ partnerData, onCodeUpdate, onSave }: PartnerCo
     hasChanges,
     saving,
     wasSaved,
+    isEditing,
     validationMessage,
     handleCodeChange,
     handleSave: saveCode,
     copyToClipboard,
-    openUrl
+    openUrl,
+    setIsEditing
   } = usePartnerCode({
     initialCode: partnerData?.partner_code,
-    onCodeChange: onCodeUpdate
+    onCodeChange: onCodeUpdate,
+    onSaveComplete: _onSave
   })
 
   const handleSave = async () => {
     await saveCode()
-    if (partnerCode.isValid) {
-      await onSave(partnerCode.code)
+    // The hook handles the database update and toast notification
+    // The onSaveComplete callback will notify the parent to refresh data
+  }
+
+  const handleFocus = () => {
+    setIsEditing(true)
+  }
+
+  const handleBlur = () => {
+    // Only stop editing if the field is empty or matches the initial code
+    const trimmedCode = (code || '').trim().toUpperCase()
+    const initialCode = (partnerData?.partner_code || '').trim().toUpperCase()
+    if (!trimmedCode || trimmedCode === initialCode) {
+      setIsEditing(false)
     }
+  }
+
+  const getDescriptionText = () => {
+    const hasExistingCode = Boolean(partnerData?.partner_code)
+    
+    if (!hasExistingCode) {
+      // No existing code - show creation text
+      return "Create a unique 3-6 character code that people can use to find your referral link"
+    }
+    
+    if (isEditing) {
+      // Editing existing code - show creation text + warning
+      return (
+        <span>
+          Create a unique 3-6 character code that people can use to find your referral link
+          <span className="text-amber-600 font-medium block mt-2">
+            ⚠️ Warning: If you change your code, any existing links, QR codes, or materials shared with others will no longer work and will need to be replaced with your new code and new QR code.
+          </span>
+        </span>
+      )
+    }
+    
+    // Has existing code and not editing - show set message without warning
+    return "Your referral code has been set below."
   }
 
   const getValidationMessage = () => {
@@ -67,7 +106,7 @@ export function PartnerCodeForm({ partnerData, onCodeUpdate, onSave }: PartnerCo
         <div>
           <Label htmlFor="partner-code">Partner Code</Label>
           <p className="text-sm text-muted-foreground mb-2">
-            Create a unique 3-6 character code that people can use to find your referral link
+            {getDescriptionText()}
           </p>
           <div className="space-y-2">
             <Input
@@ -77,6 +116,8 @@ export function PartnerCodeForm({ partnerData, onCodeUpdate, onSave }: PartnerCo
               placeholder="Enter your code (e.g., PIZZA, ABC123)"
               className="uppercase font-mono"
               maxLength={6}
+              onFocus={handleFocus}
+              onBlur={handleBlur}
             />
             {getValidationMessage()}
           </div>

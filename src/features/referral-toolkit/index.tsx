@@ -13,7 +13,7 @@ import { QRCodeGenerator } from './components/qr-code-generator'
 import { LogoUpload } from './components/logo-upload'
 import { ProfileEditor } from './components/profile-editor'
 import { PDFGenerator } from './components/pdf-generator'
-import { generateReferralUrl } from './utils/code-validation'
+
 
 export function ReferralToolkit() {
   const { user } = useAuth()
@@ -21,7 +21,7 @@ export function ReferralToolkit() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showSetupPrompt, setShowSetupPrompt] = useState(false)
-  const [qrCodeUrl, setQrCodeUrl] = useState('')
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState('')
 
   // Fetch partner data on component mount
   useEffect(() => {
@@ -30,12 +30,10 @@ export function ReferralToolkit() {
     }
   }, [user?.id])
 
-  // Update QR code URL when partner code changes
+  // Clear QR code data URL when partner code changes
   useEffect(() => {
-    if (partnerData?.partner_code?.trim()) {
-      setQrCodeUrl(generateReferralUrl(partnerData.partner_code))
-    } else {
-      setQrCodeUrl('')
+    if (!partnerData?.partner_code?.trim()) {
+      setQrCodeDataUrl('')
     }
   }, [partnerData?.partner_code])
 
@@ -82,29 +80,19 @@ export function ReferralToolkit() {
     // This prevents circular updates that make hasChanges always false
   }
 
-  const handleCodeSave = async (code: string) => {
-    if (!user?.id) return
-    
-    try {
-      const { error } = await supabase
-        .from('referrers')
-        .update({ partner_code: code })
-        .eq('user_id', user.id)
-
-      if (error) throw error
-      
-      await fetchPartnerData()
-      toast.success('Partner code updated successfully!')
-    } catch (error) {
-      toast.error('Failed to save partner code')
-      throw error
-    }
+  const handleCodeSave = async (_code: string) => {
+    // The hook already updated the database, just refresh our local data
+    await fetchPartnerData()
   }
 
   // QR Code handlers
   const handleQRDownload = async (format: 'png' | 'svg') => {
     // TODO: Implement QR code download
     toast.success(`QR code downloaded as ${format.toUpperCase()}`)
+  }
+
+  const handleQRCodeGenerated = (dataUrl: string) => {
+    setQrCodeDataUrl(dataUrl)
   }
 
   // Logo handlers
@@ -164,9 +152,9 @@ export function ReferralToolkit() {
   }
 
   // PDF handlers
-  const handlePDFGenerate = async (template: PDFTemplate) => {
-    // TODO: Implement PDF generation
-    toast.success(`PDF generated with ${template.name} template`)
+  const handlePDFGenerate = async (_template: PDFTemplate) => {
+    // PDF generation handled by the component itself
+    // No need for additional toast notification here
   }
 
   if (loading) {
@@ -250,6 +238,7 @@ export function ReferralToolkit() {
                   partnerCode={partnerData?.partner_code || ''}
                   businessName={partnerData?.business_name || partnerData?.full_name || ''}
                   onDownload={handleQRDownload}
+                  onQRCodeGenerated={handleQRCodeGenerated}
                 />
               </CardContent>
             </Card>
@@ -310,7 +299,7 @@ export function ReferralToolkit() {
               <CardContent>
                 <PDFGenerator
                   partnerData={partnerData}
-                  qrCodeUrl={qrCodeUrl}
+                  qrCodeUrl={qrCodeDataUrl}
                   logoUrl={partnerData?.logo_url}
                   onGenerate={handlePDFGenerate}
                 />

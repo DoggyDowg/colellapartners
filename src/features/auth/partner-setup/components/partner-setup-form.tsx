@@ -170,6 +170,17 @@ export function PartnerSetupForm({ className, open, onComplete, ...props }: Part
         throw insertError
       }
 
+      // Update user role to 'partner'
+      const { error: roleUpdateError } = await supabase.rpc('update_user_to_partner_role', {
+        user_uuid: user.id
+      })
+
+      if (roleUpdateError) {
+        console.error('Failed to update user role:', roleUpdateError)
+        // Don't throw error here as the partner record was created successfully
+        // The role update is supplementary
+      }
+
       // Success - close form and redirect
       onComplete()
     } catch (err: unknown) {

@@ -66,6 +66,27 @@ const NavBadge = ({ children }: { children: ReactNode }) => (
 const SidebarMenuLink = ({ item, href }: { item: NavLink; href: string }) => {
   const { setOpenMobile } = useSidebar()
   
+  // Handle onClick items (like tour trigger)
+  if (item.onClick) {
+    return (
+      <SidebarMenuItem>
+        <SidebarMenuButton
+          onClick={() => {
+            item.onClick!()
+            setOpenMobile(false)
+          }}
+          tooltip={item.tooltip || item.title}
+        >
+          {item.icon && <item.icon />}
+          <span>{item.title}</span>
+          {item.badge && <NavBadge>{item.badge}</NavBadge>}
+          {item.rightIcon && <item.rightIcon className="ml-auto h-4 w-4" />}
+          {item.notificationIndicator}
+        </SidebarMenuButton>
+      </SidebarMenuItem>
+    )
+  }
+  
   // For disabled items, we'll render a button with disabled styles instead of a Link
   if (item.disabled) {
     return (

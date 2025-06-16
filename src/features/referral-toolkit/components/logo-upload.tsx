@@ -44,10 +44,23 @@ export function LogoUpload({ currentLogoUrl, onUpload, onDelete }: LogoUploadPro
       throw new Error('User not authenticated')
     }
 
+    // Ensure we have a fresh session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    if (sessionError) {
+      console.error('Session error:', sessionError)
+      throw new Error('Authentication session error. Please try logging out and back in.')
+    }
+    
+    if (!session) {
+      throw new Error('No active session. Please log in again.')
+    }
+
     const fileName = generateFileName(file)
     const filePath = `${user.id}/${fileName}`
 
-    // Upload to Supabase Storage
+    console.log('Uploading file:', { fileName, filePath, userId: user.id })
+
+    // Upload to Supabase Storage with explicit session handling
     const { error } = await supabase.storage
       .from(STORAGE_BUCKET)
       .upload(filePath, file, {
@@ -56,6 +69,7 @@ export function LogoUpload({ currentLogoUrl, onUpload, onDelete }: LogoUploadPro
       })
 
     if (error) {
+      console.error('Storage upload error:', error)
       throw error
     }
 

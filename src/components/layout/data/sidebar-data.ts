@@ -14,11 +14,10 @@ import {
   IconNews,
   IconMail,
   IconBell,
-  IconQrcode,
   IconInfoCircle,
   IconFileText,
 } from '@tabler/icons-react'
-import { AudioWaveform, GalleryVerticalEnd, SquareUser } from 'lucide-react'
+import { AudioWaveform, GalleryVerticalEnd, SquareUser, Wrench } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ColellaSiteIcon } from '../ColellaSiteIcon'
 
@@ -119,7 +118,7 @@ export const sidebarData: SidebarData = {
         {
           title: 'Referral Toolkit',
           url: '/referral-toolkit',
-          icon: IconQrcode,
+          icon: Wrench,
         },
         {
           title: 'Achievements',
@@ -170,12 +169,14 @@ export const sidebarData: SidebarData = {
           ],
         },
         {
-          title: 'Help Center',
-          url: '/help-center',
+          title: 'Take a Tour',
+          url: '#take-tour',
           icon: IconHelp,
-          disabled: true,
-          tooltip: "Coming Soon",
-          rightIcon: IconClock,
+          onClick: () => {
+            // This will be handled in the nav group component
+            const event = new CustomEvent('orientation:start')
+            window.dispatchEvent(event)
+          },
         },
       ],
     },

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { supabase } from '@/lib/supabase'
 
@@ -17,36 +17,64 @@ export function useUserProfile() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [error, setError] = useState<Error | null>(null)
 
-  useEffect(() => {
-    async function loadUserProfile() {
-      if (!user) {
-        setLoading(false)
+  const loadUserProfile = useCallback(async () => {
+    if (!user) {
+      setLoading(false)
+      return
+    }
+
+    try {
+      setLoading(true)
+      
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        
+      if (error) {
+        setError(error)
         return
       }
-
-      try {
-        setLoading(true)
-        
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single()
-          
-        if (error) {
-          setError(error)
-          return
-        }
-        
-        setProfile(data)
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)))
-      } finally {
-        setLoading(false)
-      }
+      
+      setProfile(data)
+      setError(null)
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      setLoading(false)
     }
-    
+  }, [user])
+
+  useEffect(() => {
     loadUserProfile()
+  }, [loadUserProfile])
+
+  // Set up real-time subscription for profile changes
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase
+      .channel('profile-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_profiles',
+          filter: `id=eq.${user.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            setProfile(payload.new as UserProfile)
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [user])
   
   // Get profile picture URL with fallback logic
@@ -69,6 +97,7 @@ export function useUserProfile() {
     profile,
     loading,
     error,
-    getProfilePicture
+    getProfilePicture,
+    refreshProfile: loadUserProfile
   }
 } 

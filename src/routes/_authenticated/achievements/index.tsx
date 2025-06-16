@@ -256,24 +256,26 @@ function UserAchievements() {
     fetchAchievementData();
   }, [fetchAchievementData]);
 
-  const getIconForAchievement = (icon: string) => {
+  const getIconForAchievement = (icon: string, size: 'small' | 'large' = 'large') => {
+    const iconClass = size === 'small' ? "h-4 w-4" : "h-6 w-6";
+    
     switch (icon) {
       case 'user':
-        return <IconUser className="h-6 w-6" />;
+        return <IconUser className={iconClass} />;
       case 'userCheck':
-        return <IconUserCheck className="h-6 w-6" />;
+        return <IconUserCheck className={iconClass} />;
       case 'gift':
-        return <IconGift className="h-6 w-6" />;
+        return <IconGift className={iconClass} />;
       case 'coin':
-        return <IconCoin className="h-6 w-6" />;
+        return <IconCoin className={iconClass} />;
       case 'medal':
-        return <IconMedal className="h-6 w-6" />;
+        return <IconMedal className={iconClass} />;
       case 'award':
-        return <IconAward className="h-6 w-6" />;
+        return <IconAward className={iconClass} />;
       case 'calendar':
-        return <IconCalendar className="h-6 w-6" />;
+        return <IconCalendar className={iconClass} />;
       default:
-        return <IconTrophy className="h-6 w-6" />;
+        return <IconTrophy className={iconClass} />;
     }
   };
 
@@ -392,7 +394,7 @@ function UserAchievements() {
                           ? 'bg-primary text-primary-foreground' 
                           : 'bg-muted text-muted-foreground'
                       }`}>
-                        <IconTrophy className="h-4 w-4" />
+                        {getIconForAchievement(stack.icon, 'small')}
                       </div>
                       <div className="min-w-0 flex-1 space-y-2">
                         {/* Title and badges row - responsive layout */}

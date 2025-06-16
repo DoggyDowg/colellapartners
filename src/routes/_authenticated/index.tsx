@@ -4,9 +4,9 @@ import supabase from '../../lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../../components/ui/card'
 import { Button } from '../../components/ui/button'
 import { Header } from '../../components/layout/header'
-import { Progress } from '@/components/ui/progress'
+
 import { Badge } from '../../components/ui/badge'
-import { IconTrophy, IconUserCircle, IconGift, IconArrowRight, IconUserPlus, IconChartBar, IconCalendarStats } from '@tabler/icons-react'
+import { IconTrophy, IconUserCircle, IconGift, IconCoin, IconArrowRight, IconUserPlus, IconChartBar, IconCalendarStats } from '@tabler/icons-react'
 import { Link } from '@tanstack/react-router'
 import { QuickActions } from '../../components/dashboard/QuickActions'
 import { RewardsActivity } from '../../components/dashboard/RewardsActivity'
@@ -14,6 +14,10 @@ import { useAuth } from '../../hooks/useAuth'
 import { useProfileCompletion } from '../../hooks/useProfileCompletion'
 import { ProfileCompletionDialog } from '../../features/auth/profile-completion/profile-completion-dialog'
 import { PartnerReferralForm } from '../../components/referrals/PartnerReferralForm'
+
+import { WelcomeBanner } from '../../components/tour/WelcomeBanner'
+import { OnboardingChecklist } from '../../components/tour/OnboardingChecklist'
+import { useOrientationStore } from '../../stores/orientationStore'
 
 // Define interfaces for our data
 interface Referral {
@@ -47,6 +51,7 @@ export { PartnerDashboard };
 function PartnerDashboard() {
   const { user } = useAuth()
   const { isDialogOpen, closeDialog, handleProfileCompleted } = useProfileCompletion()
+  const { hasSeenOrientation, hasCompletedOrientation } = useOrientationStore()
   // Remove hardcoded ID and replace with state variable for referrer ID
   const [referrerId, setReferrerId] = useState<string | null>(null)
   const [stats, setStats] = useState({
@@ -56,10 +61,16 @@ function PartnerDashboard() {
     conversionRate: 0,
   })
   const [latestReferral, setLatestReferral] = useState<Referral | null>(null)
-  const [nextAchievement, ] = useState<Achievement | null>(null)
+  const [_nextAchievement, ] = useState<Achievement | null>(null)
+  const [achievementStats, setAchievementStats] = useState({
+    totalAchievements: 0,
+    completedAchievements: 0,
+    latestAchievement: null as { title: string; completed_date: string; stackIcon: string } | null
+  })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hasReferrals, setHasReferrals] = useState(false)
+  const [showWelcomeBanner, setShowWelcomeBanner] = useState(false)
 
   // Fetch referrer ID first
   const fetchReferrerId = useCallback(async () => {
@@ -87,6 +98,66 @@ function PartnerDashboard() {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       setError(`Error fetching referrer profile: ${errorMessage}`)
       return null
+    }
+  }, [user])
+
+  // Fetch user achievements data
+  const fetchAchievements = useCallback(async () => {
+    if (!user) return
+
+    try {
+      // Fetch all achievements
+      const { data: achievementsData, error: achievementsError } = await supabase
+        .from('achievements')
+        .select('*')
+
+      if (achievementsError) throw achievementsError
+
+      // Fetch user achievements with completed ones
+      const { data: userAchievementsData, error: userError } = await supabase
+        .from('user_achievements')
+        .select(`
+          *,
+          achievements:achievement_id (
+            title,
+            description,
+            stack_id,
+            achievement_stacks:stack_id (
+              icon
+            )
+          )
+        `)
+        .eq('user_id', user.id)
+
+      if (userError) throw userError
+
+      const totalAchievements = achievementsData?.length || 0
+      const completedUserAchievements = userAchievementsData?.filter(ua => ua.completed) || []
+      const completedCount = completedUserAchievements.length
+
+      // Find the most recent completed achievement
+      let latestAchievement = null
+      if (completedUserAchievements.length > 0) {
+        const latest = completedUserAchievements.sort((a, b) => 
+          new Date(b.completed_date || '').getTime() - new Date(a.completed_date || '').getTime()
+        )[0]
+        
+        latestAchievement = {
+          title: latest.achievements?.title || 'Unknown Achievement',
+          completed_date: latest.completed_date || '',
+          stackIcon: latest.achievements?.achievement_stacks?.icon || 'trophy'
+        }
+      }
+
+      setAchievementStats({
+        totalAchievements,
+        completedAchievements: completedCount,
+        latestAchievement
+      })
+
+    } catch (_error: unknown) {
+      // Silently handle achievement errors as they are secondary to the main dashboard
+      // Don't set error state here as achievements are secondary to the main dashboard
     }
   }, [user])
 
@@ -176,13 +247,16 @@ function PartnerDashboard() {
       }
       */
       
+      // Fetch achievements data
+      await fetchAchievements()
+      
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setError(`An unexpected error occurred when loading dashboard data: ${errorMessage}`);
     } finally {
       setLoading(false)
     }
-  }, [user, referrerId, fetchReferrerId])
+  }, [user, referrerId, fetchReferrerId, fetchAchievements])
 
   // Effect to fetch referrer ID when user changes
   useEffect(() => {
@@ -197,6 +271,15 @@ function PartnerDashboard() {
       fetchDashboardData()
     }
   }, [user, referrerId, fetchDashboardData])
+
+  // Check if we should show welcome banner for first-time users
+  useEffect(() => {
+    if (user && !hasSeenOrientation && !hasCompletedOrientation) {
+      setShowWelcomeBanner(true)
+    }
+  }, [user, hasSeenOrientation, hasCompletedOrientation])
+
+
 
   const getStatusBadgeClass = (status: string) => {
     const statusLower = status?.toLowerCase() || ''
@@ -224,22 +307,32 @@ function PartnerDashboard() {
     switch (icon) {
       case 'user':
         return <IconUserCircle className="h-8 w-8 text-primary" />
+      case 'userCheck':
+        return <IconUserCircle className="h-8 w-8 text-primary" />
       case 'gift':
         return <IconGift className="h-8 w-8 text-primary" />
+      case 'coin':
+        return <IconCoin className="h-8 w-8 text-primary" />
+      case 'medal':
+        return <IconTrophy className="h-8 w-8 text-primary" />
+      case 'award':
+        return <IconTrophy className="h-8 w-8 text-primary" />
+      case 'calendar':
+        return <IconTrophy className="h-8 w-8 text-primary" />
       default:
         return <IconTrophy className="h-8 w-8 text-primary" />
     }
   }
 
   const EmptyDashboardState = () => (
-    <Card className="col-span-3">
-      <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+    <Card className="col-span-full">
+      <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
         <img 
           src="/images/empty-folder.png" 
           alt="Empty folder" 
           className="mb-4 opacity-70 w-16 h-16"
         />
-        <h3 className="text-xl font-semibold mb-2">No referrals yet</h3>
+        <h3 className="text-lg md:text-xl font-semibold mb-2">No referrals yet</h3>
         <p className="text-muted-foreground mb-6 max-w-md text-sm">
           When you make a referral, you'll be able to track everything here, 
           including statistics, rewards, and progress toward achievements.
@@ -278,50 +371,90 @@ function PartnerDashboard() {
       />
       
       <div className="container py-6">
+        {/* Welcome Banner for first-time users */}
+        {showWelcomeBanner && (
+          <div className="mb-6">
+            <WelcomeBanner onDismiss={() => setShowWelcomeBanner(false)} />
+          </div>
+        )}
+
+
+
+        {/* Onboarding Checklist */}
+        {(!hasCompletedOrientation || !hasSeenOrientation) && (
+          <div className="mb-6">
+            <OnboardingChecklist />
+          </div>
+        )}
+
         {/* Quick Actions */}
         <div className="mb-6">
           <QuickActions />
         </div>
 
         {loading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Loading...</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-12"></div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Loading...</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-12"></div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-medium">Loading...</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-12"></div>
-              </CardContent>
-            </Card>
+          <div className="space-y-6">
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Loading...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-12"></div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Loading...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-12"></div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-medium">Loading...</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-12"></div>
+                </CardContent>
+              </Card>
+            </div>
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Card key={i} className="flex flex-col min-h-[280px] md:min-h-[320px]">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base">Loading...</CardTitle>
+                    <CardDescription className="text-sm">Loading data...</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded"></div>
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </CardContent>
+                  <CardFooter className="pt-3">
+                    <div className="h-10 bg-muted rounded w-full"></div>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
           </div>
         ) : hasReferrals ? (
           <>
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-6">
+            <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 mb-6">
               {/* Total Referrals */}
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base font-medium">Total Referrals</CardTitle>
+                  <CardTitle className="text-base font-medium flex items-center gap-2">
+                    Total Referrals
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center">
-                    <IconUserPlus className="mr-2 h-8 w-8 text-muted-foreground" />
-                    <div>
+                    <IconUserPlus className="mr-3 h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
                       <div className="text-2xl font-bold">{stats.totalReferrals}</div>
                       <p className="text-xs text-muted-foreground">All time referrals</p>
                     </div>
@@ -336,8 +469,8 @@ function PartnerDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center">
-                    <IconChartBar className="mr-2 h-8 w-8 text-muted-foreground" />
-                    <div>
+                    <IconChartBar className="mr-3 h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
                       <div className="text-2xl font-bold">{stats.completedReferrals}</div>
                       <p className="text-xs text-muted-foreground">
                         {`${stats.conversionRate}% conversion rate`}
@@ -354,8 +487,8 @@ function PartnerDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center">
-                    <IconCalendarStats className="mr-2 h-8 w-8 text-muted-foreground" />
-                    <div>
+                    <IconCalendarStats className="mr-3 h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
                       <div className="text-2xl font-bold">{stats.pendingReferrals}</div>
                       <p className="text-xs text-muted-foreground">Awaiting completion</p>
                     </div>
@@ -364,42 +497,44 @@ function PartnerDashboard() {
               </Card>
             </div>
 
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
               {/* Latest Referral */}
-              <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex flex-col h-[350px]">
-                <CardHeader>
-                  <CardTitle>Latest Referral</CardTitle>
-                  <CardDescription>Your most recent client referral</CardDescription>
+              <Card className="flex flex-col min-h-[280px] md:min-h-[320px]">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    Latest Referral
+                  </CardTitle>
+                  <CardDescription className="text-sm">Your most recent client referral</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
                   {latestReferral ? (
-                    <div>
-                      <div className="mb-4 flex items-center justify-between">
-                        <div>
-                          <h3 className="font-semibold text-lg">{latestReferral.referee_name}</h3>
-                          <p className="text-sm text-muted-foreground">{latestReferral.referee_email}</p>
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h3 className="font-semibold text-base truncate">{latestReferral.referee_name}</h3>
+                          <p className="text-sm text-muted-foreground truncate">{latestReferral.referee_email}</p>
                         </div>
                         <Badge className={getStatusBadgeClass(latestReferral.status)}>
                           {latestReferral.status}
                         </Badge>
                       </div>
                       {latestReferral.situation_description && (
-                        <div className="mb-4">
+                        <div>
                           <h4 className="text-sm font-medium mb-1">Situation</h4>
-                          <p className="text-sm text-muted-foreground">{latestReferral.situation_description}</p>
+                          <p className="text-sm text-muted-foreground line-clamp-3">{latestReferral.situation_description}</p>
                         </div>
                       )}
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground pt-1">
                         Referred on {formatDate(latestReferral.created_at)}
                       </div>
                     </div>
                   ) : (
-                    <div className="h-36 flex items-center justify-center">
-                      <p>No referrals found</p>
+                    <div className="flex items-center justify-center h-32">
+                      <p className="text-sm text-muted-foreground">No referrals found</p>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="mt-auto pt-2">
+                <CardFooter className="pt-3">
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/referrals">
                       View All Referrals
@@ -410,41 +545,51 @@ function PartnerDashboard() {
               </Card>
               
               {/* Rewards Activity */}
-              <Card className="col-span-2 md:col-span-1 lg:col-span-1 flex flex-col h-[350px]">
+              <Card className="flex flex-col min-h-[280px] md:min-h-[320px]">
                 <RewardsActivity userId={referrerId || undefined} noCard={true} />
               </Card>
               
-              {/* Next Achievement */}
-              <Card className="col-span-2 md:col-span-2 lg:col-span-1 flex flex-col h-[350px]">
-                <CardHeader>
-                  <CardTitle>Next Achievement</CardTitle>
-                  <CardDescription>Your progress towards the next milestone</CardDescription>
+              {/* Achievements Overview */}
+              <Card className="flex flex-col min-h-[280px] md:min-h-[320px] md:col-span-2 xl:col-span-1">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Achievements</CardTitle>
+                  <CardDescription className="text-sm">Your achievement progress and latest milestone</CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  {nextAchievement ? (
-                    <div>
-                      <div className="flex items-center gap-3 mb-4">
-                        {getIconForAchievement(nextAchievement.icon)}
-                        <div>
-                          <h3 className="font-semibold">{nextAchievement.title}</h3>
-                          <p className="text-sm text-muted-foreground">{nextAchievement.description}</p>
+                  <div className="flex items-center mb-4">
+                    <IconTrophy className="mr-3 h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-2xl font-bold">{achievementStats.completedAchievements}</div>
+                      <p className="text-xs text-muted-foreground">
+                        of {achievementStats.totalAchievements} achievements completed
+                      </p>
+                    </div>
+                  </div>
+                  {achievementStats.latestAchievement ? (
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Latest Achievement</h4>
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          {getIconForAchievement(achievementStats.latestAchievement.stackIcon)}
                         </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span>Progress</span>
-                          <span>{nextAchievement.progress} / {nextAchievement.target}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium line-clamp-2">{achievementStats.latestAchievement.title}</p>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            Completed on {formatDate(achievementStats.latestAchievement.completed_date)}
+                          </div>
                         </div>
-                        <Progress value={(nextAchievement.progress / nextAchievement.target) * 100} />
                       </div>
                     </div>
                   ) : (
-                    <div className="h-[104px] flex items-center justify-center">
-                      <p>No achievements found</p>
+                    <div className="space-y-2">
+                      <h4 className="text-sm font-medium">Get Started</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Complete your first referral to unlock achievements!
+                      </p>
                     </div>
                   )}
                 </CardContent>
-                <CardFooter className="mt-auto pt-2">
+                <CardFooter className="pt-3">
                   <Button asChild variant="outline" className="w-full">
                     <Link to="/achievements">
                       View All Achievements
@@ -456,11 +601,13 @@ function PartnerDashboard() {
             </div>
           </>
         ) : (
-          <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="grid gap-6">
             <EmptyDashboardState />
           </div>
         )}
       </div>
+
+
     </>
   )
 }

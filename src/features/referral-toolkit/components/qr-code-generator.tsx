@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { QRCodeGeneratorProps } from '../types'
 import { Button } from '../../../components/ui/button'
 import { Card, CardContent } from '../../../components/ui/card'
@@ -29,7 +29,7 @@ const QR_COLORS = [
   { label: 'White on Black', value: '#FFFFFF', bg: '#000000' }
 ]
 
-export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCodeGeneratorProps) {
+export function QRCodeGenerator({ partnerCode, businessName, onDownload, onQRCodeGenerated }: QRCodeGeneratorProps) {
   const [size, setSize] = useState(512)
   const [colorScheme, setColorScheme] = useState(QR_COLORS[0])
   const [includeText, setIncludeText] = useState(true)
@@ -38,6 +38,60 @@ export function QRCodeGenerator({ partnerCode, businessName, onDownload }: QRCod
 
   const referralUrl = generateReferralUrl(partnerCode)
   const displayText = customText || `Scan to refer someone to ${businessName || 'Colella Partners'}`
+
+  // Generate QR code data URL for use by other components
+  useEffect(() => {
+    const generateQRCodeDataUrl = async () => {
+      if (!partnerCode || !qrRef.current) return
+
+      // Wait a bit for the QR code to render
+      setTimeout(async () => {
+        try {
+          const qrElement = qrRef.current?.querySelector('svg')
+          if (!qrElement) return
+
+          // Create a canvas to convert SVG to data URL
+          const canvas = document.createElement('canvas')
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return
+
+          const qrSize = 256 // Fixed size for consistent use
+          canvas.width = qrSize
+          canvas.height = qrSize
+
+          // Fill background
+          ctx.fillStyle = '#FFFFFF'
+          ctx.fillRect(0, 0, qrSize, qrSize)
+
+          // Get the QR code SVG data
+          const qrSvgData = new XMLSerializer().serializeToString(qrElement)
+          const cleanSvgData = qrSvgData
+            .replace(/width="[^"]*"/, `width="${qrSize}"`)
+            .replace(/height="[^"]*"/, `height="${qrSize}"`)
+          
+          // Convert SVG to image and draw on canvas
+          const img = new Image()
+          const svgBlob = new Blob([cleanSvgData], { type: 'image/svg+xml' })
+          const svgUrl = URL.createObjectURL(svgBlob)
+
+          img.onload = () => {
+            ctx.drawImage(img, 0, 0, qrSize, qrSize)
+            URL.revokeObjectURL(svgUrl)
+            
+            // Convert canvas to data URL
+            const dataUrl = canvas.toDataURL('image/png', 1.0)
+            onQRCodeGenerated?.(dataUrl)
+          }
+          
+          img.src = svgUrl
+        } catch (error) {
+          console.error('Error generating QR code data URL:', error)
+        }
+      }, 100)
+    }
+
+    generateQRCodeDataUrl()
+  }, [partnerCode, colorScheme, onQRCodeGenerated])
 
   const copyToClipboard = async (text: string) => {
     try {

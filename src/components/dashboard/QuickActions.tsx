@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { IconUserPlus, IconGift, IconAward, IconHome } from '@tabler/icons-react';
+import { IconUserPlus, IconGift, IconAward } from '@tabler/icons-react';
+import { Wrench } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 
 export function QuickActions() {
@@ -34,9 +35,9 @@ export function QuickActions() {
           </Button>
           
           <Button asChild variant="outline" className="flex flex-col h-20 py-2">
-            <Link to="/for-sale">
-              <IconHome className="h-5 w-5 mb-1" />
-              <span>For Sale</span>
+            <Link to="/referral-toolkit">
+              <Wrench className="h-5 w-5 mb-1" />
+              <span>Referral Toolkit</span>
             </Link>
           </Button>
         </div>

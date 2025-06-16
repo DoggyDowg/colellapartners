@@ -96,7 +96,6 @@ const getDaysInMonth = (month: number) => {
 export default function ProfileForm() {
   const [loading, setLoading] = useState(true)
   const [userId, setUserId] = useState<string | null>(null)
-  const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [dbDiagnostics, setDbDiagnostics] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   
@@ -486,12 +485,8 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
           { type: "image/jpeg", lastModified: Date.now() }
         );
         
-        // Set the avatar file and update the form
-        setAvatarFile(optimizedFile);
-        
-        // Create preview URL
-        const previewUrl = URL.createObjectURL(optimizedFile);
-        formRef.current.setValue('avatar_url', previewUrl);
+        // Automatically upload and save the avatar
+        await uploadAndSaveAvatar(optimizedFile);
         
         // Close editor
         setImageEditorOpen(false);
@@ -555,12 +550,106 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     setIsDragging(false);
   };
 
+  // Upload avatar and immediately save to database
+  const uploadAndSaveAvatar = async (file: File) => {
+    if (!userId) {
+      setDbDiagnostics('Upload failed: No user ID available')
+      toast({
+        title: 'Upload failed',
+        description: 'You must be logged in to upload a profile picture.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    try {
+      setLoading(true)
+      setDbDiagnostics(`Uploading avatar... File size: ${file.size} bytes`)
+
+      // Upload the file
+      const uploadedUrl = await uploadAvatar(file)
+      if (!uploadedUrl) {
+        toast({
+          title: 'Upload failed',
+          description: 'Failed to upload profile picture. Please try again.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      setDbDiagnostics(`Avatar uploaded successfully. Updating database...`)
+
+      // Update the database immediately
+      const { error } = await supabase
+        .from('user_profiles')
+        .update({
+          avatar_url: uploadedUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId)
+
+      if (error) {
+        setDbDiagnostics(`Database update error: ${error.message}. Code: ${error.code}`)
+        toast({
+          title: 'Save failed',
+          description: 'Profile picture uploaded but failed to save. Please refresh the page.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      // Update the form with the new avatar URL
+      formRef.current.setValue('avatar_url', uploadedUrl)
+      
+      // Clean up any blob URLs that might have been created for preview
+      const currentUrl = formRef.current.getValues('avatar_url')
+      if (currentUrl && currentUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(currentUrl)
+      }
+      
+      // Force refresh all avatar images by adding a timestamp to bypass cache
+      const avatarImages = document.querySelectorAll('img[alt*="Profile"], img[alt*="profile"], img[src*="avatar"]')
+      avatarImages.forEach((img) => {
+        const htmlImg = img as HTMLImageElement
+        if (htmlImg.src.includes(userId)) {
+          // Force reload the image to bypass browser cache
+          const originalSrc = htmlImg.src.split('?')[0] // Remove existing query params
+          htmlImg.src = `${originalSrc}?t=${Date.now()}`
+        }
+      })
+      
+      // Clear any previous diagnostic messages
+      setDbDiagnostics(null)
+
+      toast({
+        title: 'Profile picture updated',
+        description: 'Your profile picture has been updated successfully.',
+      })
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setDbDiagnostics(`Avatar update failed: ${errorMessage}`)
+      toast({
+        title: 'Update failed',
+        description: `Failed to update profile picture: ${errorMessage}`,
+        variant: 'destructive',
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   // Handle avatar upload
   const uploadAvatar = async (file: File) => {
-    if (!userId) return null
+    if (!userId) {
+      setDbDiagnostics('Upload failed: No user ID available')
+      return null
+    }
     
     const fileExt = file.name.split('.').pop()
-    const filePath = `${userId}/avatar.${fileExt}`
+    // Add timestamp to make filename unique and prevent caching issues
+    const timestamp = Date.now()
+    const filePath = `${userId}/avatar-${timestamp}.${fileExt}`
     
     try {
       // Try to upload the file directly to the profiles bucket
@@ -569,6 +658,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         .upload(filePath, file, { upsert: true })
         
       if (uploadError) {
+        setDbDiagnostics(`Storage upload error: ${uploadError.message}`)
         throw uploadError
       }
       
@@ -576,11 +666,21 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         .from('profiles')
         .getPublicUrl(filePath)
       
-      return urlData.publicUrl
-    } catch (_error) {
+      if (!urlData.publicUrl) {
+        setDbDiagnostics('Failed to get public URL for uploaded file')
+        return null
+      }
+      
+      // Add cache-busting parameter to ensure fresh image loads
+      const urlWithCacheBusting = `${urlData.publicUrl}?t=${timestamp}`
+      
+      return urlWithCacheBusting
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown upload error'
+      setDbDiagnostics(`Avatar upload failed: ${errorMessage}`)
       toast({
         title: 'Upload failed',
-        description: 'Failed to upload avatar. Please try again.',
+        description: `Failed to upload avatar: ${errorMessage}`,
         variant: 'destructive',
       })
       return null
@@ -749,16 +849,7 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
     try {
       setLoading(true)
       
-      // If there's a new avatar file, upload it
-      let avatarUrl = data.avatar_url
-      if (avatarFile) {
-        const uploadedUrl = await uploadAvatar(avatarFile)
-        if (uploadedUrl) {
-          avatarUrl = uploadedUrl
-        }
-      }
-      
-      // Prepare data for upsert
+      // Prepare data for upsert (avatar is handled separately now)
       const profileData: Record<string, unknown> = {
         id: userId,
         name: data.name,
@@ -778,8 +869,9 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         }
       }
       
-      if (avatarUrl) {
-        profileData.avatar_url = avatarUrl
+      // Always preserve current avatar_url if it exists
+      if (data.avatar_url) {
+        profileData.avatar_url = data.avatar_url
       }
       
       if (data.phone_number) {
@@ -792,17 +884,24 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         .upsert(profileData, { onConflict: 'id' })
         
       if (error) {
+        // Log error to diagnostics for debugging
+        setDbDiagnostics(`Database update error: ${error.message}. Code: ${error.code}`)
         throw error
       }
+      
+      // Avatar updates are handled separately now
       
       toast({
         title: 'Profile updated',
         description: 'Your profile has been updated successfully.',
       })
-    } catch (_error) {
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      // Log error to diagnostics for debugging
+      setDbDiagnostics(`Profile update failed: ${errorMessage}`)
       toast({
         title: 'Update failed',
-        description: 'Failed to update profile. Please try again.',
+        description: `Failed to update profile: ${errorMessage}`,
         variant: 'destructive',
       })
     } finally {
@@ -837,15 +936,24 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
                         </AvatarFallback>
                       </Avatar>
                       
-                      {/* Overlay on hover */}
-                      <div 
-                        className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                        onClick={() => document.getElementById('profile-pic-input')?.click()}
-                      >
-                        <Camera className="h-8 w-8 text-white" />
-                      </div>
+                      {/* Loading overlay */}
+                      {loading && (
+                        <div className="absolute inset-0 bg-black bg-opacity-75 rounded-full flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                        </div>
+                      )}
                       
-                      {field.value && (
+                      {/* Overlay on hover */}
+                      {!loading && (
+                        <div 
+                          className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                          onClick={() => document.getElementById('profile-pic-input')?.click()}
+                        >
+                          <Camera className="h-8 w-8 text-white" />
+                        </div>
+                      )}
+                      
+                      {field.value && !loading && (
                         <Button 
                           variant="destructive" 
                           size="icon"
@@ -1088,8 +1196,17 @@ Check if the RLS policies are correctly set up on the user_profiles table.`)
         </div>
             
             <DialogFooter>
-              <Button variant="outline" onClick={() => setImageEditorOpen(false)}>Cancel</Button>
-              <Button onClick={applyCrop}>Apply</Button>
+              <Button variant="outline" onClick={() => setImageEditorOpen(false)} disabled={loading}>Cancel</Button>
+              <Button onClick={applyCrop} disabled={loading}>
+                {loading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  'Apply'
+                )}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

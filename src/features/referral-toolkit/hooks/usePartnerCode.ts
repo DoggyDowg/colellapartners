@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 interface UsePartnerCodeProps {
   initialCode?: string
   onCodeChange?: (code: string) => void
+  onSaveComplete?: (code: string) => void
 }
 
 interface UsePartnerCodeReturn {
@@ -21,16 +22,19 @@ interface UsePartnerCodeReturn {
   hasChanges: boolean
   saving: boolean
   wasSaved: boolean
+  isEditing: boolean
   validationMessage: string | null
   handleCodeChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   handleSave: () => Promise<void>
   copyToClipboard: (text: string) => Promise<void>
   openUrl: () => void
+  setIsEditing: (editing: boolean) => void
 }
 
 export const usePartnerCode = ({ 
   initialCode = '', 
-  onCodeChange 
+  onCodeChange,
+  onSaveComplete
 }: UsePartnerCodeProps = {}): UsePartnerCodeReturn => {
   const { user } = useAuth()
   const [code, setCode] = useState(initialCode || '')
@@ -46,6 +50,7 @@ export const usePartnerCode = ({
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [wasSaved, setWasSaved] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
 
   // Initialize with existing partner code
   useEffect(() => {
@@ -122,6 +127,7 @@ export const usePartnerCode = ({
     const sanitizedValue = sanitizeCodeInput(e.target.value)
     setCode(sanitizedValue)
     setWasSaved(false) // Reset saved state when user types
+    setIsEditing(true) // Mark as editing when user types
     onCodeChange?.(sanitizedValue)
   }, [onCodeChange])
 
@@ -141,15 +147,17 @@ export const usePartnerCode = ({
 
       setHasChanges(false)
       setWasSaved(true)
+      setIsEditing(false)
       setCurrentInitialCode(partnerCode.code)
       toast.success('Partner code updated successfully!')
+      onSaveComplete?.(partnerCode.code)
     } catch (error) {
       console.error('Error saving partner code:', error)
       toast.error('Failed to save partner code. Please try again.')
     } finally {
       setSaving(false)
     }
-  }, [partnerCode.isValid, partnerCode.code, user?.id, hasChanges])
+  }, [partnerCode.isValid, partnerCode.code, user?.id, hasChanges, onSaveComplete])
 
   const copyToClipboard = useCallback(async (text: string) => {
     try {
@@ -167,6 +175,9 @@ export const usePartnerCode = ({
   }, [partnerCode.code])
 
   const getValidationMessage = useCallback((): string | null => {
+    // Only show validation messages when actively editing
+    if (!isEditing) return null
+    
     if (!(code || '').trim()) return null
     
     if (partnerCode.isChecking) {
@@ -175,6 +186,7 @@ export const usePartnerCode = ({
 
     // Use the validation utility to get consistent messages
     const trimmedCode = (code || '').trim().toUpperCase()
+    const currentCodeNormalized = (currentInitialCode || '').trim().toUpperCase()
     
     if (!/^[A-Z0-9]{3,6}$/.test(trimmedCode)) {
       return 'Code must be 3-6 characters, letters and numbers only'
@@ -187,6 +199,11 @@ export const usePartnerCode = ({
       return 'This code is reserved and cannot be used'
     }
 
+    // Check if this is the user's current code
+    if (trimmedCode === currentCodeNormalized && currentCodeNormalized) {
+      return 'This is your current code'
+    }
+
     if (!partnerCode.isUnique) {
       return 'This code is already taken'
     }
@@ -196,7 +213,7 @@ export const usePartnerCode = ({
     }
 
     return null
-  }, [code, partnerCode])
+  }, [code, partnerCode, isEditing, currentInitialCode])
 
   const referralUrl = generateReferralUrl(partnerCode.code)
   const validationMessage = getValidationMessage()
@@ -208,10 +225,12 @@ export const usePartnerCode = ({
     hasChanges,
     saving,
     wasSaved,
+    isEditing,
     validationMessage,
     handleCodeChange,
     handleSave,
     copyToClipboard,
-    openUrl
+    openUrl,
+    setIsEditing
   }
 } 

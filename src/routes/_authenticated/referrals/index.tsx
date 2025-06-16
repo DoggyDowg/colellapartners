@@ -21,6 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui
 import { ErrorState } from '../../../components/ui/error-state';
 import { handleError } from '../../../utils/error-handler';
 import { PartnerReferralForm } from '../../../components/referrals/PartnerReferralForm';
+import { Loader2 } from 'lucide-react';
+import { ReferralsPartnerSetupPrompt } from '../../../components/referrals/ReferralsPartnerSetupPrompt';
 
 // Define interfaces for our data
 interface Referral {
@@ -65,8 +67,8 @@ function UserReferrals() {
   const [error, setError] = useState<string | null>(null);
   const [statusHistory, setStatusHistory] = useState<StatusHistoryItem[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showSetupPrompt, setShowSetupPrompt] = useState(false);
 
-  // Move fetchReferrals to useCallback hook
   const fetchReferrals = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -91,30 +93,33 @@ function UserReferrals() {
         .eq('user_id', authUser.id)
         .single();
       
-      if (referrerError && referrerError.code !== 'PGRST116') {
-        // Only show error if it's not "No rows found" error
-        const errorMessage = handleError(referrerError, {
-          context: 'UserReferrals.fetchReferrals',
-          toastMessage: 'Error fetching your referrer profile',
-          showToast: false
-        });
-        setError(errorMessage);
-        return;
+      if (referrerError) {
+        if (referrerError.code === 'PGRST116') {
+          // No partner record found - show setup prompt
+          setShowSetupPrompt(true);
+          setReferrals([]);
+          setFilteredReferrals([]);
+          setTotalReferrals(0);
+          setCompletedReferrals(0);
+          setPendingReferrals(0);
+          setLoading(false);
+          return;
+        } else {
+          // Other error
+          const errorMessage = handleError(referrerError, {
+            context: 'UserReferrals.fetchReferrals',
+            toastMessage: 'Error fetching your referrer profile',
+            showToast: false
+          });
+          setError(errorMessage);
+          return;
+        }
       }
       
       if (referrerData) {
         // Use the existing referrer ID
         referrerId = referrerData.id;
-      } else {
-        // No referrer record found for this user
-        // We'll just show empty referrals
-        setReferrals([]);
-        setFilteredReferrals([]);
-        setTotalReferrals(0);
-        setCompletedReferrals(0);
-        setPendingReferrals(0);
-        setLoading(false);
-        return;
+        setShowSetupPrompt(false);
       }
       
       // Now fetch referrals with the correct referrer ID
@@ -162,11 +167,16 @@ function UserReferrals() {
     } finally {
       setLoading(false);
     }
-  }, [authUser]); // Only depends on authUser
+  }, [authUser]);
 
   useEffect(() => {
     fetchReferrals();
-  }, [fetchReferrals]); // Add fetchReferrals to dependency array
+  }, [fetchReferrals]);
+
+  const handleSetupComplete = () => {
+    setShowSetupPrompt(false);
+    fetchReferrals();
+  };
 
   // Apply search filter when searchQuery changes
   useEffect(() => {
@@ -270,19 +280,34 @@ function UserReferrals() {
     </Card>
   );
 
+  if (loading) {
+    return (
+      <>
+        <Header title="My Referrals" />
+        <div className="container py-6">
+          <div className="flex items-center justify-center h-96">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span>Loading referrals...</span>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
   if (error) {
     return (
       <>
         <Header title="My Referrals" />
         <div className="container py-6">
-          <h1 className="text-3xl font-bold mb-6">My Referrals</h1>
           <ErrorState 
             message={error}
-            onRetry={fetchReferrals}
+            onRetry={handleRefresh}
           />
         </div>
       </>
-    );
+    )
   }
 
   return (
@@ -446,26 +471,28 @@ function UserReferrals() {
                           <p><span className="font-medium">Type:</span> {selectedReferral.referee_type.charAt(0).toUpperCase() + selectedReferral.referee_type.slice(1)}</p>
                         </div>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-4">
+                      
                       <div>
                         <h3 className="text-sm font-medium text-muted-foreground">Referral Details</h3>
                         <div className="mt-1 space-y-2">
+                          <p><span className="font-medium">Status:</span> <Badge className={getStatusBadgeClass(selectedReferral.status)}>{selectedReferral.status}</Badge></p>
                           <p><span className="font-medium">Created:</span> {formatDate(selectedReferral.created_at)}</p>
-                          <p>
-                            <span className="font-medium">Status:</span>
-                            <Badge className={`ml-2 ${getStatusBadgeClass(selectedReferral.status)}`}>
-                              {selectedReferral.status}
-                            </Badge>
-                          </p>
                         </div>
                       </div>
-                      
+                    </div>
+                    
+                    <div className="space-y-4">
                       {selectedReferral.situation_description && (
                         <div>
                           <h3 className="text-sm font-medium text-muted-foreground">Situation Description</h3>
-                          <p className="mt-1">{selectedReferral.situation_description}</p>
+                          <p className="mt-1 text-sm">{selectedReferral.situation_description}</p>
+                        </div>
+                      )}
+                      
+                      {selectedReferral.additional_notes && (
+                        <div>
+                          <h3 className="text-sm font-medium text-muted-foreground">Additional Notes</h3>
+                          <p className="mt-1 text-sm">{selectedReferral.additional_notes}</p>
                         </div>
                       )}
                     </div>
@@ -473,45 +500,48 @@ function UserReferrals() {
                 </TabsContent>
                 
                 <TabsContent value="history" className="space-y-4">
-                  {loadingHistory ? (
-                    <div className="flex justify-center items-center h-40">
-                      <p>Loading history...</p>
-                    </div>
-                  ) : statusHistory.length === 0 ? (
-                    <div className="flex justify-center items-center h-20">
-                      <p className="text-muted-foreground">No status history found</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {statusHistory.map((historyItem) => (
-                        <Card key={historyItem.id}>
-                          <CardContent className="p-4">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <div className="font-medium">
-                                  Status changed to <Badge className={getStatusBadgeClass(historyItem.new_status)}>{historyItem.new_status}</Badge>
-                                </div>
-                                {historyItem.previous_status && (
-                                  <div className="text-sm text-muted-foreground">
-                                    Previous status: {historyItem.previous_status}
-                                  </div>
-                                )}
+                  <div className="py-4">
+                    <h3 className="text-lg font-medium mb-4">Status History</h3>
+                    
+                    {loadingHistory ? (
+                      <div className="flex justify-center items-center py-8">
+                        <p>Loading status history...</p>
+                      </div>
+                    ) : statusHistory.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">No status history available</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {statusHistory.map((item, _index) => (
+                          <div key={item.id} className="border-l-2 border-muted pl-4 relative">
+                            <div className="absolute w-3 h-3 bg-primary rounded-full -left-2 top-0"></div>
+                            <div className="pb-4">
+                              <div className="flex items-center justify-between">
+                                <h4 className="font-medium">
+                                  Status changed to: <Badge className={getStatusBadgeClass(item.new_status)}>{item.new_status}</Badge>
+                                </h4>
+                                <span className="text-sm text-muted-foreground">
+                                  {formatDate(item.created_at)}
+                                </span>
                               </div>
-                              <div className="text-sm text-muted-foreground">
-                                {formatDate(historyItem.created_at)}
-                              </div>
+                              {item.previous_status && (
+                                <p className="text-sm text-muted-foreground">
+                                  Previous status: {item.previous_status}
+                                </p>
+                              )}
+                              {item.notes && (
+                                <p className="text-sm mt-1">{item.notes}</p>
+                              )}
+                              {item.user_full_name && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Updated by: {item.user_full_name}
+                                </p>
+                              )}
                             </div>
-                            {historyItem.notes && (
-                              <div className="mt-2 text-sm">
-                                <div className="font-medium">Notes:</div>
-                                <div className="text-muted-foreground">{historyItem.notes}</div>
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </TabsContent>
               </Tabs>
               
@@ -524,6 +554,13 @@ function UserReferrals() {
           </Dialog>
         )}
       </div>
+
+      {/* Setup Prompt Dialog */}
+      <ReferralsPartnerSetupPrompt
+        isOpen={showSetupPrompt}
+        onClose={() => setShowSetupPrompt(false)}
+        onSetupComplete={handleSetupComplete}
+      />
     </>
-  );
+  )
 } 

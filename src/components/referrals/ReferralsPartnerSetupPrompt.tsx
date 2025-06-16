@@ -1,11 +1,16 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { PartnerSetupPromptProps } from '../types'
-import { Button } from '../../../components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogPortal, DialogOverlay } from '../../../components/ui/dialog'
+import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogPortal, DialogOverlay } from '../ui/dialog'
 import * as DialogPrimitive from '@radix-ui/react-dialog'
-import { cn } from '../../../lib/utils'
-import { ToolkitPartnerSetupForm } from './toolkit-partner-setup-form'
+import { cn } from '../../lib/utils'
+import { ToolkitPartnerSetupForm } from '../../features/referral-toolkit/components/toolkit-partner-setup-form'
+
+interface ReferralsPartnerSetupPromptProps {
+  isOpen: boolean
+  onClose: () => void
+  onSetupComplete: () => void
+}
 
 // Custom DialogContent without close button
 const DialogContentNoClose = ({ className, children, ...props }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
@@ -23,14 +28,14 @@ const DialogContentNoClose = ({ className, children, ...props }: React.Component
   </DialogPortal>
 )
 
-export function PartnerSetupPrompt({ isOpen, onClose, onSetupComplete }: PartnerSetupPromptProps) {
+export function ReferralsPartnerSetupPrompt({ isOpen, onClose, onSetupComplete }: ReferralsPartnerSetupPromptProps) {
   const [showSetupForm, setShowSetupForm] = useState(false)
   const navigate = useNavigate()
 
   if (!isOpen) return null
 
   const handleSetupClick = () => {
-    // Go directly to the setup form (skip the redundant confirmation)
+    // Go directly to the setup form
     setShowSetupForm(true)
   }
 
@@ -53,34 +58,34 @@ export function PartnerSetupPrompt({ isOpen, onClose, onSetupComplete }: Partner
 
   return (
     <>
-             {/* Main Setup Prompt Dialog */}
-       <Dialog open={isOpen && !showSetupForm}>
-         <DialogContentNoClose className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
-           <DialogHeader>
-             <DialogTitle className="pb-4">Welcome to the Referral Toolkit! 🎉</DialogTitle>
-             <DialogDescription className="space-y-3">
-               <p>
-                 To get started with your referral toolkit, let's quickly set up your Partner account.
-               </p>
-               <p className="font-medium text-foreground">
-                 This unlocks your ability to create referral codes, generate QR codes, and earn rewards for successful referrals.
-               </p>
-               <p className="text-sm text-muted-foreground">
-                 ⏱️ Takes just 1-2 minutes to complete
-               </p>
-             </DialogDescription>
-           </DialogHeader>
-           
-           <div className="flex gap-3 mt-6">
-             <Button onClick={handleSetupClick} className="flex-1">
-               Get Started (1-2 mins)
-             </Button>
-             <Button variant="outline" onClick={handleMaybeLater} className="flex-1">
-               Maybe Later
-             </Button>
-           </div>
-         </DialogContentNoClose>
-       </Dialog>
+      {/* Main Setup Prompt Dialog */}
+      <Dialog open={isOpen && !showSetupForm}>
+        <DialogContentNoClose className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="pb-4">Welcome to My Referrals! 🎯</DialogTitle>
+            <DialogDescription className="space-y-3">
+              <p>
+                To start tracking and managing your referrals, let's quickly set up your Partner account.
+              </p>
+              <p className="font-medium text-foreground">
+                This unlocks your ability to create referrals, track their progress, and earn rewards for successful conversions.
+              </p>
+              <p className="text-sm text-muted-foreground">
+                ⏱️ Takes just 1-2 minutes to complete
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="flex gap-3 mt-6">
+            <Button onClick={handleSetupClick} className="flex-1">
+              Get Started (1-2 mins)
+            </Button>
+            <Button variant="outline" onClick={handleMaybeLater} className="flex-1">
+              Maybe Later
+            </Button>
+          </div>
+        </DialogContentNoClose>
+      </Dialog>
 
       {/* Partner Setup Form Dialog */}
       <Dialog open={showSetupForm} onOpenChange={() => setShowSetupForm(false)}>

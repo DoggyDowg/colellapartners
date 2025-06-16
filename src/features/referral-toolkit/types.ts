@@ -84,6 +84,7 @@ export interface QRCodeGeneratorProps {
   partnerCode: string
   businessName: string
   onDownload: (format: 'png' | 'svg') => void
+  onQRCodeGenerated?: (dataUrl: string) => void
 }
 
 export interface LogoUploadProps {

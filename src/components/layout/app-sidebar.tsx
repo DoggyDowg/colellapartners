@@ -22,6 +22,8 @@ import { NavUser } from '@/components/layout/nav-user'
 import { sidebarData } from './data/sidebar-data'
 import supabase from '@/lib/supabase'
 import { useTheme } from '@/context/theme-context'
+import { useOrientationStore } from '@/stores/orientationStore'
+import { OrientationDialog } from '@/components/orientation/OrientationDialog'
 
 // Utility function for error handling
 const logError = (_message: string, _error: unknown): void => {
@@ -117,6 +119,8 @@ function SidebarLogo() {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { startOrientation } = useOrientationStore()
+  
   // Start with non-admin view by default (safer assumption)
   const [navGroups, setNavGroups] = useState(() => {
     // Try to get cached admin status
@@ -188,9 +192,20 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     };
   }, []);
 
+  // Global event listener for orientation:start
+  useEffect(() => {
+    const handleOrientationStart = () => {
+      startOrientation()
+    }
+
+    window.addEventListener('orientation:start', handleOrientationStart)
+    return () => window.removeEventListener('orientation:start', handleOrientationStart)
+  }, [startOrientation]);
+
   // If we're still loading and don't have a cached status, only show non-admin items
   if (isLoading) {
     return (
+      <>
       <Sidebar collapsible='icon' variant='floating' {...props}>
         <SidebarHeader>
           <SidebarLogo />
@@ -205,15 +220,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
+        <OrientationDialog />
+      </>
     );
   }
 
   return (
+    <>
     <Sidebar collapsible='icon' variant='floating' {...props}>
       <SidebarHeader>
         <SidebarLogo />
       </SidebarHeader>
-      <SidebarContent>
+                <SidebarContent>
         {navGroups.map((props) => (
           <NavGroupWithIndicators key={props.title} {...props} />
         ))}
@@ -223,5 +241,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+      <OrientationDialog />
+    </>
   )
 }

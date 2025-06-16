@@ -110,13 +110,13 @@ export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps
 
   const RewardsContent = () => (
     <>
-      <CardHeader>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle>Rewards Activity</CardTitle>
-            <CardDescription>Your recent reward transactions</CardDescription>
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base">Rewards Activity</CardTitle>
+            <CardDescription className="text-sm">Your recent reward transactions</CardDescription>
           </div>
-          <div className="text-right">
+          <div className="text-right sm:text-right">
             <p className="text-sm font-medium">Earned Rewards</p>
             <p className="text-2xl font-bold">{loading ? '...' : `$${totalPoints.toFixed(2)}`}</p>
           </div>
@@ -124,19 +124,19 @@ export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps
       </CardHeader>
       <CardContent className="flex-grow">
         {loading ? (
-          <div className="h-[148px] flex items-center justify-center">
-            <p>Loading rewards activity...</p>
+          <div className="flex items-center justify-center h-32">
+            <p className="text-sm text-muted-foreground">Loading rewards activity...</p>
           </div>
         ) : error ? (
-          <div className="h-[148px] flex items-center justify-center text-center">
-            <p className="text-muted-foreground">{error}</p>
+          <div className="flex items-center justify-center text-center h-32">
+            <p className="text-muted-foreground text-sm">{error}</p>
           </div>
         ) : hasRewards ? (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {activities.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <div className={`p-2 rounded-full mr-3 ${
+              <div key={activity.id} className="flex items-center justify-between gap-3">
+                <div className="flex items-center min-w-0 flex-1">
+                  <div className={`p-2 rounded-full mr-3 flex-shrink-0 ${
                     activity.status === 'pending' || activity.status === 'approved' 
                       ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
                       : 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300'
@@ -147,8 +147,8 @@ export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps
                       <IconGift className="h-4 w-4" />
                     )}
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium truncate">
                       {activity.reward_type === 'cash' ? 'Cash Reward' : 'Gift Card'} 
                       {activity.status === 'pending' ? ' (Pending)' : 
                        activity.status === 'approved' ? ' (Approved)' : ' (Paid)'}
@@ -156,7 +156,7 @@ export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps
                     <p className="text-xs text-muted-foreground">{formatDate(activity.created_at)}</p>
                   </div>
                 </div>
-                <Badge variant={activity.status === 'pending' || activity.status === 'approved' ? 'default' : 'outline'}>
+                <Badge variant={activity.status === 'pending' || activity.status === 'approved' ? 'default' : 'outline'} className="flex-shrink-0">
                   ${activity.amount.toFixed(2)}
                 </Badge>
               </div>
@@ -166,7 +166,7 @@ export function RewardsActivity({ userId, noCard = false }: RewardsActivityProps
           <EmptyRewardsState />
         )}
       </CardContent>
-      <CardFooter className="mt-auto pt-2">
+      <CardFooter className="pt-3">
         <Button asChild variant="outline" className="w-full">
           <Link to="/rewards">
             View All Rewards

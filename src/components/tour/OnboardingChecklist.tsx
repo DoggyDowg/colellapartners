@@ -10,10 +10,10 @@ import {
   IconChevronUp,
   IconUser,
   IconUserPlus,
-  IconGift,
   IconSettings,
   IconArrowRight,
-  IconExternalLink
+  IconExternalLink,
+  IconPhotoScan
 } from '@tabler/icons-react'
 import { Link } from '@tanstack/react-router'
 import { useOrientationStore } from '@/stores/orientationStore'
@@ -135,13 +135,13 @@ export function OnboardingChecklist({ className, isCollapsible = true }: Onboard
             required: false,
           },
           {
-            id: 'explore-rewards',
-            title: 'Explore Rewards',
-            description: 'See what rewards you can earn',
-            icon: <IconGift className="h-5 w-5" />,
-            completed: false, // This could be tracked based on visits
-            actionText: 'View Rewards',
-            actionLink: '/rewards',
+            id: 'create-marketing-material',
+            title: 'Create Marketing Material',
+            description: 'Design and download professional marketing assets',
+            icon: <IconPhotoScan className="h-5 w-5" />,
+            completed: false, // This can be tracked later if needed
+            actionText: 'View Materials',
+            actionLink: '/referral-toolkit?tab=materials',
             required: false,
           },
         ]

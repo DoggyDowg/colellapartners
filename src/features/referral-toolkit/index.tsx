@@ -14,8 +14,11 @@ import { LogoUpload } from './components/logo-upload'
 import { ProfileEditor } from './components/profile-editor'
 import { PDFGenerator } from './components/pdf-generator'
 
+interface ReferralToolkitProps {
+  defaultTab?: string
+}
 
-export function ReferralToolkit() {
+export function ReferralToolkit({ defaultTab = 'partner-code' }: ReferralToolkitProps) {
   const { user } = useAuth()
   const [partnerData, setPartnerData] = useState<PartnerData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -204,7 +207,7 @@ export function ReferralToolkit() {
           </div>
         </div>
 
-        <Tabs defaultValue="partner-code" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="partner-code">Partner Code</TabsTrigger>
             <TabsTrigger value="qr-code">QR Code</TabsTrigger>

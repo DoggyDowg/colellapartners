@@ -6,5 +6,6 @@ export const Route = createLazyFileRoute('/_authenticated/referral-toolkit')({
 })
 
 function ReferralToolkitPage() {
-  return <ReferralToolkit />
+  const { tab } = Route.useSearch()
+  return <ReferralToolkit defaultTab={tab} />
 } 

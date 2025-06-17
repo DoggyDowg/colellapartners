@@ -7,6 +7,7 @@ import { AppSidebar } from '@/components/layout/app-sidebar'
 import SkipToMain from '@/components/skip-to-main'
 import supabase from '@/lib/supabase'
 import { NotificationsProvider } from '@/providers/NotificationsProvider'
+import { z } from 'zod'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
@@ -20,6 +21,9 @@ export const Route = createFileRoute('/_authenticated')({
       });
     }
   },
+  validateSearch: z.object({
+    tab: z.string().optional().catch('partner-code'),
+  }),
   component: RouteComponent,
 })
 

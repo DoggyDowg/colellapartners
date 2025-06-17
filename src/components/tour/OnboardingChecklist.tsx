@@ -235,7 +235,7 @@ export function OnboardingChecklist({ className, isCollapsible = true }: Onboard
           {checklistItems.map((item) => (
             <div
               key={item.id}
-              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+              className={`flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg border transition-colors ${
                 item.completed 
                   ? 'bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-800' 
                   : 'bg-muted/50 border-border hover:bg-muted'
@@ -268,7 +268,7 @@ export function OnboardingChecklist({ className, isCollapsible = true }: Onboard
               </div>
 
               {!item.completed && item.actionText && (
-                <div>
+                <div className="ml-11 sm:ml-0 sm:flex-shrink-0">
                   {item.actionLink ? (
                     <Button size="sm" variant="outline" asChild>
                       <Link to={item.actionLink}>

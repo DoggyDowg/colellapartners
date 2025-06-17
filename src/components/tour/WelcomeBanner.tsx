@@ -1,8 +1,8 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { IconRocket, IconX, IconArrowRight, IconSparkles } from '@tabler/icons-react'
+import { IconRocket, IconX, IconSparkles } from '@tabler/icons-react'
+import { Luggage } from 'lucide-react'
 import { useOrientationStore } from '@/stores/orientationStore'
 
 interface WelcomeBannerProps {
@@ -88,16 +88,14 @@ export function WelcomeBanner({ onDismiss, className }: WelcomeBannerProps) {
               <Button 
                 onClick={handleStartOrientation}
                 className="flex-1"
-                size="sm"
               >
-                <IconArrowRight className="h-4 w-4 mr-2" />
-                Start Orientation
+                <Luggage className="h-4 w-4 mr-2" />
+                Take a Tour
               </Button>
               <Button 
                 variant="outline" 
                 onClick={handleDismiss}
                 className="flex-1"
-                size="sm"
               >
                 Maybe Later
               </Button>

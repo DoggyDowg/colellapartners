@@ -1,5 +1,4 @@
 import {
-  IconHelp,
   IconLayoutDashboard,
   IconPalette,
   IconSettings,
@@ -17,7 +16,7 @@ import {
   IconInfoCircle,
   IconFileText,
 } from '@tabler/icons-react'
-import { AudioWaveform, GalleryVerticalEnd, SquareUser, Wrench } from 'lucide-react'
+import { AudioWaveform, GalleryVerticalEnd, SquareUser, Wrench, Luggage } from 'lucide-react'
 import { type SidebarData } from '../types'
 import { ColellaSiteIcon } from '../ColellaSiteIcon'
 
@@ -171,7 +170,7 @@ export const sidebarData: SidebarData = {
         {
           title: 'Take a Tour',
           url: '#take-tour',
-          icon: IconHelp,
+          icon: Luggage,
           onClick: () => {
             // This will be handled in the nav group component
             const event = new CustomEvent('orientation:start')
